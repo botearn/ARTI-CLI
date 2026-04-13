@@ -1,11 +1,13 @@
 /**
- * scan 命令 — 技术指标扫描
+ * scan 命令 — 技术指标扫描（OpenBB 数据源）
  * 用法：arti scan AAPL
  */
 import chalk from "chalk";
 import ora from "ora";
-import { scanStock } from "../api.js";
+import { getTechnical, type TechnicalData } from "../openbb.js";
 import { title, kvLine, divider, colorChange } from "../format.js";
+import { printError } from "../errors.js";
+import { output } from "../output.js";
 
 export async function scanCommand(symbol: string): Promise<void> {
   if (!symbol) {
@@ -17,74 +19,103 @@ export async function scanCommand(symbol: string): Promise<void> {
   const spinner = ora(`扫描 ${symbol} 技术指标...`).start();
 
   try {
-    const data = await scanStock(symbol);
+    const data = await getTechnical(symbol);
     spinner.stop();
 
-    console.log(title(`${symbol} 技术扫描`));
-
-    // 基础信息
-    if (data.price !== undefined) {
-      console.log(kvLine("  当前价格", chalk.bold(`$${data.price}`)));
-    }
-    if (data.change_percent !== undefined) {
-      console.log(kvLine("  涨跌幅", colorChange(data.change_percent as number, "%")));
+    if (data.error) {
+      console.log(chalk.red(`  ${data.error}`));
+      return;
     }
 
-    // 均线
-    const maKeys = ["ma5", "ma10", "ma20", "ma60", "ma200"];
-    const maValues = maKeys.filter(k => data[k] !== undefined && data[k] !== null);
-    if (maValues.length) {
-      console.log(chalk.gray("\n  均线系统:"));
-      for (const k of maValues) {
-        const val = data[k] as number;
-        const label = k.toUpperCase();
-        const aboveBelow = data.price
-          ? (data.price as number) > val
+    output(data, () => {
+      console.log(title(`${symbol} 技术扫描`));
+
+      // 基础信息
+      console.log(kvLine("  当前价格", chalk.bold(`$${data.price.toFixed(2)}`)));
+      console.log(kvLine("  涨跌", colorChange(data.change)));
+      console.log(kvLine("  涨跌幅", colorChange(data.change_percent, "%")));
+
+      // 均线系统
+      if (Object.keys(data.ma).length) {
+        console.log(chalk.gray("\n  均线系统:"));
+        for (const [label, val] of Object.entries(data.ma)) {
+          const aboveBelow = data.price > val
             ? chalk.red("▲ 在上方")
-            : chalk.green("▼ 在下方")
-          : "";
-        console.log(`    ${chalk.white(label.padEnd(8))} ${chalk.bold(val.toFixed(2).padStart(10))} ${aboveBelow}`);
+            : chalk.green("▼ 在下方");
+          console.log(`    ${chalk.white(label.padEnd(8))} ${chalk.bold(val.toFixed(2).padStart(10))} ${aboveBelow}`);
+        }
       }
-    }
 
-    // RSI
-    if (data.rsi !== undefined && data.rsi !== null) {
-      const rsi = data.rsi as number;
-      let rsiColor = chalk.white;
-      let rsiLabel = "中性";
-      if (rsi > 70) { rsiColor = chalk.red; rsiLabel = "超买"; }
-      else if (rsi < 30) { rsiColor = chalk.green; rsiLabel = "超卖"; }
-      console.log(`\n  ${chalk.gray("RSI(14):")}     ${rsiColor(`${rsi.toFixed(1)} ${rsiLabel}`)}`);
-    }
-
-    // MACD
-    if (data.macd !== undefined) {
-      const macd = data.macd as Record<string, number>;
-      if (macd.macd !== undefined) {
-        console.log(chalk.gray("\n  MACD:"));
-        console.log(`    DIF:      ${chalk.bold(macd.macd?.toFixed(4) ?? "N/A")}`);
-        console.log(`    DEA:      ${chalk.bold(macd.signal?.toFixed(4) ?? "N/A")}`);
-        console.log(`    柱状:     ${colorChange(macd.histogram ?? 0)}`);
+      // RSI
+      if (data.rsi !== null) {
+        let rsiColor = chalk.white;
+        let rsiLabel = "中性";
+        if (data.rsi > 70) { rsiColor = chalk.red; rsiLabel = "超买"; }
+        else if (data.rsi < 30) { rsiColor = chalk.green; rsiLabel = "超卖"; }
+        console.log(`\n  ${chalk.gray("RSI(14):")}     ${rsiColor(`${data.rsi.toFixed(1)} ${rsiLabel}`)}`);
       }
-    }
 
-    // AI 解读
-    if (data.ai_summary) {
-      console.log(chalk.gray("\n  AI 解读:"));
-      const summary = String(data.ai_summary);
-      console.log(summary.split("\n").map(l => `    ${l}`).join("\n"));
-    }
+      // MACD
+      if (data.macd) {
+        console.log(chalk.gray("\n  MACD(12,26,9):"));
+        console.log(`    DIF:      ${chalk.bold(data.macd.MACD.toFixed(4))}`);
+        console.log(`    DEA:      ${chalk.bold(data.macd.signal.toFixed(4))}`);
+        console.log(`    柱状:     ${colorChange(data.macd.histogram)}`);
+      }
 
-    // 交易信号
-    if (data.signal) {
-      const signal = String(data.signal);
-      const signalColor = signal.includes("买") ? chalk.red : signal.includes("卖") ? chalk.green : chalk.yellow;
-      console.log(`\n  ${chalk.bold("信号:")} ${signalColor(signal)}`);
-    }
+      // 布林带
+      if (data.bbands) {
+        console.log(chalk.gray("\n  布林带(20,2):"));
+        console.log(`    上轨:     ${chalk.red(data.bbands.upper.toFixed(2))}`);
+        console.log(`    中轨:     ${chalk.white(data.bbands.middle.toFixed(2))}`);
+        console.log(`    下轨:     ${chalk.green(data.bbands.lower.toFixed(2))}`);
+      }
 
-    console.log(divider());
+      // ATR
+      if (data.atr !== null) {
+        console.log(`\n  ${chalk.gray("ATR(14):")}     ${chalk.yellow(data.atr.toFixed(2))}`);
+      }
+
+      // ADX
+      if (data.adx !== null) {
+        const adxLabel = data.adx > 25 ? "趋势较强" : "趋势较弱";
+        console.log(`  ${chalk.gray("ADX(14):")}     ${chalk.yellow(`${data.adx.toFixed(1)} ${adxLabel}`)}`);
+      }
+
+      // Stochastic
+      if (data.stochastic) {
+        console.log(chalk.gray("\n  Stochastic(14,3,3):"));
+        console.log(`    %K:       ${chalk.bold(data.stochastic.K.toFixed(1))}`);
+        console.log(`    %D:       ${chalk.bold(data.stochastic.D.toFixed(1))}`);
+      }
+
+      // OBV
+      if (data.obv !== null) {
+        console.log(`\n  ${chalk.gray("OBV:")}         ${chalk.yellow(data.obv.toLocaleString())}`);
+      }
+
+      // 综合信号
+      if (data.signals.length) {
+        console.log(chalk.gray("\n  技术信号:"));
+        for (const sig of data.signals) {
+          const isBull = sig.includes("超卖") || sig.includes("多头") || sig.includes("突破布林上轨");
+          const isBear = sig.includes("超买") || sig.includes("空头") || sig.includes("跌破布林下轨");
+          const color = isBull ? chalk.red : isBear ? chalk.green : chalk.yellow;
+          console.log(`    ${color("•")} ${sig}`);
+        }
+      }
+
+      // 综合判断
+      const signalColor =
+        data.overall_signal === "偏多" ? chalk.red :
+        data.overall_signal === "偏空" ? chalk.green :
+        chalk.yellow;
+      console.log(`\n  ${chalk.bold("综合研判:")} ${signalColor(data.overall_signal)}`);
+
+      console.log(divider());
+    });
   } catch (err) {
     spinner.fail("技术扫描失败");
-    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    printError(err);
   }
 }

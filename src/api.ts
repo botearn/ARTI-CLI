@@ -1,9 +1,9 @@
 /**
  * Supabase Edge Function 调用封装
  * 直接 HTTP 调用，无需认证（verify_jwt = false）
+ * 支持超时控制和自动重试
  */
-
-const BASE_URL = "https://xzxcpastkeinorggtjaa.supabase.co/functions/v1";
+import { loadConfig } from "./config.js";
 
 export class ApiError extends Error {
   constructor(
@@ -16,27 +16,71 @@ export class ApiError extends Error {
   }
 }
 
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1000;
+
+function isRetryable(err: unknown): boolean {
+  // 网络层错误：可重试
+  if (err instanceof TypeError) return true;
+  // 5xx 服务端错误：可重试
+  if (err instanceof ApiError && err.status >= 500) return true;
+  return false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function callEdge<T>(
   functionName: string,
   body: Record<string, unknown>,
 ): Promise<T> {
-  const res = await fetch(`${BASE_URL}/${functionName}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const config = loadConfig();
+  const baseUrl = config.api.baseUrl;
+  const timeout = config.api.timeout;
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "unknown error");
-    let msg = text;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const json = JSON.parse(text);
-      if (json.error) msg = json.error;
-    } catch { /* 非 JSON，用原始文本 */ }
-    throw new ApiError(functionName, res.status, msg);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeout);
+
+      const res = await fetch(`${baseUrl}/${functionName}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "unknown error");
+        let msg = text;
+        try {
+          const json = JSON.parse(text);
+          if (json.error) msg = json.error;
+        } catch { /* 非 JSON，用原始文本 */ }
+        throw new ApiError(functionName, res.status, msg);
+      }
+
+      return res.json() as Promise<T>;
+    } catch (err) {
+      lastError = err;
+      // AbortController 超时转为友好错误
+      if (err instanceof DOMException && err.name === "AbortError") {
+        lastError = new Error(`请求超时（${timeout / 1000}s）: ${functionName}`);
+      }
+      if (attempt < MAX_RETRIES && isRetryable(err)) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        continue;
+      }
+      break;
+    }
   }
 
-  return res.json() as Promise<T>;
+  throw lastError;
 }
 
 // ── 行情接口 ──

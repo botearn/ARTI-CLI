@@ -12,6 +12,8 @@ import {
   type ResearchReport,
 } from "../api.js";
 import { title, divider, sentimentBadge, confidenceBar } from "../format.js";
+import { printError } from "../errors.js";
+import { output } from "../output.js";
 
 export async function researchCommand(
   symbol: string,
@@ -52,58 +54,71 @@ export async function researchCommand(
     );
 
     spinner.stop();
-    console.log(title(`${symbol} 多维度研报`));
 
-    for (const result of results) {
-      if (result.status === "rejected") {
-        console.log(chalk.red(`  分析师调用失败: ${result.reason}`));
-        console.log(divider());
-        continue;
-      }
-
-      const { agentType, report } = result.value;
-      const label = AGENT_LABELS[agentType] || agentType;
-
-      console.log(
-        `\n  ${chalk.bold.magenta(`【${label}】`)} ${sentimentBadge(report.sentiment)}`
-      );
-      console.log(`  ${chalk.bold(report.title)}`);
-      console.log(`  ${chalk.gray(report.summary)}`);
-      console.log(`  置信度: ${confidenceBar(report.confidence)}`);
-
-      if (report.keyPoints.length) {
-        console.log(chalk.gray("  要点:"));
-        for (const point of report.keyPoints) {
-          console.log(`    ${chalk.yellow("•")} ${point}`);
-        }
-      }
-
-      if (options.full) {
-        console.log(chalk.gray("\n  ── 完整报告 ──"));
-        console.log(report.fullReport.split("\n").map(l => `  ${l}`).join("\n"));
-      }
-
-      console.log(divider());
-    }
-
-    // 汇总
+    // 构建 JSON 数据
     const completed = results.filter(
       (r): r is PromiseFulfilledResult<{ agentType: string; report: ResearchReport }> =>
         r.status === "fulfilled",
     );
-    const bullish = completed.filter(r => r.value.report.sentiment === "看多").length;
-    const bearish = completed.filter(r => r.value.report.sentiment === "看空").length;
-    const neutral = completed.filter(r => r.value.report.sentiment === "中性").length;
+    const jsonData = {
+      symbol,
+      reports: completed.map(r => ({
+        agent: r.value.agentType,
+        label: AGENT_LABELS[r.value.agentType] || r.value.agentType,
+        ...r.value.report,
+      })),
+      summary: {
+        bullish: completed.filter(r => r.value.report.sentiment === "看多").length,
+        bearish: completed.filter(r => r.value.report.sentiment === "看空").length,
+        neutral: completed.filter(r => r.value.report.sentiment === "中性").length,
+      },
+    };
 
-    console.log(
-      `\n  ${chalk.bold("综合意见:")} ` +
-      `${chalk.red(`看多 ${bullish}`)} | ` +
-      `${chalk.green(`看空 ${bearish}`)} | ` +
-      `${chalk.yellow(`中性 ${neutral}`)}`
-    );
-    console.log();
+    output(jsonData, () => {
+      console.log(title(`${symbol} 多维度研报`));
+
+      for (const result of results) {
+        if (result.status === "rejected") {
+          console.log(chalk.red(`  分析师调用失败: ${result.reason}`));
+          console.log(divider());
+          continue;
+        }
+
+        const { agentType, report } = result.value;
+        const label = AGENT_LABELS[agentType] || agentType;
+
+        console.log(
+          `\n  ${chalk.bold.magenta(`【${label}】`)} ${sentimentBadge(report.sentiment)}`
+        );
+        console.log(`  ${chalk.bold(report.title)}`);
+        console.log(`  ${chalk.gray(report.summary)}`);
+        console.log(`  置信度: ${confidenceBar(report.confidence)}`);
+
+        if (report.keyPoints.length) {
+          console.log(chalk.gray("  要点:"));
+          for (const point of report.keyPoints) {
+            console.log(`    ${chalk.yellow("•")} ${point}`);
+          }
+        }
+
+        if (options.full) {
+          console.log(chalk.gray("\n  ── 完整报告 ──"));
+          console.log(report.fullReport.split("\n").map(l => `  ${l}`).join("\n"));
+        }
+
+        console.log(divider());
+      }
+
+      console.log(
+        `\n  ${chalk.bold("综合意见:")} ` +
+        `${chalk.red(`看多 ${jsonData.summary.bullish}`)} | ` +
+        `${chalk.green(`看空 ${jsonData.summary.bearish}`)} | ` +
+        `${chalk.yellow(`中性 ${jsonData.summary.neutral}`)}`
+      );
+      console.log();
+    });
   } catch (err) {
     spinner.fail("研报生成失败");
-    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    printError(err);
   }
 }

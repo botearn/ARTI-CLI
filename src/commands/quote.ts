@@ -1,11 +1,13 @@
 /**
- * quote 命令 — 实时行情查询
- * 用法：arti quote AAPL NVDA 0700.HK
+ * quote 命令 — 实时行情查询（OpenBB 数据源）
+ * 用法：arti quote AAPL NVDA BTCUSD
  */
 import chalk from "chalk";
 import ora from "ora";
-import { fetchQuotes, resolveStock } from "../api.js";
+import { getQuote, getHistorical, searchEquity, type QuoteData } from "../openbb.js";
 import { colorChange, kvLine, divider, title, sparkline } from "../format.js";
+import { printError } from "../errors.js";
+import { output } from "../output.js";
 
 export async function quoteCommand(symbols: string[]): Promise<void> {
   if (!symbols.length) {
@@ -16,18 +18,24 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
   const spinner = ora("获取行情数据...").start();
 
   try {
-    // 尝试解析非标准输入（如"苹果"、"腾讯"）
+    // 解析 symbols：标准代码直接用，中文名先搜索
     const resolved: string[] = [];
     for (const s of symbols) {
-      if (/^[A-Z0-9.]+$/i.test(s)) {
+      if (/^[A-Z0-9.^=]+$/i.test(s)) {
         resolved.push(s.toUpperCase());
       } else {
-        spinner.text = `解析 "${s}"...`;
-        const sym = await resolveStock(s);
-        if (sym) {
-          resolved.push(sym);
-        } else {
-          spinner.warn(`无法识别 "${s}"，已跳过`);
+        spinner.text = `搜索 "${s}"...`;
+        try {
+          const results = await searchEquity(s, 1);
+          if (results.length && results[0].symbol) {
+            resolved.push(results[0].symbol);
+            spinner.text = `"${s}" → ${results[0].symbol}`;
+          } else {
+            spinner.warn(`无法识别 "${s}"，已跳过`);
+            spinner.start();
+          }
+        } catch {
+          spinner.warn(`搜索 "${s}" 失败，已跳过`);
           spinner.start();
         }
       }
@@ -38,46 +46,67 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
       return;
     }
 
-    spinner.text = "获取实时行情...";
-    const { quotes, indices } = await fetchQuotes(resolved.join(","));
+    // 并行获取所有报价
+    spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
+    const quoteResults = await Promise.allSettled(
+      resolved.map(async (sym) => {
+        const quote = await getQuote(sym);
+        // 获取近 20 日历史用于 sparkline
+        let prices: number[] = [];
+        try {
+          const hist = await getHistorical(sym, 20);
+          prices = hist.map(h => h.close);
+        } catch { /* sparkline 失败不阻断 */ }
+        return { quote, prices };
+      }),
+    );
+
     spinner.stop();
 
-    // 显示大盘指数
-    if (indices.length) {
-      console.log(title("大盘指数"));
-      for (const idx of indices) {
-        console.log(
-          `  ${chalk.white(idx.nameZh.padEnd(10))} ` +
-          `${chalk.bold(idx.value.toLocaleString().padStart(10))} ` +
-          `${colorChange(idx.change).padStart(10)} ` +
-          `${colorChange(idx.changePercent, "%")}`
-        );
-      }
-      console.log();
-    }
+    const quotes = quoteResults
+      .filter((r): r is PromiseFulfilledResult<{ quote: QuoteData; prices: number[] }> =>
+        r.status === "fulfilled")
+      .map(r => r.value);
 
-    // 显示个股行情
-    if (quotes.length) {
-      console.log(title("个股行情"));
-      for (const q of quotes) {
-        const marketTag = chalk.gray(`[${q.market}]`);
+    const jsonData = { quotes: quotes.map(q => ({ ...q.quote, sparkline: q.prices })) };
+
+    output(jsonData, () => {
+      if (!quotes.length) {
+        console.log(chalk.yellow("  未获取到行情数据"));
+        return;
+      }
+
+      console.log(title("实时行情"));
+
+      for (const { quote: q, prices } of quotes) {
+        const price = q.last_price || q.prev_close || 0;
+        const change = q.change ?? (q.prev_close ? price - q.prev_close : 0);
+        const changePct = q.change_percent ?? (q.prev_close ? (change / q.prev_close) * 100 : 0);
+
         console.log(
-          `  ${marketTag} ${chalk.bold.white(q.symbol.padEnd(8))} ${chalk.gray(q.nameZh)}`
+          `  ${chalk.bold.white(q.symbol.padEnd(10))} ${chalk.gray(q.name || "")}`
         );
-        console.log(kvLine("    价格", chalk.bold("$" + q.price.toFixed(2))));
-        console.log(kvLine("    涨跌", colorChange(q.change)));
-        console.log(kvLine("    涨跌幅", colorChange(q.changePercent, "%")));
-        console.log(kvLine("    成交量", chalk.yellow(q.volume)));
-        if (q.sparkline.length) {
-          console.log(kvLine("    走势", chalk.cyan(sparkline(q.sparkline))));
+        console.log(kvLine("    价格", chalk.bold(`$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)));
+        console.log(kvLine("    涨跌", colorChange(change)));
+        console.log(kvLine("    涨跌幅", colorChange(changePct, "%")));
+        console.log(kvLine("    成交量", chalk.yellow(q.volume?.toLocaleString() || "N/A")));
+
+        if (q.year_high && q.year_low) {
+          console.log(kvLine("    52周范围", `${chalk.green(q.year_low.toFixed(2))} — ${chalk.red(q.year_high.toFixed(2))}`));
         }
+        if (q.ma_50d) {
+          console.log(kvLine("    50日均线", chalk.white(q.ma_50d.toFixed(2))));
+        }
+
+        if (prices.length) {
+          console.log(kvLine("    走势", chalk.cyan(sparkline(prices))));
+        }
+
         console.log(divider());
       }
-    } else {
-      console.log(chalk.yellow("  未找到行情数据"));
-    }
+    });
   } catch (err) {
     spinner.fail("获取行情失败");
-    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    printError(err);
   }
 }

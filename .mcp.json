@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "arti": {
+      "command": "node",
+      "args": ["dist/mcp-server.js"],
+      "cwd": "/Users/nicolechen/ARTI-CLI",
+      "env": {
+        "PATH": "/Users/nicolechen/ARTI-CLI/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
