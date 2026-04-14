@@ -80,19 +80,28 @@ export async function watchCommand(symbols: string[], opts?: WatchOptions): Prom
     console.log(chalk.gray("\n  " + "─".repeat(70)));
   }
 
-  // 首次刷新
-  await refresh();
+  // 用 setTimeout 递归代替 setInterval，确保上一轮完成后再排下一轮
+  // 避免慢网络下 refresh 未完成就触发下一次
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
-  // 轮询
-  const timer = setInterval(refresh, intervalSec * 1000);
+  async function loop(): Promise<void> {
+    await refresh();
+    if (!stopped) {
+      timer = setTimeout(loop, intervalSec * 1000);
+    }
+  }
 
-  // 优雅退出
-  process.on("SIGINT", () => {
-    clearInterval(timer);
-    console.log(chalk.gray("\n\n  已停止监控\n"));
-    process.exit(0);
+  // 首次刷新 + 启动循环
+  await loop();
+
+  // 优雅退出：用 once 避免 REPL 多次调用时累积 listener
+  await new Promise<void>((resolve) => {
+    process.once("SIGINT", () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      console.log(chalk.gray("\n\n  已停止监控\n"));
+      resolve();
+    });
   });
-
-  // 保持进程运行
-  await new Promise(() => {});
 }
