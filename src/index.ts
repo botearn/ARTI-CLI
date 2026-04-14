@@ -97,23 +97,28 @@ program
   $ arti news TSLA --json        # JSON 输出`)
   .action((symbol, opts) => newsCommand(symbol, { limit: parseInt(opts.limit, 10) }));
 
-// ── research：多维研报（保留，仍走 Edge Function） ──
+// ── research：三层级 AI 研报（Orchestrator SSE） ──
 program
   .command("research")
-  .description("生成多维度 AI 研报（7 位分析师并行，需要后端服务）")
+  .description("三层级 AI 研报（分析师 → 大师辩论 → 圆桌裁定）")
   .argument("<symbol>", "股票代码")
-  .option("-a, --agent <type>", "指定单个分析师: natasha|steve|tony|thor|clint|sam|vision")
+  .option("-a, --agent <type>", "仅调单个分析师: natasha|steve|tony|thor|clint|sam|vision|wanda")
   .option("-f, --full", "显示完整报告（默认仅摘要）")
+  .option("-m, --mode <mode>", "研报模式: full | layer1-only", "full")
   .addHelpText("after", `
 示例:
-  $ arti research AAPL           # 7 位分析师并行研报
-  $ arti research NVDA -a tony   # 仅 Tony（技术面）分析
-  $ arti research TSLA -f        # 显示完整报告
+  $ arti research AAPL             # 完整三层级研报
+  $ arti research NVDA -a tony     # 仅 Tony（技术面）快速分析
+  $ arti research TSLA -f          # 显示完整报告
+  $ arti research AAPL -m layer1-only  # 仅 Layer 1 分析师，跳过大师辩论
 
-分析师:
-  natasha — 风险评估    steve — 价值投资    tony — 技术分析
-  thor    — 宏观视角    clint — 事件驱动    sam  — 动量策略
-  vision  — 量化模型`)
+三层结构:
+  Layer 1 — 8 位分析师并行分析
+    natasha(情报·宏观) steve(板块轮动) tony(技术面) thor(风控)
+    clint(基本面) sam(收益分析) vision(量化验证) wanda(组合策略)
+  Layer 2 — 投资大师圆桌辩论（动态路由）
+    巴菲特 林奇 马克斯 索罗斯 达里奥 德鲁肯米勒 段永平
+  Layer 3 — 综合裁定（多空联盟 + 分歧点 + 失败信号）`)
   .action(researchCommand);
 
 // ── config：配置管理 ──
@@ -250,12 +255,15 @@ registerCommand({
 });
 registerCommand({
   name: "research", aliases: ["r"],
-  description: "AI 多维研报", usage: "research <symbol> [--agent <type>]",
+  description: "三层级 AI 研报", usage: "research <symbol> [--agent <type>] [--mode full|layer1-only]",
   handler: (args) => {
     const symbol = args[0];
     const agentIdx = args.indexOf("--agent");
     const agent = agentIdx !== -1 ? args[agentIdx + 1] : undefined;
-    return researchCommand(symbol, { agent });
+    const modeIdx = args.indexOf("--mode");
+    const mode = modeIdx !== -1 ? args[modeIdx + 1] : undefined;
+    const full = args.includes("--full") || args.includes("-f");
+    return researchCommand(symbol, { agent, mode, full });
   },
 });
 registerCommand({

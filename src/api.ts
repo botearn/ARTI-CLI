@@ -127,7 +127,44 @@ export interface ResearchReport {
   fullReport: string;
 }
 
-export const AGENT_TYPES = ["natasha", "steve", "tony", "thor", "clint", "sam", "vision"] as const;
+export interface MasterOpinion {
+  role: string;
+  stance: string;
+  content: string;
+}
+
+export interface SynthesisResult {
+  bull_coalition?: string;
+  bear_challenge?: string;
+  key_divergence?: string;
+  roundtable_verdict?: string;
+  failure_signals?: string[];
+  raw_synthesis?: string;
+}
+
+export interface OrchestratorSSEEvent {
+  type: string;
+  // layer1_agent_done
+  agent?: string;
+  label?: string;
+  report?: ResearchReport;
+  error?: string;
+  // router_done
+  rule?: string;
+  selectedMasters?: string[];
+  reasoning?: string;
+  // layer2_master_done
+  master?: string;
+  opinion?: MasterOpinion;
+  // synthesis
+  // layer1_complete
+  summary?: string;
+  // route_info
+  layer1Agents?: string[];
+  theme?: string | null;
+}
+
+export const AGENT_TYPES = ["natasha", "steve", "tony", "thor", "clint", "sam", "vision", "wanda"] as const;
 
 export const AGENT_LABELS: Record<string, string> = {
   natasha: "情报·宏观",
@@ -137,6 +174,17 @@ export const AGENT_LABELS: Record<string, string> = {
   clint: "基本面",
   sam: "收益分析",
   vision: "量化验证",
+  wanda: "组合策略",
+};
+
+export const MASTER_LABELS: Record<string, string> = {
+  buffett: "巴菲特·价值派",
+  lynch: "林奇·成长派",
+  marks: "马克斯·周期派",
+  soros: "索罗斯·反身性派",
+  dalio: "达里奥·全天候派",
+  druckenmiller: "德鲁肯米勒·动量派",
+  duan: "段永平·生意模式派",
 };
 
 export async function fetchResearch(
@@ -145,6 +193,71 @@ export async function fetchResearch(
   stockData?: string,
 ): Promise<ResearchReport> {
   return callEdge("stock-research", { symbol, agentType, stockData });
+}
+
+/**
+ * 调用 orchestrator SSE 端点，返回异步事件迭代器
+ * 三层结构：Layer 1 分析师 → Router + Layer 2 大师辩论 → Synthesis 合成
+ */
+export async function* streamOrchestrator(
+  symbol: string,
+  opts?: { stockData?: string; mode?: string },
+): AsyncGenerator<OrchestratorSSEEvent> {
+  const config = loadConfig();
+  const baseUrl = config.api.baseUrl;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 600_000); // 10 分钟超时
+
+  try {
+    const res = await fetch(`${baseUrl}/orchestrator`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol,
+        stockData: opts?.stockData || "",
+        mode: opts?.mode || "full",
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "unknown");
+      throw new ApiError("orchestrator", res.status, text);
+    }
+
+    if (!res.body) throw new Error("SSE 响应无 body");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // 解析 SSE：以 \n\n 分割事件
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (!trimmed || trimmed.startsWith(":")) continue; // 心跳或注释
+        const dataLine = trimmed.split("\n").find(l => l.startsWith("data: "));
+        if (!dataLine) continue;
+        try {
+          const event = JSON.parse(dataLine.slice(6)) as OrchestratorSSEEvent;
+          yield event;
+        } catch {
+          // 非 JSON 行，跳过
+        }
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ── 技术扫描 ──
