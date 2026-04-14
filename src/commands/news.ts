@@ -9,6 +9,7 @@ import { getCompanyNews, getWorldNews, type NewsItem } from "../openbb.js";
 import { title, divider } from "../format.js";
 import { printError } from "../errors.js";
 import { output } from "../output.js";
+import { track } from "../tracker.js";
 
 export async function newsCommand(symbol?: string): Promise<void> {
   const isCompany = !!symbol;
@@ -21,6 +22,7 @@ export async function newsCommand(symbol?: string): Promise<void> {
       : await getWorldNews(15);
 
     spinner.stop();
+    track("news", isCompany ? [symbol!.toUpperCase()] : []);
 
     output({ symbol: symbol?.toUpperCase() || null, news }, () => {
       console.log(title(label));

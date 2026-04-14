@@ -10,8 +10,11 @@ import { scanCommand } from "./commands/scan.js";
 import { predictCommand } from "./commands/predict.js";
 import { marketCommand } from "./commands/market.js";
 import { newsCommand } from "./commands/news.js";
+import { watchlistCommand } from "./commands/watchlist.js";
 import { configSetCommand, configGetCommand, configListCommand, configResetCommand } from "./commands/config.js";
+import { insightsCommand } from "./commands/insights.js";
 import { setJsonMode } from "./output.js";
+import { registerCommand, startRepl } from "./core/repl.js";
 
 const program = new Command();
 
@@ -97,4 +100,60 @@ configCmd
   .description("重置为默认配置")
   .action(configResetCommand);
 
-program.parse();
+// ── insights：个人投研洞察 ──
+program
+  .command("insights")
+  .description("生成个人投研洞察报告（HTML 可分享）")
+  .action(insightsCommand);
+
+// ── watchlist：自选股 ──
+const wlCmd = program
+  .command("watchlist")
+  .description("自选股管理（查看行情 / 添加 / 移除）")
+  .argument("[sub]", "子命令: add | remove | list")
+  .argument("[symbols...]", "股票代码")
+  .action(watchlistCommand);
+
+// ── REPL 注册命令 ──
+registerCommand({
+  name: "quote", aliases: ["q"],
+  description: "查询实时行情", usage: "quote <symbol...>",
+  handler: (args) => quoteCommand(args),
+});
+registerCommand({
+  name: "market", aliases: ["m"],
+  description: "全球市场 / 涨跌榜", usage: "market [gainers|losers|active]",
+  handler: (args) => marketCommand(args[0]),
+});
+registerCommand({
+  name: "scan", aliases: ["s"],
+  description: "技术指标扫描", usage: "scan <symbol>",
+  handler: (args) => scanCommand(args[0]),
+});
+registerCommand({
+  name: "predict", aliases: ["p"],
+  description: "综合预测分析", usage: "predict <symbol>",
+  handler: (args) => predictCommand(args[0]),
+});
+registerCommand({
+  name: "news", aliases: ["n"],
+  description: "财经新闻", usage: "news [symbol]",
+  handler: (args) => newsCommand(args[0]),
+});
+registerCommand({
+  name: "insights", aliases: ["i"],
+  description: "个人投研洞察", usage: "insights",
+  handler: () => insightsCommand(),
+});
+registerCommand({
+  name: "watchlist", aliases: ["wl", "w"],
+  description: "自选股", usage: "watchlist [add|remove|list] [symbols...]",
+  handler: (args) => watchlistCommand(args[0], args.slice(1)),
+});
+
+// ── 入口：无参数进入 REPL，有参数走 commander ──
+if (process.argv.length <= 2) {
+  startRepl();
+} else {
+  program.parse();
+}

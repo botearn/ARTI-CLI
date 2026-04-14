@@ -64,3 +64,44 @@ npm run build                 # 构建
 - OpenBB 调用通过 `src/openbb.ts` 桥接，底层是 `scripts/openbb_query.py`
 - 每个 Python 调用是独立子进程，120s 超时
 - 涨红跌绿（中国习惯）
+
+## 演绎法（强制）
+
+修改 src/ 时，按顺序执行：
+1. 查 `.deductive/acs/rules.json` → 向用户展示相关规则
+2. 用业务语言写验收要点（3-5条）→ 等用户说"确认"
+3. 写 `tests/test_ac_*.py`（头部 `# @covers: 规则ID`）+ 写生产代码
+4. 跑一次给用户看结果 → 等用户说"对"
+5. 用户说"对" → commit；说"不对" → 改了再跑给用户看
+
+不可跳步。未确认不写代码。未验证不 commit。
+无匹配规则时告知用户后正常实现。
+用户说"跳过演绎"时可直接实现。
+
+### 验收要点规则
+用用户能判断对错的业务语言，禁止写技术细节。
+
+### 意图识别规则
+系统已配置 UserPromptSubmit hook 做意图识别。
+当 hook 返回 UNCERTAIN 时，不要视为确认。必须追问用户。
+"应该对吧""算是吧""嗯...""可能" = 不确定 = 必须追问。
+
+### 演绎法文件结构
+
+```
+.deductive/
+├── config.json              # 模式配置（observe/enforce）
+├── state.json               # 实时状态（自动更新）
+├── acs/
+│   └── rules.json           # 规则注册表（ARTI CLI 需求清单）
+├── hooks/
+│   ├── gate-commit.py       # commit 门禁 + 覆盖率计算
+│   ├── run-lint.py          # 编辑后即时 lint
+│   └── check-intent.py      # 用户意图识别
+├── evidence/                # 验证存档（自动写入）
+└── logs/                    # 执行日志
+```
+
+启用方式：将 `settings.deductive.json` 中的 hooks 合并到 `~/.claude/settings.json`。
+临时禁用：`touch .deductive/DISABLED`
+切换为强制模式：编辑 `.deductive/config.json` 将 mode 改为 `enforce`。

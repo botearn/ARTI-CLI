@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "将下面的 hooks 字段合并到 ~/.claude/settings.json 中以启用演绎法系统",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .deductive/hooks/check-intent.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .deductive/hooks/gate-commit.py",
+            "if": "Bash(git commit*)"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .deductive/hooks/run-lint.py"
+          }
+        ]
+      }
+    ]
+  }
+}
