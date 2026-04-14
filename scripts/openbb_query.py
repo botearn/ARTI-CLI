@@ -512,7 +512,7 @@ def economy_data(params: dict) -> dict:
         result["data"] = df.head(params.get("limit", 10)).to_dict(orient="records")
 
     elif indicator == "treasury_rates":
-        r = obb.fixedincome.government.treasury_rates(provider="fred")
+        r = obb.fixedincome.government.treasury_rates(provider="federal_reserve")
         df = r.to_dataframe()
         result["data"] = df.tail(params.get("limit", 5)).to_dict(orient="records")
 
