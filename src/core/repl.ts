@@ -77,12 +77,12 @@ function printHelp(): void {
   console.log(chalk.cyan("\n  可用命令:\n"));
   const maxName = Math.max(...commands.map(c => c.usage.length));
   for (const cmd of commands) {
-    const aliases = cmd.aliases.length ? chalk.gray(` (${cmd.aliases.join(", ")})`) : "";
+    const aliases = cmd.aliases.length ? chalk.cyan(` [${cmd.aliases.join(", ")}]`) : "";
     console.log(`    ${chalk.white(cmd.usage.padEnd(maxName + 2))} ${chalk.gray(cmd.description)}${aliases}`);
   }
-  console.log(`    ${chalk.white("help".padEnd(maxName + 2))} ${chalk.gray("显示此帮助")}`);
-  console.log(`    ${chalk.white("clear".padEnd(maxName + 2))} ${chalk.gray("清屏")}`);
-  console.log(`    ${chalk.white("exit".padEnd(maxName + 2))} ${chalk.gray("退出")} ${chalk.gray("(quit)")}`);
+  console.log(`    ${chalk.white("help".padEnd(maxName + 2))} ${chalk.gray("显示此帮助")} ${chalk.cyan("[?]")}`);
+  console.log(`    ${chalk.white("clear".padEnd(maxName + 2))} ${chalk.gray("清屏")} ${chalk.cyan("[cls]")}`);
+  console.log(`    ${chalk.white("exit".padEnd(maxName + 2))} ${chalk.gray("退出")} ${chalk.cyan("[quit]")}`);
   console.log();
 }
 

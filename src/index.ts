@@ -33,6 +33,13 @@ program
   .command("quote")
   .description("查询实时行情（支持股票代码和中文名称搜索）")
   .argument("<symbols...>", "股票代码或名称，如 AAPL NVDA 0700.HK")
+  .addHelpText("after", `
+示例:
+  $ arti quote AAPL              # 单只股票
+  $ arti quote AAPL NVDA TSLA    # 多只股票
+  $ arti quote 0700.HK           # 港股
+  $ arti quote 腾讯              # 中文名搜索
+  $ arti quote AAPL --json       # JSON 输出`)
   .action(quoteCommand);
 
 // ── market：市场概览 ──
@@ -40,13 +47,25 @@ program
   .command("market")
   .description("全球市场概览（指数 / 涨跌榜 / 活跃榜）")
   .argument("[sub]", "子命令: gainers | losers | active")
-  .action(marketCommand);
+  .option("-l, --limit <n>", "涨跌/活跃榜返回条数", "15")
+  .addHelpText("after", `
+示例:
+  $ arti market                  # 全球主要指数
+  $ arti market gainers          # 今日涨幅榜
+  $ arti market losers           # 今日跌幅榜
+  $ arti market active           # 今日活跃榜
+  $ arti market gainers -l 5     # 只看前 5 名`)
+  .action((sub, opts) => marketCommand(sub, { limit: parseInt(opts.limit, 10) }));
 
 // ── scan：技术扫描 ──
 program
   .command("scan")
   .description("技术指标扫描（MA/RSI/MACD/布林带/ATR/ADX + 综合研判）")
   .argument("<symbol>", "股票代码")
+  .addHelpText("after", `
+示例:
+  $ arti scan AAPL               # 扫描苹果技术面
+  $ arti scan NVDA --json        # JSON 输出，适合脚本`)
   .action(scanCommand);
 
 // ── predict：综合预测 ──
@@ -54,6 +73,10 @@ program
   .command("predict")
   .description("综合预测分析（行情 + 技术面 + 新闻 → 多空研判）")
   .argument("<symbol>", "股票代码")
+  .addHelpText("after", `
+示例:
+  $ arti predict AAPL            # 综合分析苹果
+  $ arti predict TSLA --json     # JSON 输出`)
   .action(predictCommand);
 
 // ── news：财经新闻 ──
@@ -61,7 +84,14 @@ program
   .command("news")
   .description("财经新闻（指定股票代码查公司新闻，不指定查全球新闻）")
   .argument("[symbol]", "股票代码（可选）")
-  .action(newsCommand);
+  .option("-l, --limit <n>", "返回新闻条数", "15")
+  .addHelpText("after", `
+示例:
+  $ arti news                    # 全球财经新闻
+  $ arti news AAPL               # 苹果公司新闻
+  $ arti news AAPL -l 5          # 只看 5 条
+  $ arti news TSLA --json        # JSON 输出`)
+  .action((symbol, opts) => newsCommand(symbol, { limit: parseInt(opts.limit, 10) }));
 
 // ── research：多维研报（保留，仍走 Edge Function） ──
 program
@@ -70,6 +100,16 @@ program
   .argument("<symbol>", "股票代码")
   .option("-a, --agent <type>", "指定单个分析师: natasha|steve|tony|thor|clint|sam|vision")
   .option("-f, --full", "显示完整报告（默认仅摘要）")
+  .addHelpText("after", `
+示例:
+  $ arti research AAPL           # 7 位分析师并行研报
+  $ arti research NVDA -a tony   # 仅 Tony（技术面）分析
+  $ arti research TSLA -f        # 显示完整报告
+
+分析师:
+  natasha — 风险评估    steve — 价值投资    tony — 技术分析
+  thor    — 宏观视角    clint — 事件驱动    sam  — 动量策略
+  vision  — 量化模型`)
   .action(researchCommand);
 
 // ── config：配置管理 ──
@@ -112,6 +152,12 @@ const wlCmd = program
   .description("自选股管理（查看行情 / 添加 / 移除）")
   .argument("[sub]", "子命令: add | remove | list")
   .argument("[symbols...]", "股票代码")
+  .addHelpText("after", `
+示例:
+  $ arti watchlist               # 查看自选股行情
+  $ arti watchlist add AAPL NVDA # 添加到自选
+  $ arti watchlist remove TSLA   # 从自选移除
+  $ arti watchlist list          # 列出自选股代码`)
   .action(watchlistCommand);
 
 // ── REPL 注册命令 ──
@@ -122,8 +168,13 @@ registerCommand({
 });
 registerCommand({
   name: "market", aliases: ["m"],
-  description: "全球市场 / 涨跌榜", usage: "market [gainers|losers|active]",
-  handler: (args) => marketCommand(args[0]),
+  description: "全球市场 / 涨跌榜", usage: "market [gainers|losers|active] [-l N]",
+  handler: (args) => {
+    const limitIdx = args.indexOf("-l");
+    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
+    const sub = args.find(a => ["gainers", "losers", "active"].includes(a));
+    return marketCommand(sub, limit ? { limit } : undefined);
+  },
 });
 registerCommand({
   name: "scan", aliases: ["s"],
@@ -137,8 +188,13 @@ registerCommand({
 });
 registerCommand({
   name: "news", aliases: ["n"],
-  description: "财经新闻", usage: "news [symbol]",
-  handler: (args) => newsCommand(args[0]),
+  description: "财经新闻", usage: "news [symbol] [-l N]",
+  handler: (args) => {
+    const limitIdx = args.indexOf("-l");
+    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
+    const symbol = args.find(a => a !== "-l" && (limitIdx === -1 || a !== args[limitIdx + 1]));
+    return newsCommand(symbol, limit ? { limit } : undefined);
+  },
 });
 registerCommand({
   name: "insights", aliases: ["i"],

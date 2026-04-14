@@ -232,3 +232,49 @@ export function getCompanyNews(symbol: string, limit = 10): Promise<NewsItem[]> 
 export function getWorldNews(limit = 10): Promise<NewsItem[]> {
   return callOpenBB<NewsItem[]>("news_world", { limit });
 }
+
+// ── 新增：基本面 / 期权 / 宏观经济 ──
+
+export interface FundamentalData {
+  income?: Record<string, unknown>[];
+  income_error?: string;
+  balance?: Record<string, unknown>[];
+  balance_error?: string;
+  metrics?: Record<string, unknown>;
+  metrics_error?: string;
+  dividends?: Record<string, unknown>[];
+  dividends_error?: string;
+}
+
+export interface OptionsItem {
+  [key: string]: unknown;
+}
+
+export interface EconomyData {
+  data?: Record<string, unknown>[];
+}
+
+/** 基本面数据（财报 + 估值指标） */
+export function getFundamental(symbol: string, fields?: string[]): Promise<FundamentalData> {
+  return callOpenBB<FundamentalData>("fundamental", { symbol, fields });
+}
+
+/** 期权链 */
+export function getOptionsChain(symbol: string, limit = 20): Promise<OptionsItem[]> {
+  return callOpenBB<OptionsItem[]>("options", { symbol, limit });
+}
+
+/** 宏观经济 — FRED 数据系列 */
+export function getFredSeries(seriesId: string, limit = 20): Promise<EconomyData> {
+  return callOpenBB<EconomyData>("economy", { indicator: "fred_series", series_id: seriesId, limit });
+}
+
+/** 宏观经济 — FRED 搜索 */
+export function getFredSearch(query: string, limit = 10): Promise<EconomyData> {
+  return callOpenBB<EconomyData>("economy", { indicator: "fred_search", query, limit });
+}
+
+/** 宏观经济 — 美国国债利率 */
+export function getTreasuryRates(limit = 5): Promise<EconomyData> {
+  return callOpenBB<EconomyData>("economy", { indicator: "treasury_rates", limit });
+}

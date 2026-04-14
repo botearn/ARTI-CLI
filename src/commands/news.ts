@@ -10,14 +10,15 @@ import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommandWithOutput } from "../core/handler.js";
 
-export async function newsCommand(symbol?: string): Promise<void> {
+export async function newsCommand(symbol?: string, options?: { limit?: number }): Promise<void> {
+  const limit = options?.limit || 15;
   const isCompany = !!symbol;
   const label = isCompany ? `${symbol!.toUpperCase()} 公司新闻` : "全球财经新闻";
 
   await handleCommandWithOutput(`获取${label}...`, async () => {
     const news: NewsItem[] = isCompany
-      ? await getCompanyNews(symbol!.toUpperCase(), 15)
-      : await getWorldNews(15);
+      ? await getCompanyNews(symbol!.toUpperCase(), limit)
+      : await getWorldNews(limit);
 
     track("news", isCompany ? [symbol!.toUpperCase()] : []);
 
@@ -29,6 +30,9 @@ export async function newsCommand(symbol?: string): Promise<void> {
 
         if (!news.length) {
           console.log(chalk.yellow("  暂无新闻"));
+          if (isCompany) {
+            console.log(chalk.gray("  提示: 部分非美股代码可能无新闻覆盖，试试 arti news 查看全球新闻"));
+          }
           return;
         }
 

@@ -49,8 +49,11 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
     spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
     const quotes: { quote: QuoteData; prices: number[] }[] = [];
 
-    for (const sym of resolved) {
-      spinner.text = `获取 ${sym} 行情...`;
+    for (let idx = 0; idx < resolved.length; idx++) {
+      const sym = resolved[idx];
+      spinner.text = resolved.length > 1
+        ? `获取 ${sym} 行情... (${idx + 1}/${resolved.length})`
+        : `获取 ${sym} 行情...`;
       const [quoteResult, histResult] = await Promise.allSettled([
         getQuote(sym),
         getHistorical(sym, 20),

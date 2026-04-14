@@ -12,10 +12,11 @@ import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommandWithOutput } from "../core/handler.js";
 
-export async function marketCommand(sub?: string): Promise<void> {
-  if (sub === "gainers") return showDiscovery("gainers");
-  if (sub === "losers") return showDiscovery("losers");
-  if (sub === "active") return showDiscovery("active");
+export async function marketCommand(sub?: string, options?: { limit?: number }): Promise<void> {
+  const limit = options?.limit || 15;
+  if (sub === "gainers") return showDiscovery("gainers", limit);
+  if (sub === "losers") return showDiscovery("losers", limit);
+  if (sub === "active") return showDiscovery("active", limit);
 
   await handleCommandWithOutput("获取全球市场数据...", async () => {
     const data = await getMarketOverview();
@@ -61,12 +62,12 @@ export async function marketCommand(sub?: string): Promise<void> {
   });
 }
 
-async function showDiscovery(type: "gainers" | "losers" | "active"): Promise<void> {
+async function showDiscovery(type: "gainers" | "losers" | "active", limit = 15): Promise<void> {
   const labels = { gainers: "涨幅榜", losers: "跌幅榜", active: "活跃榜" };
   const fetchers = { gainers: getGainers, losers: getLosers, active: getActive };
 
   await handleCommandWithOutput(`获取${labels[type]}...`, async () => {
-    const data = await fetchers[type](15);
+    const data = await fetchers[type](limit);
 
     return {
       data,
