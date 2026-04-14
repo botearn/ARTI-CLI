@@ -54,15 +54,16 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
       spinner.text = resolved.length > 1
         ? `获取 ${sym} 行情... (${idx + 1}/${resolved.length})`
         : `获取 ${sym} 行情...`;
-      const [quoteResult, histResult] = await Promise.allSettled([
-        getQuote(sym),
-        getHistorical(sym, 20),
-      ]);
-      if (quoteResult.status === "rejected") continue;
-      const quote = quoteResult.value;
-      const prices = histResult.status === "fulfilled"
-        ? histResult.value.map(h => h.close)
-        : [];
+      // 完全串行：避免并发子进程争抢 yfinance 资源导致下载失败
+      let quote: QuoteData;
+      try {
+        quote = await getQuote(sym);
+      } catch { continue; }
+      let prices: number[] = [];
+      try {
+        const hist = await getHistorical(sym, 20);
+        prices = hist.map(h => h.close);
+      } catch { /* sparkline 非关键 */ }
       quotes.push({ quote, prices });
     }
 

@@ -450,7 +450,7 @@ def news_company(params: dict) -> list:
     """公司新闻"""
     symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
-    limit = validate_limit(params.get("limit"))
+    limit = validate_limit(params.get("limit"), default=15)
     r = obb.news.company(symbol, provider=provider, limit=limit)
     df = r.to_dataframe()
     records = []
@@ -461,22 +461,26 @@ def news_company(params: dict) -> list:
             "url": row.get("url", ""),
             "source": row.get("images", {}).get("source", "") if isinstance(row.get("images"), dict) else "",
         })
-    return records
+    # yfinance provider 可能忽略 limit 参数，手动截断
+    return records[:limit]
 
 
 def news_world(params: dict) -> list:
-    """全球新闻"""
-    provider = params.get("provider", "biztoc")
-    limit = params.get("limit", 10)
-    r = obb.news.world(provider=provider, limit=limit)
-    df = r.to_dataframe()
+    """全球新闻 — 通过 yfinance 获取主要指数相关新闻"""
+    import yfinance as yf
+    limit = validate_limit(params.get("limit"), default=15)
+    ticker = yf.Ticker("^GSPC")
+    raw = ticker.news or []
     records = []
-    for _, row in df.iterrows():
+    for item in raw[:limit]:
+        content = item.get("content", {})
+        url_info = content.get("canonicalUrl", {})
+        provider = content.get("provider", {})
         records.append({
-            "date": str(row.get("date", ""))[:19],
-            "title": row.get("title", ""),
-            "url": row.get("url", ""),
-            "source": row.get("source", ""),
+            "date": str(content.get("pubDate", ""))[:19],
+            "title": content.get("title", ""),
+            "url": url_info.get("url", ""),
+            "source": provider.get("displayName", ""),
         })
     return records
 

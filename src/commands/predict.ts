@@ -70,16 +70,13 @@ export async function predictCommand(symbol: string): Promise<void> {
   symbol = symbol.toUpperCase();
 
   const result = await handleCommand(`获取 ${symbol} 数据进行综合预测...`, async () => {
-    // 并行获取报价、技术分析、新闻
-    const [quoteResult, techResult, newsResult] = await Promise.allSettled([
-      getQuote(symbol),
-      getTechnical(symbol),
-      getCompanyNews(symbol, 5),
-    ]);
-
-    const quote = quoteResult.status === "fulfilled" ? quoteResult.value : null;
-    const tech = techResult.status === "fulfilled" ? techResult.value : null;
-    const news = newsResult.status === "fulfilled" ? newsResult.value : [];
+    // 串行获取：避免并发子进程争抢 yfinance 资源
+    let quote = null;
+    try { quote = await getQuote(symbol); } catch { /* ignore */ }
+    let tech = null;
+    try { tech = await getTechnical(symbol); } catch { /* ignore */ }
+    let news: Awaited<ReturnType<typeof getCompanyNews>> = [];
+    try { news = await getCompanyNews(symbol, 5); } catch { /* ignore */ }
     track("predict", [symbol]);
 
     return { quote, tech, news };

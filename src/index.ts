@@ -258,9 +258,9 @@ registerCommand({
   description: "三层级 AI 研报", usage: "research <symbol> [--agent <type>] [--mode full|layer1-only]",
   handler: (args) => {
     const symbol = args[0];
-    const agentIdx = args.indexOf("--agent");
+    const agentIdx = Math.max(args.indexOf("-a"), args.indexOf("--agent"));
     const agent = agentIdx !== -1 ? args[agentIdx + 1] : undefined;
-    const modeIdx = args.indexOf("--mode");
+    const modeIdx = Math.max(args.indexOf("-m"), args.indexOf("--mode"));
     const mode = modeIdx !== -1 ? args[modeIdx + 1] : undefined;
     const full = args.includes("--full") || args.includes("-f");
     return researchCommand(symbol, { agent, mode, full });

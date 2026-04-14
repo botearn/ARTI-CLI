@@ -6,9 +6,12 @@
 
 ## 当前状态
 
-已完成的骨架：
-- [x] commander 命令路由（quote / research / scan / predict）
-- [x] Supabase Edge Functions API 层（api.ts）
+核心功能已全部实现，进入稳定迭代阶段：
+- [x] 12 个 CLI 命令（quote / market / scan / predict / news / research / config / watchlist / insights / watch / export / completion）
+- [x] REPL 交互模式（session 状态管理 + 命令别名）
+- [x] OpenBB 本地数据源（yfinance，免费无 API Key）
+- [x] MCP Server（13 个工具）
+- [x] Supabase Edge Functions API 层（research 命令专用）
 - [x] 终端格式化工具（format.ts — chalk 涨跌着色、sparkline、置信度条）
 - [x] tsup 构建配置
 
@@ -187,10 +190,10 @@
 
 ### 4.8 新闻资讯
 
-| 能力 | OpenBB 调用 |
+| 能力 | 调用方式 |
 |---|---|
 | 公司新闻 | `obb.news.company('AAPL', provider='yfinance')` |
-| 全球新闻 | `obb.news.world(provider='biztoc')` |
+| 全球新闻 | `yfinance.Ticker('^GSPC').news`（OpenBB news.world 需付费 API Key，改用 yfinance 直接调用） |
 
 ### 免费可用的 Provider（无需 API Key）
 
@@ -216,7 +219,7 @@
 > 已完成
 
 ### 5.1 Claude Code — MCP Server
-- [x] `src/mcp-server.ts` — MCP Server，暴露 14 个金融数据工具
+- [x] `src/mcp-server.ts` — MCP Server，暴露 13 个金融数据工具
 - [x] `.mcp.json` — 项目级 MCP 配置，Claude Code 自动发现
 - [x] `CLAUDE.md` — Claude Code 项目指令
 - [x] 构建入口：`npm run build` 同时输出 `dist/index.js` 和 `dist/mcp-server.js`
@@ -252,6 +255,9 @@
 - [x] `arti watch <symbols>` — 轮询刷新行情（终端 dashboard）
 - [x] `arti export <symbol> --format csv` — 导出数据
 - [x] Shell 自动补全（`arti completion bash/zsh`）
+- [x] REPL 交互模式（`arti` 无参数进入，支持命令别名和 session 状态）
+- [x] `arti insights` — 个人投研洞察（HTML 可分享）
+- [x] `arti watchlist` — 自选股管理（add / remove / list + 行情展示）
 - [ ] `arti login` — 用户认证（如果需要）
 - [x] 版本更新检查提示
 - [x] MCP Server 增加 fundamental / economy / options 工具
