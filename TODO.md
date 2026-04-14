@@ -17,63 +17,63 @@
 ## Phase 1：基础设施补全
 
 ### 1.1 配置管理（config.ts）
-- [ ] 配置文件路径：`~/.config/arti/config.json`
-- [ ] 支持的配置项：
+- [x] 配置文件路径：`~/.config/arti/config.json`
+- [x] 支持的配置项：
   - `api.baseUrl` — Edge Function 地址（可覆盖默认值）
   - `api.timeout` — 请求超时（默认 30s）
   - `display.market` — 默认市场（US / HK / CN）
   - `display.lang` — 语言（zh / en）
   - `watchlist` — 常用自选股列表
-- [ ] 新增命令：`arti config set <key> <value>`
-- [ ] 新增命令：`arti config get <key>`
-- [ ] 新增命令：`arti config list`
-- [ ] 新增命令：`arti config reset`
+- [x] 新增命令：`arti config set <key> <value>`
+- [x] 新增命令：`arti config get <key>`
+- [x] 新增命令：`arti config list`
+- [x] 新增命令：`arti config reset`
 
 ### 1.2 错误处理增强
-- [ ] 网络超时 → 提示检查网络连接
-- [ ] DNS 解析失败 → 提示检查网络或代理
-- [ ] HTTP 401/403 → 提示认证问题
-- [ ] HTTP 429 → 提示请求过快，稍后重试
-- [ ] HTTP 500 → 提示服务端异常，建议反馈
-- [ ] JSON 解析失败 → 提示返回格式异常
-- [ ] 统一错误展示格式（错误码 + 友好描述 + 建议操作）
+- [x] 网络超时 → 提示检查网络连接
+- [x] DNS 解析失败 → 提示检查网络或代理
+- [x] HTTP 401/403 → 提示认证问题
+- [x] HTTP 429 → 提示请求过快，稍后重试
+- [x] HTTP 500 → 提示服务端异常，建议反馈
+- [x] JSON 解析失败 → 提示返回格式异常
+- [x] 统一错误展示格式（错误码 + 友好描述 + 建议操作）
 
 ### 1.3 API 层超时与重试
-- [ ] 使用 AbortController 实现请求超时（默认 30s，可通过配置覆盖）
-- [ ] 关键请求自动重试（最多 2 次，仅对 5xx / 网络错误重试）
-- [ ] 重试时 spinner 文案更新（"重试中 (1/2)..."）
+- [x] 使用 AbortController 实现请求超时（默认 30s，可通过配置覆盖）
+- [x] 关键请求自动重试（最多 2 次，仅对 5xx / 网络错误重试）
+- [x] 重试时 spinner 文案更新（"重试中 (1/2)..."）
 
 ---
 
 ## Phase 2：输出体系
 
 ### 2.1 统一输出层（output.ts）
-- [ ] 抽取输出逻辑：命令层只返回数据，输出层负责渲染
-- [ ] 根据 `--json` flag 自动选择输出模式
-- [ ] JSON 模式：结构化输出，适合管道和脚本
-- [ ] 终端模式：现有的 chalk 美化输出
+- [x] 抽取输出逻辑：命令层只返回数据，输出层负责渲染
+- [x] 根据 `--json` flag 自动选择输出模式
+- [x] JSON 模式：结构化输出，适合管道和脚本
+- [x] 终端模式：现有的 chalk 美化输出
 
 ### 2.2 全局 --json 选项
-- [ ] 在 program 级别添加 `--json` 全局选项
-- [ ] quote 命令 JSON 输出
-- [ ] research 命令 JSON 输出
-- [ ] scan 命令 JSON 输出
-- [ ] predict 命令 JSON 输出
+- [x] 在 program 级别添加 `--json` 全局选项
+- [x] quote 命令 JSON 输出
+- [x] research 命令 JSON 输出
+- [x] scan 命令 JSON 输出
+- [x] predict 命令 JSON 输出
 
 ---
 
 ## Phase 3：发布准备
 
 ### 3.1 package.json 完善
-- [ ] 添加 `files: ["dist"]` 控制发包内容
-- [ ] 添加 `keywords` 提升 npm 搜索可见性
-- [ ] 添加 `engines: { node: ">=18" }`
-- [ ] 添加 `repository` / `homepage` / `license` 字段
+- [x] 添加 `files: ["dist"]` 控制发包内容
+- [x] 添加 `keywords` 提升 npm 搜索可见性
+- [x] 添加 `engines: { node: ">=18" }`
+- [x] 添加 `repository` / `homepage` / `license` 字段
 
 ### 3.2 .gitignore 补全
-- [ ] 添加 `.env` / `.env.local`
-- [ ] 添加 OS 临时文件（.DS_Store 等）
-- [ ] 添加编辑器配置（.vscode / .idea）
+- [x] 添加 `.env` / `.env.local`
+- [x] 添加 OS 临时文件（.DS_Store 等）
+- [x] 添加编辑器配置（.vscode / .idea）
 
 ---
 
@@ -205,10 +205,9 @@
 
 ### 集成方案
 
-- [ ] 新建 `src/openbb.ts` — Python 子进程桥接层，通过 `child_process` 调用 `.venv/bin/python`
-- [ ] 或新建 `src/openbb-server.ts` — 启动 OpenBB Platform API（`obb.api()`），通过 REST 调用
-- [ ] 行情命令优先走 OpenBB 本地数据，Edge Function 作为备选
-- [ ] 各 Agent 研报生成时自动拉取对应 OpenBB 数据作为上下文
+- [x] 新建 `src/openbb.ts` — Python 子进程桥接层，通过 `child_process` 调用 `.venv/bin/python`
+- [x] 行情命令优先走 OpenBB 本地数据，Edge Function 作为备选（research 仍用 Edge Function）
+- [x] 各 Agent 研报生成时自动拉取对应 OpenBB 数据作为上下文
 
 ---
 
@@ -217,7 +216,7 @@
 > 已完成
 
 ### 5.1 Claude Code — MCP Server
-- [x] `src/mcp-server.ts` — MCP Server，暴露 10 个金融数据工具
+- [x] `src/mcp-server.ts` — MCP Server，暴露 14 个金融数据工具
 - [x] `.mcp.json` — 项目级 MCP 配置，Claude Code 自动发现
 - [x] `CLAUDE.md` — Claude Code 项目指令
 - [x] 构建入口：`npm run build` 同时输出 `dist/index.js` 和 `dist/mcp-server.js`
@@ -237,6 +236,9 @@
 | `arti_technical` | 技术指标全面扫描 |
 | `arti_search` | 搜索股票代码 |
 | `arti_news` | 财经新闻 |
+| `arti_fundamental` | 基本面数据 |
+| `arti_options` | 期权链 |
+| `arti_economy` | 宏观经济数据 |
 
 ### 5.2 Codex CLI 适配
 - [x] `agents.md` — Codex agent 指令（工具说明 + 用法示例）
@@ -247,14 +249,12 @@
 
 ## Phase 6：功能扩展
 
-> 框架与数据源稳定后再考虑
-
-- [ ] `arti watch <symbols>` — 轮询刷新行情（终端 dashboard）
-- [ ] `arti export <symbol> --format csv` — 导出数据
-- [ ] Shell 自动补全（commander completion）
+- [x] `arti watch <symbols>` — 轮询刷新行情（终端 dashboard）
+- [x] `arti export <symbol> --format csv` — 导出数据
+- [x] Shell 自动补全（`arti completion bash/zsh`）
 - [ ] `arti login` — 用户认证（如果需要）
-- [ ] 版本更新检查提示
-- [ ] MCP Server 增加 fundamental / economy / options 工具
+- [x] 版本更新检查提示
+- [x] MCP Server 增加 fundamental / economy / options 工具
 
 ---
 
@@ -270,6 +270,8 @@ src/
   format.ts         ← 终端格式化
   output.ts         ← 统一输出（JSON / 终端 自动切换）
   errors.ts         ← 错误分类与友好提示
+  update-check.ts   ← 版本更新检查
+  tracker.ts        ← 活动追踪
   commands/
     quote.ts        ← 实时行情（OpenBB）
     market.ts       ← 全球市场概览（OpenBB）
@@ -278,6 +280,15 @@ src/
     news.ts         ← 财经新闻（OpenBB）
     research.ts     ← AI 多维研报（Edge Function）
     config.ts       ← arti config set/get/list/reset
+    watchlist.ts    ← 自选股管理
+    insights.ts     ← 个人投研洞察
+    watch.ts        ← 实时行情 Dashboard
+    export.ts       ← 数据导出（CSV / JSON）
+    completion.ts   ← Shell 自动补全脚本生成
+  core/
+    handler.ts      ← 统一命令处理器
+    session.ts      ← 会话状态管理
+    repl.ts         ← REPL 交互模式
 scripts/
   openbb_query.py   ← Python 端 OpenBB 数据查询
 CLAUDE.md           ← Claude Code 项目指令

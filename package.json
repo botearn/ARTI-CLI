@@ -32,6 +32,11 @@
   "engines": {
     "node": ">=18"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YuqingNicole/ARTI-CLI.git"
+  },
+  "homepage": "https://github.com/YuqingNicole/ARTI-CLI#readme",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

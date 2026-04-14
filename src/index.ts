@@ -13,7 +13,11 @@ import { newsCommand } from "./commands/news.js";
 import { watchlistCommand } from "./commands/watchlist.js";
 import { configSetCommand, configGetCommand, configListCommand, configResetCommand } from "./commands/config.js";
 import { insightsCommand } from "./commands/insights.js";
+import { watchCommand } from "./commands/watch.js";
+import { exportCommand } from "./commands/export.js";
+import { completionCommand } from "./commands/completion.js";
 import { setJsonMode } from "./output.js";
+import { checkForUpdate } from "./update-check.js";
 import { registerCommand, startRepl } from "./core/repl.js";
 
 const program = new Command();
@@ -160,6 +164,49 @@ const wlCmd = program
   $ arti watchlist list          # 列出自选股代码`)
   .action(watchlistCommand);
 
+// ── watch：实时行情 Dashboard ──
+program
+  .command("watch")
+  .description("实时行情 Dashboard（轮询刷新）")
+  .argument("<symbols...>", "股票代码，如 AAPL NVDA TSLA")
+  .option("-i, --interval <seconds>", "刷新间隔（秒），默认 15", "15")
+  .addHelpText("after", `
+示例:
+  $ arti watch AAPL NVDA TSLA    # 监控三只股票
+  $ arti watch AAPL -i 10        # 10秒刷新
+  按 Ctrl+C 退出`)
+  .action((symbols, opts) => watchCommand(symbols, { interval: parseInt(opts.interval, 10) }));
+
+// ── export：导出历史数据 ──
+program
+  .command("export")
+  .description("导出股票历史数据到文件（CSV / JSON）")
+  .argument("<symbol>", "股票代码")
+  .option("-f, --format <type>", "输出格式: csv | json", "csv")
+  .option("-d, --days <n>", "历史天数", "60")
+  .option("-o, --output <path>", "输出文件路径")
+  .addHelpText("after", `
+示例:
+  $ arti export AAPL                    # 导出 60 天 CSV
+  $ arti export NVDA -f json -d 90      # 导出 90 天 JSON
+  $ arti export TSLA -o ~/data/tsla.csv # 指定输出路径`)
+  .action((symbol, opts) => exportCommand(symbol, {
+    format: opts.format,
+    days: parseInt(opts.days, 10),
+    output: opts.output,
+  }));
+
+// ── completion：Shell 自动补全 ──
+program
+  .command("completion")
+  .description("生成 Shell 自动补全脚本")
+  .argument("[shell]", "Shell 类型: bash | zsh")
+  .addHelpText("after", `
+示例:
+  $ arti completion bash >> ~/.bashrc
+  $ arti completion zsh >> ~/.zshrc`)
+  .action(completionCommand);
+
 // ── REPL 注册命令 ──
 registerCommand({
   name: "quote", aliases: ["q"],
@@ -212,10 +259,35 @@ registerCommand({
   },
 });
 registerCommand({
-  name: "watchlist", aliases: ["wl", "w"],
+  name: "watchlist", aliases: ["wl"],
   description: "自选股", usage: "watchlist [add|remove|list] [symbols...]",
   handler: (args) => watchlistCommand(args[0], args.slice(1)),
 });
+registerCommand({
+  name: "watch", aliases: ["w"],
+  description: "实时行情 Dashboard", usage: "watch <symbol...> [-i N]",
+  handler: (args) => {
+    const intervalIdx = args.indexOf("-i");
+    const interval = intervalIdx !== -1 ? parseInt(args[intervalIdx + 1], 10) : undefined;
+    const symbols = args.filter((a, i) => i !== intervalIdx && (intervalIdx === -1 || i !== intervalIdx + 1));
+    return watchCommand(symbols, interval ? { interval } : undefined);
+  },
+});
+registerCommand({
+  name: "export", aliases: ["exp"],
+  description: "导出历史数据", usage: "export <symbol> [-f csv|json] [-d N]",
+  handler: (args) => {
+    const symbol = args[0];
+    const fmtIdx = args.indexOf("-f");
+    const format = fmtIdx !== -1 ? args[fmtIdx + 1] : undefined;
+    const daysIdx = args.indexOf("-d");
+    const days = daysIdx !== -1 ? parseInt(args[daysIdx + 1], 10) : undefined;
+    return exportCommand(symbol, { format, days });
+  },
+});
+
+// ── 版本更新检查（静默、不阻塞） ──
+checkForUpdate("0.2.0");
 
 // ── 入口：无参数进入 REPL，有参数走 commander ──
 if (process.argv.length <= 2) {

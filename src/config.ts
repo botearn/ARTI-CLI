@@ -13,6 +13,11 @@ export interface ArtiConfig {
     baseUrl: string;
     timeout: number;
   };
+  display: {
+    market: "US" | "HK" | "CN";
+    lang: "zh" | "en";
+  };
+  watchlist: string[];
 }
 
 const DEFAULT_CONFIG: ArtiConfig = {
@@ -20,6 +25,11 @@ const DEFAULT_CONFIG: ArtiConfig = {
     baseUrl: "https://xzxcpastkeinorggtjaa.supabase.co/functions/v1",
     timeout: 30000,
   },
+  display: {
+    market: "US",
+    lang: "zh",
+  },
+  watchlist: [],
 };
 
 function ensureConfigDir(): void {
@@ -36,6 +46,8 @@ export function loadConfig(): ArtiConfig {
     // 深度合并，保证新增字段有默认值
     return {
       api: { ...DEFAULT_CONFIG.api, ...saved.api },
+      display: { ...DEFAULT_CONFIG.display, ...saved.display },
+      watchlist: saved.watchlist ?? DEFAULT_CONFIG.watchlist,
     };
   } catch {
     return { ...DEFAULT_CONFIG };
@@ -61,6 +73,8 @@ export function getConfigValue(key: string): unknown {
 
 const ALLOWED_CONFIG_KEYS = new Set([
   "api.baseUrl", "api.timeout",
+  "display.market", "display.lang",
+  "watchlist",
 ]);
 
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);

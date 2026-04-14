@@ -32,6 +32,9 @@ ARTI 是一个基于 OpenBB 的金融数据命令行工具，同时提供 MCP Se
 | `arti_technical` | 技术指标全面扫描 | `symbol` |
 | `arti_search` | 搜索股票代码 | `query`, `limit?` |
 | `arti_news` | 财经新闻 | `symbol?`, `limit?` |
+| `arti_fundamental` | 基本面数据 | `symbol`, `fields?` |
+| `arti_options` | 期权链 | `symbol`, `limit?` |
+| `arti_economy` | 宏观经济数据 | `indicator`, `series_id?`, `query?`, `limit?` |
 
 ## CLI 命令
 
@@ -44,6 +47,9 @@ arti predict AAPL             # 综合预测分析
 arti news AAPL                # 公司新闻
 arti news                     # 全球新闻
 arti research AAPL            # AI 多维研报（需后端服务）
+arti watch AAPL NVDA          # 实时行情 Dashboard（Ctrl+C 退出）
+arti export AAPL -f csv       # 导出历史数据到 CSV
+arti completion zsh           # 生成 Shell 自动补全脚本
 arti config list              # 查看配置
 ```
 
