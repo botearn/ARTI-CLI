@@ -44,28 +44,24 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
       return undefined;
     }
 
-    // 并行获取所有报价
+    // 逐个 symbol 串行获取（每个 symbol 内 quote+historical 并行）
+    // 避免同时启动过多 Python/OpenBB 子进程导致资源竞争被杀
     spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
-    const quoteResults = await Promise.allSettled(
-      resolved.map(async (sym) => {
-        // quote 和 historical 并行启动
-        const [quoteResult, histResult] = await Promise.allSettled([
-          getQuote(sym),
-          getHistorical(sym, 20),
-        ]);
-        if (quoteResult.status === "rejected") throw quoteResult.reason;
-        const quote = quoteResult.value;
-        const prices = histResult.status === "fulfilled"
-          ? histResult.value.map(h => h.close)
-          : [];
-        return { quote, prices };
-      }),
-    );
+    const quotes: { quote: QuoteData; prices: number[] }[] = [];
 
-    const quotes = quoteResults
-      .filter((r): r is PromiseFulfilledResult<{ quote: QuoteData; prices: number[] }> =>
-        r.status === "fulfilled")
-      .map(r => r.value);
+    for (const sym of resolved) {
+      spinner.text = `获取 ${sym} 行情...`;
+      const [quoteResult, histResult] = await Promise.allSettled([
+        getQuote(sym),
+        getHistorical(sym, 20),
+      ]);
+      if (quoteResult.status === "rejected") continue;
+      const quote = quoteResult.value;
+      const prices = histResult.status === "fulfilled"
+        ? histResult.value.map(h => h.close)
+        : [];
+      quotes.push({ quote, prices });
+    }
 
     track("quote", resolved);
 
