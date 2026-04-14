@@ -50,20 +50,20 @@ $ arti market
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew tap YuqingNicole/arti https://github.com/YuqingNicole/homebrew-arti
+brew tap botearn/arti https://github.com/botearn/homebrew-arti
 brew install arti
 ```
 
 ### Shell script
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/YuqingNicole/ARTI-CLI/master/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/botearn/ARTI-CLI/master/install.sh | sh
 ```
 
 ### Build from source
 
 ```bash
-git clone https://github.com/YuqingNicole/ARTI-CLI.git
+git clone https://github.com/botearn/ARTI-CLI.git
 cd ARTI-CLI
 npm install && npm run build && python3 -m venv .venv && .venv/bin/pip install openbb && npm link
 ```

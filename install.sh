@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO="https://github.com/YuqingNicole/ARTI-CLI.git"
+REPO="https://github.com/botearn/ARTI-CLI.git"
 INSTALL_DIR="${ARTI_HOME:-$HOME/.arti}"
 
 echo ""
