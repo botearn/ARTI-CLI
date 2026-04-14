@@ -146,6 +146,16 @@ registerCommand({
   handler: () => insightsCommand(),
 });
 registerCommand({
+  name: "research", aliases: ["r"],
+  description: "AI 多维研报", usage: "research <symbol> [--agent <type>]",
+  handler: (args) => {
+    const symbol = args[0];
+    const agentIdx = args.indexOf("--agent");
+    const agent = agentIdx !== -1 ? args[agentIdx + 1] : undefined;
+    return researchCommand(symbol, { agent });
+  },
+});
+registerCommand({
   name: "watchlist", aliases: ["wl", "w"],
   description: "自选股", usage: "watchlist [add|remove|list] [symbols...]",
   handler: (args) => watchlistCommand(args[0], args.slice(1)),

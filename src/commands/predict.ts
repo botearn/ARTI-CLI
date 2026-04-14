@@ -4,12 +4,11 @@
  * 用法：arti predict AAPL
  */
 import chalk from "chalk";
-import ora from "ora";
 import { getQuote, getTechnical, getCompanyNews, classifySignal, type QuoteData, type TechnicalData, type NewsItem } from "../openbb.js";
 import { title, divider, sentimentBadge, colorChange, kvLine, sparkline, confidenceBar } from "../format.js";
-import { printError } from "../errors.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
+import { handleCommand } from "../core/handler.js";
 
 /** 根据技术指标生成综合预测 */
 function generatePrediction(quote: QuoteData | null, tech: TechnicalData) {
@@ -69,9 +68,8 @@ export async function predictCommand(symbol: string): Promise<void> {
   }
 
   symbol = symbol.toUpperCase();
-  const spinner = ora(`获取 ${symbol} 数据进行综合预测...`).start();
 
-  try {
+  const result = await handleCommand(`获取 ${symbol} 数据进行综合预测...`, async () => {
     // 并行获取报价、技术分析、新闻
     const [quoteResult, techResult, newsResult] = await Promise.allSettled([
       getQuote(symbol),
@@ -79,93 +77,94 @@ export async function predictCommand(symbol: string): Promise<void> {
       getCompanyNews(symbol, 5),
     ]);
 
-    spinner.stop();
-
     const quote = quoteResult.status === "fulfilled" ? quoteResult.value : null;
     const tech = techResult.status === "fulfilled" ? techResult.value : null;
     const news = newsResult.status === "fulfilled" ? newsResult.value : [];
     track("predict", [symbol]);
 
-    if (!tech || tech.error) {
-      console.log(chalk.red(`  无法获取 ${symbol} 技术数据: ${tech?.error || "未知错误"}`));
-      return;
+    return { quote, tech, news };
+  });
+
+  if (!result) return;
+
+  const { quote, tech, news } = result;
+
+  if (!tech || tech.error) {
+    console.log(chalk.red(`  无法获取 ${symbol} 技术数据: ${tech?.error || "未知错误"}`));
+    return;
+  }
+
+  const prediction = generatePrediction(quote, tech);
+  const jsonData = { symbol, quote, technical: tech, news, prediction };
+
+  output(jsonData, () => {
+    console.log(title(`${symbol} 综合预测分析`));
+
+    // 行情摘要
+    if (quote) {
+      const price = quote.last_price || quote.prev_close || 0;
+      const change = quote.change ?? 0;
+      const changePct = quote.change_percent ?? 0;
+      console.log(kvLine("  当前价格", chalk.bold(`$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)));
+      console.log(kvLine("  涨跌幅", colorChange(changePct, "%")));
+      console.log(kvLine("  成交量", chalk.yellow(quote.volume?.toLocaleString() || "N/A")));
+      console.log();
     }
 
-    const prediction = generatePrediction(quote, tech);
-    const jsonData = { symbol, quote, technical: tech, news, prediction };
+    // 综合预测
+    console.log(chalk.bold.magenta("  【综合预测】"));
+    console.log(`  方向: ${sentimentBadge(prediction.direction)}`);
+    console.log(`  置信度: ${confidenceBar(prediction.confidence)}`);
+    if (prediction.support !== null) {
+      console.log(kvLine("  支撑位", chalk.green(`$${prediction.support.toFixed(2)}`)));
+    }
+    if (prediction.resistance !== null) {
+      console.log(kvLine("  压力位", chalk.red(`$${prediction.resistance.toFixed(2)}`)));
+    }
+    console.log();
 
-    output(jsonData, () => {
-      console.log(title(`${symbol} 综合预测分析`));
-
-      // 行情摘要
-      if (quote) {
-        const price = quote.last_price || quote.prev_close || 0;
-        const change = quote.change ?? 0;
-        const changePct = quote.change_percent ?? 0;
-        console.log(kvLine("  当前价格", chalk.bold(`$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)));
-        console.log(kvLine("  涨跌幅", colorChange(changePct, "%")));
-        console.log(kvLine("  成交量", chalk.yellow(quote.volume?.toLocaleString() || "N/A")));
-        console.log();
+    // 多空信号
+    if (prediction.bullSignals.length) {
+      console.log(chalk.red("  多头信号:"));
+      for (const s of prediction.bullSignals) {
+        console.log(`    ${chalk.red("▲")} ${s}`);
       }
-
-      // 综合预测
-      console.log(chalk.bold.magenta("  【综合预测】"));
-      console.log(`  方向: ${sentimentBadge(prediction.direction)}`);
-      console.log(`  置信度: ${confidenceBar(prediction.confidence)}`);
-      if (prediction.support !== null) {
-        console.log(kvLine("  支撑位", chalk.green(`$${prediction.support.toFixed(2)}`)));
+    }
+    if (prediction.bearSignals.length) {
+      console.log(chalk.green("  空头信号:"));
+      for (const s of prediction.bearSignals) {
+        console.log(`    ${chalk.green("▼")} ${s}`);
       }
-      if (prediction.resistance !== null) {
-        console.log(kvLine("  压力位", chalk.red(`$${prediction.resistance.toFixed(2)}`)));
-      }
-      console.log();
+    }
+    console.log();
 
-      // 多空信号
-      if (prediction.bullSignals.length) {
-        console.log(chalk.red("  多头信号:"));
-        for (const s of prediction.bullSignals) {
-          console.log(`    ${chalk.red("▲")} ${s}`);
-        }
-      }
-      if (prediction.bearSignals.length) {
-        console.log(chalk.green("  空头信号:"));
-        for (const s of prediction.bearSignals) {
-          console.log(`    ${chalk.green("▼")} ${s}`);
-        }
-      }
-      console.log();
+    // 分析逻辑
+    console.log(chalk.bold.cyan("  【分析依据】"));
+    for (const reason of prediction.reasons) {
+      console.log(`    ${chalk.yellow("•")} ${reason}`);
+    }
+    console.log();
 
-      // 分析逻辑
-      console.log(chalk.bold.cyan("  【分析依据】"));
-      for (const reason of prediction.reasons) {
-        console.log(`    ${chalk.yellow("•")} ${reason}`);
+    // 技术指标快照
+    console.log(chalk.bold.cyan("  【技术指标】"));
+    if (tech.rsi !== null) console.log(kvLine("    RSI(14)", String(tech.rsi.toFixed(1))));
+    if (tech.macd) console.log(kvLine("    MACD", `${tech.macd.MACD.toFixed(4)} / ${tech.macd.signal.toFixed(4)}`));
+    if (tech.adx !== null) console.log(kvLine("    ADX(14)", String(tech.adx.toFixed(1))));
+    if (tech.atr !== null) console.log(kvLine("    ATR(14)", String(tech.atr.toFixed(2))));
+    if (tech.stochastic) console.log(kvLine("    Stochastic", `K=${tech.stochastic.K.toFixed(1)} D=${tech.stochastic.D.toFixed(1)}`));
+    console.log();
+
+    // 相关新闻
+    if (news.length) {
+      console.log(chalk.bold.cyan("  【相关新闻】"));
+      for (const n of news) {
+        const date = n.date ? chalk.gray(`[${n.date.slice(0, 10)}]`) : "";
+        console.log(`    ${date} ${n.title}`);
       }
-      console.log();
+    }
 
-      // 技术指标快照
-      console.log(chalk.bold.cyan("  【技术指标】"));
-      if (tech.rsi !== null) console.log(kvLine("    RSI(14)", String(tech.rsi.toFixed(1))));
-      if (tech.macd) console.log(kvLine("    MACD", `${tech.macd.MACD.toFixed(4)} / ${tech.macd.signal.toFixed(4)}`));
-      if (tech.adx !== null) console.log(kvLine("    ADX(14)", String(tech.adx.toFixed(1))));
-      if (tech.atr !== null) console.log(kvLine("    ATR(14)", String(tech.atr.toFixed(2))));
-      if (tech.stochastic) console.log(kvLine("    Stochastic", `K=${tech.stochastic.K.toFixed(1)} D=${tech.stochastic.D.toFixed(1)}`));
-      console.log();
-
-      // 相关新闻
-      if (news.length) {
-        console.log(chalk.bold.cyan("  【相关新闻】"));
-        for (const n of news) {
-          const date = n.date ? chalk.gray(`[${n.date.slice(0, 10)}]`) : "";
-          console.log(`    ${date} ${n.title}`);
-        }
-      }
-
-      console.log(divider());
-      console.log(chalk.gray("  * 以上分析基于 OpenBB 技术指标自动生成，仅供参考，不构成投资建议"));
-      console.log();
-    });
-  } catch (err) {
-    spinner.fail("预测分析失败");
-    printError(err);
-  }
+    console.log(divider());
+    console.log(chalk.gray("  * 以上分析基于 OpenBB 技术指标自动生成，仅供参考，不构成投资建议"));
+    console.log();
+  });
 }
