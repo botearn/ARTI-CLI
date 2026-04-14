@@ -65,7 +65,7 @@ export async function callEdge<T>(
         throw new ApiError(functionName, res.status, msg);
       }
 
-      return res.json() as Promise<T>;
+      return await res.json() as T;
     } catch (err) {
       lastError = err;
       // AbortController 超时转为友好错误

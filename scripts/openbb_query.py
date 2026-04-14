@@ -8,9 +8,41 @@ OpenBB 数据查询桥接脚本
 import sys
 import json
 import math
+import re
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from openbb import obb
+
+# ── 参数验证 ──
+
+SYMBOL_PATTERN = re.compile(r'^[A-Z0-9.\-^=]{1,20}$', re.IGNORECASE)
+
+
+def validate_symbol(symbol: str) -> str:
+    """验证并规范化股票代码"""
+    s = symbol.strip().upper()
+    if not SYMBOL_PATTERN.match(s):
+        raise ValueError(f"非法 symbol 参数: {repr(symbol)}")
+    return s
+
+
+def validate_limit(limit, default=10, max_val=100) -> int:
+    """验证 limit 参数"""
+    if limit is None:
+        return default
+    if not isinstance(limit, int) or not (1 <= limit <= max_val):
+        raise ValueError(f"limit 参数超出范围 [1, {max_val}]: {limit}")
+    return limit
+
+
+def validate_days(days, default=60, max_val=3650) -> int:
+    """验证 days 参数"""
+    if days is None:
+        return default
+    if not isinstance(days, int) or not (1 <= days <= max_val):
+        raise ValueError(f"days 参数超出范围 [1, {max_val}]: {days}")
+    return days
 
 
 def clean_value(v):
@@ -26,7 +58,7 @@ def clean_value(v):
 
 def quote(params: dict) -> dict:
     """获取股票实时报价"""
-    symbol = params["symbol"]
+    symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
     r = obb.equity.price.quote(symbol, provider=provider)
     d = r.results[0]
@@ -52,9 +84,9 @@ def quote(params: dict) -> dict:
 
 def historical(params: dict) -> list:
     """获取历史价格"""
-    symbol = params["symbol"]
+    symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
-    days = params.get("days", 60)
+    days = validate_days(params.get("days"))
     start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
     end = datetime.now().strftime("%Y-%m-%d")
 
@@ -77,9 +109,9 @@ def historical(params: dict) -> list:
 
 def crypto_quote(params: dict) -> list:
     """获取加密货币历史价格"""
-    symbol = params["symbol"]
+    symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
-    days = params.get("days", 30)
+    days = validate_days(params.get("days"), default=30)
     start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
     end = datetime.now().strftime("%Y-%m-%d")
 
@@ -102,13 +134,15 @@ def crypto_quote(params: dict) -> list:
 
 def index_quote(params: dict) -> dict:
     """获取指数报价"""
-    symbol = params["symbol"]
+    symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
 
     r = obb.equity.price.historical(
         symbol, provider=provider, start_date=(datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
     )
     df = r.to_dataframe()
+    if len(df) == 0:
+        raise ValueError(f"symbol {symbol} 无历史数据")
     if len(df) < 2:
         latest = df.iloc[-1]
         return {
@@ -153,48 +187,67 @@ def market_overview(params: dict) -> dict:
         "^GDAXI": "德国DAX",
     }
 
-    results = []
-    for sym, name in indices.items():
+    def fetch_one(sym, name):
         try:
             data = index_quote({"symbol": sym})
             data["name_zh"] = name
-            results.append(data)
+            return data
         except Exception:
-            results.append({
-                "symbol": sym,
-                "name_zh": name,
-                "error": True,
-            })
+            return {"symbol": sym, "name_zh": name, "error": True}
 
+    results_map = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(fetch_one, sym, name): sym for sym, name in indices.items()}
+        for future in as_completed(futures):
+            sym = futures[future]
+            results_map[sym] = future.result()
+
+    # 保持原始顺序
+    results = [results_map[sym] for sym in indices]
     return {"indices": results}
+
+
+def _normalize_discovery(df, limit: int) -> list:
+    """规范化涨跌/活跃榜数据，统一输出格式"""
+    records = []
+    for _, row in df.head(limit).iterrows():
+        pct = row.get("change_percent") or row.get("percent_change") or 0
+        records.append({
+            "symbol": str(row.get("symbol", "")),
+            "name": str(row.get("name", "")),
+            "price": float(row.get("price", 0)) if row.get("price") is not None else None,
+            "change_percent": float(pct),
+            "volume": int(row.get("volume", 0)) if row.get("volume") is not None else None,
+        })
+    return records
 
 
 def gainers(params: dict) -> list:
     """今日涨幅榜"""
+    limit = validate_limit(params.get("limit"))
     r = obb.equity.discovery.gainers(provider="yfinance")
-    df = r.to_dataframe()
-    return df.head(params.get("limit", 10)).to_dict(orient="records")
+    return _normalize_discovery(r.to_dataframe(), limit)
 
 
 def losers(params: dict) -> list:
     """今日跌幅榜"""
+    limit = validate_limit(params.get("limit"))
     r = obb.equity.discovery.losers(provider="yfinance")
-    df = r.to_dataframe()
-    return df.head(params.get("limit", 10)).to_dict(orient="records")
+    return _normalize_discovery(r.to_dataframe(), limit)
 
 
 def active(params: dict) -> list:
     """今日活跃榜"""
+    limit = validate_limit(params.get("limit"))
     r = obb.equity.discovery.active(provider="yfinance")
-    df = r.to_dataframe()
-    return df.head(params.get("limit", 10)).to_dict(orient="records")
+    return _normalize_discovery(r.to_dataframe(), limit)
 
 
 def technical(params: dict) -> dict:
     """技术分析 — 获取价格并计算技术指标"""
-    symbol = params["symbol"]
+    symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
-    days = params.get("days", 200)
+    days = validate_days(params.get("days"), default=200)
     start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     r = obb.equity.price.historical(symbol, provider=provider, start_date=start)
@@ -328,7 +381,7 @@ def technical(params: dict) -> dict:
         "change": round(change, 2),
         "change_percent": round(change_pct, 2),
         "ma": ma,
-        "rsi": round(rsi_val, 2) if rsi_val else None,
+        "rsi": round(rsi_val, 2) if rsi_val is not None else None,
         "macd": macd_data,
         "bbands": bbands,
         "atr": atr_val,
@@ -343,7 +396,7 @@ def technical(params: dict) -> dict:
 
 def fundamental(params: dict) -> dict:
     """基本面数据"""
-    symbol = params["symbol"]
+    symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
     fields = params.get("fields", ["income", "balance", "metrics"])
 
@@ -395,9 +448,9 @@ def search(params: dict) -> list:
 
 def news_company(params: dict) -> list:
     """公司新闻"""
-    symbol = params["symbol"]
+    symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
-    limit = params.get("limit", 10)
+    limit = validate_limit(params.get("limit"))
     r = obb.news.company(symbol, provider=provider, limit=limit)
     df = r.to_dataframe()
     records = []
@@ -430,7 +483,7 @@ def news_world(params: dict) -> list:
 
 def options_chain(params: dict) -> list:
     """期权链"""
-    symbol = params["symbol"]
+    symbol = validate_symbol(params["symbol"])
     provider = params.get("provider", "yfinance")
     r = obb.derivatives.options.chains(symbol, provider=provider)
     df = r.to_dataframe()
@@ -488,7 +541,7 @@ def main():
         raw = sys.stdin.read()
         req = json.loads(raw)
     except json.JSONDecodeError as e:
-        print(json.dumps({"error": f"JSON 解析失败: {e}"}))
+        print(json.dumps({"ok": False, "error": f"JSON 解析失败: {e}"}))
         sys.exit(1)
 
     cmd = req.get("command")

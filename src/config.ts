@@ -71,10 +71,25 @@ export function getConfigValue(key: string): unknown {
   return current;
 }
 
+const ALLOWED_CONFIG_KEYS = new Set([
+  "api.baseUrl", "api.timeout",
+  "display.market", "display.lang",
+  "watchlist",
+]);
+
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 /** 通过点号路径设置配置值，如 "api.timeout" "60000" */
 export function setConfigValue(key: string, value: string): void {
-  const config = loadConfig();
+  if (!ALLOWED_CONFIG_KEYS.has(key)) {
+    throw new Error(`不支持的配置项: ${key}，可用: ${[...ALLOWED_CONFIG_KEYS].join(", ")}`);
+  }
   const parts = key.split(".");
+  if (parts.some(p => DANGEROUS_KEYS.has(p))) {
+    throw new Error("非法配置键");
+  }
+
+  const config = loadConfig();
   let current: Record<string, unknown> = config as unknown as Record<string, unknown>;
 
   for (let i = 0; i < parts.length - 1; i++) {

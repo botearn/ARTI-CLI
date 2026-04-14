@@ -11,6 +11,7 @@ import { getMarketOverview, getGainers, getLosers, getActive } from "../openbb.j
 import { title, divider, colorChange, kvLine } from "../format.js";
 import { printError } from "../errors.js";
 import { output } from "../output.js";
+import { track } from "../tracker.js";
 
 export async function marketCommand(sub?: string): Promise<void> {
   if (sub === "gainers") return showDiscovery("gainers");
@@ -22,6 +23,7 @@ export async function marketCommand(sub?: string): Promise<void> {
   try {
     const data = await getMarketOverview();
     spinner.stop();
+    track("market", []);
 
     output(data, () => {
       console.log(title("全球市场概览"));
@@ -90,8 +92,7 @@ async function showDiscovery(type: "gainers" | "losers" | "active"): Promise<voi
         const sym = String(item.symbol || "").padEnd(10);
         const name = String(item.name || "").slice(0, 22).padEnd(25);
         const price = item.price != null ? item.price.toFixed(2).padStart(12) : "N/A".padStart(12);
-        const rawPct = item.change_percent ?? item.percent_change ?? (item as Record<string, unknown>).percent_change;
-        const pctVal = typeof rawPct === "number" ? rawPct * (Math.abs(rawPct) < 1 ? 100 : 1) : null;
+        const pctVal = typeof item.change_percent === "number" ? item.change_percent : null;
         const chgPct = pctVal != null ? colorChange(pctVal, "%").padStart(10) : "N/A".padStart(10);
         const vol = item.volume != null ? item.volume.toLocaleString().padStart(15) : "N/A".padStart(15);
 

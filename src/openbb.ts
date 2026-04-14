@@ -126,6 +126,14 @@ function callOpenBB<T>(command: string, params: Record<string, unknown> = {}): P
       { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
+          if (err.killed || (err as NodeJS.ErrnoException).code === "ETIMEDOUT") {
+            reject(new Error("OpenBB 请求超时（>120s），请检查网络或重试"));
+            return;
+          }
+          if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+            reject(new Error(`找不到 Python 解释器: ${PYTHON}，请确认 .venv 已创建`));
+            return;
+          }
           const msg = stderr?.trim() || err.message;
           reject(new Error(`OpenBB 调用失败: ${msg}`));
           return;
@@ -143,10 +151,24 @@ function callOpenBB<T>(command: string, params: Record<string, unknown> = {}): P
       },
     );
 
-    // 通过 stdin 传入命令
-    child.stdin?.write(JSON.stringify({ command, params }));
-    child.stdin?.end();
+    // 注册 error 监听，防止 EPIPE 导致进程崩溃
+    if (child.stdin) {
+      child.stdin.on("error", () => { /* 错误由 execFile 回调统一处理 */ });
+      child.stdin.write(JSON.stringify({ command, params }));
+      child.stdin.end();
+    }
   });
+}
+
+// ── 信号分类 ──
+
+const BULL_KEYWORDS = ["超卖", "多头", "突破"] as const;
+const BEAR_KEYWORDS = ["超买", "空头", "跌破"] as const;
+
+export function classifySignal(sig: string): "bull" | "bear" | "neutral" {
+  if (BULL_KEYWORDS.some(k => sig.includes(k))) return "bull";
+  if (BEAR_KEYWORDS.some(k => sig.includes(k))) return "bear";
+  return "neutral";
 }
 
 // ── 公开 API ──

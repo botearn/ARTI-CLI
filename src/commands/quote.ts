@@ -8,6 +8,7 @@ import { getQuote, getHistorical, searchEquity, type QuoteData } from "../openbb
 import { colorChange, kvLine, divider, title, sparkline } from "../format.js";
 import { printError } from "../errors.js";
 import { output } from "../output.js";
+import { track } from "../tracker.js";
 
 export async function quoteCommand(symbols: string[]): Promise<void> {
   if (!symbols.length) {
@@ -50,13 +51,16 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
     spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
     const quoteResults = await Promise.allSettled(
       resolved.map(async (sym) => {
-        const quote = await getQuote(sym);
-        // 获取近 20 日历史用于 sparkline
-        let prices: number[] = [];
-        try {
-          const hist = await getHistorical(sym, 20);
-          prices = hist.map(h => h.close);
-        } catch { /* sparkline 失败不阻断 */ }
+        // quote 和 historical 并行启动
+        const [quoteResult, histResult] = await Promise.allSettled([
+          getQuote(sym),
+          getHistorical(sym, 20),
+        ]);
+        if (quoteResult.status === "rejected") throw quoteResult.reason;
+        const quote = quoteResult.value;
+        const prices = histResult.status === "fulfilled"
+          ? histResult.value.map(h => h.close)
+          : [];
         return { quote, prices };
       }),
     );
@@ -67,6 +71,8 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
       .filter((r): r is PromiseFulfilledResult<{ quote: QuoteData; prices: number[] }> =>
         r.status === "fulfilled")
       .map(r => r.value);
+
+    track("quote", resolved);
 
     const jsonData = { quotes: quotes.map(q => ({ ...q.quote, sparkline: q.prices })) };
 

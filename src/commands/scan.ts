@@ -4,10 +4,11 @@
  */
 import chalk from "chalk";
 import ora from "ora";
-import { getTechnical, type TechnicalData } from "../openbb.js";
+import { getTechnical, classifySignal, type TechnicalData } from "../openbb.js";
 import { title, kvLine, divider, colorChange } from "../format.js";
 import { printError } from "../errors.js";
 import { output } from "../output.js";
+import { track } from "../tracker.js";
 
 export async function scanCommand(symbol: string): Promise<void> {
   if (!symbol) {
@@ -21,6 +22,7 @@ export async function scanCommand(symbol: string): Promise<void> {
   try {
     const data = await getTechnical(symbol);
     spinner.stop();
+    track("scan", [symbol]);
 
     if (data.error) {
       console.log(chalk.red(`  ${data.error}`));
@@ -98,9 +100,8 @@ export async function scanCommand(symbol: string): Promise<void> {
       if (data.signals.length) {
         console.log(chalk.gray("\n  技术信号:"));
         for (const sig of data.signals) {
-          const isBull = sig.includes("超卖") || sig.includes("多头") || sig.includes("突破布林上轨");
-          const isBear = sig.includes("超买") || sig.includes("空头") || sig.includes("跌破布林下轨");
-          const color = isBull ? chalk.red : isBear ? chalk.green : chalk.yellow;
+          const cls = classifySignal(sig);
+          const color = cls === "bull" ? chalk.red : cls === "bear" ? chalk.green : chalk.yellow;
           console.log(`    ${color("•")} ${sig}`);
         }
       }

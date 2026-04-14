@@ -5,20 +5,17 @@
  */
 import chalk from "chalk";
 import ora from "ora";
-import { getQuote, getTechnical, getCompanyNews, type QuoteData, type TechnicalData, type NewsItem } from "../openbb.js";
+import { getQuote, getTechnical, getCompanyNews, classifySignal, type QuoteData, type TechnicalData, type NewsItem } from "../openbb.js";
 import { title, divider, sentimentBadge, colorChange, kvLine, sparkline, confidenceBar } from "../format.js";
 import { printError } from "../errors.js";
 import { output } from "../output.js";
+import { track } from "../tracker.js";
 
 /** 根据技术指标生成综合预测 */
 function generatePrediction(quote: QuoteData | null, tech: TechnicalData) {
   const signals = tech.signals;
-  const bullSignals = signals.filter(s =>
-    s.includes("超卖") || s.includes("多头") || s.includes("突破")
-  );
-  const bearSignals = signals.filter(s =>
-    s.includes("超买") || s.includes("空头") || s.includes("跌破")
-  );
+  const bullSignals = signals.filter(s => classifySignal(s) === "bull");
+  const bearSignals = signals.filter(s => classifySignal(s) === "bear");
 
   const bullScore = bullSignals.length;
   const bearScore = bearSignals.length;
@@ -87,6 +84,7 @@ export async function predictCommand(symbol: string): Promise<void> {
     const quote = quoteResult.status === "fulfilled" ? quoteResult.value : null;
     const tech = techResult.status === "fulfilled" ? techResult.value : null;
     const news = newsResult.status === "fulfilled" ? newsResult.value : [];
+    track("predict", [symbol]);
 
     if (!tech || tech.error) {
       console.log(chalk.red(`  无法获取 ${symbol} 技术数据: ${tech?.error || "未知错误"}`));
