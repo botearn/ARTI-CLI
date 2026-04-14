@@ -16,6 +16,12 @@ import { insightsCommand } from "./commands/insights.js";
 import { watchCommand } from "./commands/watch.js";
 import { exportCommand } from "./commands/export.js";
 import { completionCommand } from "./commands/completion.js";
+import { historyCommand } from "./commands/history.js";
+import { cryptoCommand } from "./commands/crypto.js";
+import { fundamentalCommand } from "./commands/fundamental.js";
+import { optionsCommand } from "./commands/options.js";
+import { economyCommand } from "./commands/economy.js";
+import { searchCommand } from "./commands/search.js";
 import { setJsonMode } from "./output.js";
 import { checkForUpdate } from "./update-check.js";
 import { registerCommand, startRepl } from "./core/repl.js";
@@ -71,6 +77,88 @@ program
   $ arti scan AAPL               # 扫描苹果技术面
   $ arti scan NVDA --json        # JSON 输出，适合脚本`)
   .action(scanCommand);
+
+// ── history：历史价格 ──
+program
+  .command("history")
+  .description("查看股票历史价格（OHLCV 表格）")
+  .argument("<symbol>", "股票代码")
+  .option("-d, --days <n>", "历史天数", "60")
+  .addHelpText("after", `
+示例:
+  $ arti history AAPL              # 默认 60 天
+  $ arti history NVDA -d 30        # 最近 30 天
+  $ arti history TSLA --json       # JSON 输出`)
+  .action((symbol, opts) => historyCommand(symbol, { days: parseInt(opts.days, 10) }));
+
+// ── crypto：加密货币 ──
+program
+  .command("crypto")
+  .description("查看加密货币历史价格")
+  .argument("<symbol>", "加密货币代码，如 BTCUSD、ETHUSD")
+  .option("-d, --days <n>", "历史天数", "30")
+  .addHelpText("after", `
+示例:
+  $ arti crypto BTCUSD             # 比特币 30 天
+  $ arti crypto ETHUSD -d 7        # 以太坊 7 天
+  $ arti crypto BTCUSD --json      # JSON 输出`)
+  .action((symbol, opts) => cryptoCommand(symbol, { days: parseInt(opts.days, 10) }));
+
+// ── fundamental：基本面 ──
+program
+  .command("fundamental")
+  .description("公司基本面数据（财报 / 估值 / 分红）")
+  .argument("<symbol>", "股票代码")
+  .option("--fields <list>", "数据类别: income,balance,metrics,dividends", "income,balance,metrics")
+  .addHelpText("after", `
+示例:
+  $ arti fundamental AAPL                      # 利润表+资产负债+估值
+  $ arti fundamental NVDA --fields metrics     # 仅估值指标
+  $ arti fundamental TSLA --fields income,dividends --json`)
+  .action((symbol, opts) => fundamentalCommand(symbol, { fields: opts.fields }));
+
+// ── options：期权链 ──
+program
+  .command("options")
+  .description("查看股票期权链（行权价 / IV / 持仓量）")
+  .argument("<symbol>", "股票代码")
+  .option("-l, --limit <n>", "返回条数", "20")
+  .addHelpText("after", `
+示例:
+  $ arti options AAPL              # 默认 20 条
+  $ arti options NVDA -l 10        # 前 10 条
+  $ arti options TSLA --json       # JSON 输出`)
+  .action((symbol, opts) => optionsCommand(symbol, { limit: parseInt(opts.limit, 10) }));
+
+// ── economy：宏观经济 ──
+program
+  .command("economy")
+  .description("宏观经济数据（国债利率 / FRED 数据系列）")
+  .argument("[sub]", "子命令: treasury | fred <id> | search <keyword>")
+  .argument("[args...]", "子命令参数")
+  .option("-l, --limit <n>", "返回条数", "20")
+  .addHelpText("after", `
+示例:
+  $ arti economy treasury          # 国债利率
+  $ arti economy fred GDP          # GDP 数据
+  $ arti economy fred UNRATE       # 失业率
+  $ arti economy search CPI        # 搜索 CPI 相关系列
+  $ arti economy treasury --json   # JSON 输出`)
+  .action((sub, args, opts) => economyCommand(sub, args, { limit: parseInt(opts.limit, 10) }));
+
+// ── search：搜索股票 ──
+program
+  .command("search")
+  .description("搜索股票代码（支持公司名称、代码模糊搜索）")
+  .argument("<query>", "搜索关键词，如 Apple、腾讯、MSFT")
+  .option("-l, --limit <n>", "返回条数", "10")
+  .addHelpText("after", `
+示例:
+  $ arti search apple              # 搜索 Apple 相关股票
+  $ arti search 腾讯               # 中文搜索
+  $ arti search bank -l 20         # 返回 20 条
+  $ arti search tesla --json       # JSON 输出`)
+  .action((query, opts) => searchCommand(query, { limit: parseInt(opts.limit, 10) }));
 
 // ── predict：综合预测 ──
 program
@@ -291,6 +379,71 @@ registerCommand({
     const daysIdx = args.indexOf("-d");
     const days = daysIdx !== -1 ? parseInt(args[daysIdx + 1], 10) : undefined;
     return exportCommand(symbol, { format, days });
+  },
+});
+
+registerCommand({
+  name: "history", aliases: ["hist"],
+  description: "历史价格", usage: "history <symbol> [-d N]",
+  handler: (args) => {
+    const daysIdx = args.indexOf("-d");
+    const days = daysIdx !== -1 ? parseInt(args[daysIdx + 1], 10) : undefined;
+    const symbol = args.find((a, i) => i !== daysIdx && (daysIdx === -1 || i !== daysIdx + 1));
+    return historyCommand(symbol!, days ? { days } : undefined);
+  },
+});
+registerCommand({
+  name: "crypto", aliases: ["cr"],
+  description: "加密货币历史", usage: "crypto <symbol> [-d N]",
+  handler: (args) => {
+    const daysIdx = args.indexOf("-d");
+    const days = daysIdx !== -1 ? parseInt(args[daysIdx + 1], 10) : undefined;
+    const symbol = args.find((a, i) => i !== daysIdx && (daysIdx === -1 || i !== daysIdx + 1));
+    return cryptoCommand(symbol!, days ? { days } : undefined);
+  },
+});
+registerCommand({
+  name: "fundamental", aliases: ["fund"],
+  description: "基本面数据", usage: "fundamental <symbol> [--fields income,metrics]",
+  handler: (args) => {
+    const symbol = args[0];
+    const fieldsIdx = args.indexOf("--fields");
+    const fields = fieldsIdx !== -1 ? args[fieldsIdx + 1] : undefined;
+    return fundamentalCommand(symbol, fields ? { fields } : undefined);
+  },
+});
+registerCommand({
+  name: "options", aliases: ["opt"],
+  description: "期权链", usage: "options <symbol> [-l N]",
+  handler: (args) => {
+    const limitIdx = args.indexOf("-l");
+    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
+    const symbol = args.find((a, i) => i !== limitIdx && (limitIdx === -1 || i !== limitIdx + 1));
+    return optionsCommand(symbol!, limit ? { limit } : undefined);
+  },
+});
+registerCommand({
+  name: "economy", aliases: ["eco"],
+  description: "宏观经济数据", usage: "economy treasury | fred <id> | search <keyword> [-l N]",
+  handler: (args) => {
+    const limitIdx = args.indexOf("-l");
+    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
+    const sub = args[0];
+    const rest = args.slice(1).filter((a, i) => {
+      const absIdx = i + 1;
+      return absIdx !== limitIdx && (limitIdx === -1 || absIdx !== limitIdx + 1);
+    });
+    return economyCommand(sub, rest, limit ? { limit } : undefined);
+  },
+});
+registerCommand({
+  name: "search", aliases: ["find"],
+  description: "搜索股票代码", usage: "search <keyword> [-l N]",
+  handler: (args) => {
+    const limitIdx = args.indexOf("-l");
+    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
+    const query = args.filter((a, i) => i !== limitIdx && (limitIdx === -1 || i !== limitIdx + 1)).join(" ");
+    return searchCommand(query, limit ? { limit } : undefined);
   },
 });
 

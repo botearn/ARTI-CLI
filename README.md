@@ -30,6 +30,12 @@ $ arti market
 | `arti market active` | 今日活跃榜 |
 | `arti scan AAPL` | 技术指标扫描（MA/RSI/MACD/布林带/ATR/ADX/KDJ/OBV） |
 | `arti predict AAPL` | 综合预测（行情 + 技术面 + 新闻 → 多空研判） |
+| `arti history AAPL -d 30` | 历史价格（OHLCV 表格） |
+| `arti crypto BTCUSD` | 加密货币历史价格 |
+| `arti fundamental AAPL` | 基本面数据（财报 / 估值 / 分红） |
+| `arti options AAPL` | 期权链（行权价 / IV / 持仓量） |
+| `arti economy treasury` | 宏观经济（国债利率 / FRED 数据） |
+| `arti search 苹果` | 搜索股票代码 |
 | `arti news AAPL` | 公司新闻 |
 | `arti news` | 全球财经新闻 |
 | `arti research AAPL` | AI 多维研报（7 位分析师并行，需后端服务） |
@@ -39,34 +45,30 @@ $ arti market
 
 ## 安装
 
-### 前置依赖
+需要 Node.js >= 18 和 Python >= 3.9。
 
-- Node.js >= 18
-- Python >= 3.9（推荐 3.12）
-
-### 步骤
+### Homebrew (macOS / Linux)
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/YuqingNicole/ARTI-CLI.git
-cd ARTI-CLI
-
-# 2. 安装 Node 依赖
-npm install
-
-# 3. 创建 Python 虚拟环境并安装 OpenBB
-python3 -m venv .venv
-source .venv/bin/activate
-pip install openbb openbb-cli
-
-# 4. 构建
-npm run build
-
-# 5. 全局链接（可选）
-npm link
+brew tap YuqingNicole/arti https://github.com/YuqingNicole/homebrew-arti
+brew install arti
 ```
 
-安装完成后即可使用 `arti` 命令，或通过 `node dist/index.js` 运行。
+### Shell script
+
+```bash
+curl -sSL https://raw.githubusercontent.com/YuqingNicole/ARTI-CLI/master/install.sh | sh
+```
+
+### Build from source
+
+```bash
+git clone https://github.com/YuqingNicole/ARTI-CLI.git
+cd ARTI-CLI
+npm install && npm run build && python3 -m venv .venv && .venv/bin/pip install openbb && npm link
+```
+
+安装完成后即可使用 `arti` 命令。
 
 ## 架构
 
