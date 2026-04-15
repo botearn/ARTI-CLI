@@ -22,7 +22,7 @@ export interface ArtiConfig {
 
 const DEFAULT_CONFIG: ArtiConfig = {
   api: {
-    baseUrl: "https://xzxcpastkeinorggtjaa.supabase.co/functions/v1",
+    baseUrl: "https://laoclhqedllwjuboyqib.supabase.co/functions/v1",
     timeout: 30000,
   },
   display: {
