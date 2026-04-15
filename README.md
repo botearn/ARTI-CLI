@@ -91,13 +91,24 @@ npm install && npm run build && python3 -m venv .venv && .venv/bin/pip install o
 
 通过 [OpenBB](https://github.com/OpenBB-finance/OpenBB) 聚合多个金融数据源，以下为免费可用（无需 API Key）：
 
-| Provider | 数据范围 |
-|---|---|
-| yfinance | 全球股票、加密货币、外汇、ETF、指数、期权、期货、新闻 |
-| SEC | SEC 文件、公司搜索、13F 持仓、内部人交易 |
-| FRED | 美联储经济数据（GDP、CPI、利率、国债收益率等） |
-| OECD | 国际经济数据（GDP、失业率、通胀等） |
-| ECB | 欧洲央行汇率 |
+| Provider | 数据范围 | API Key |
+|---|---|---|
+| yfinance | 全球股票、加密货币、外汇、ETF、指数、期权、期货、新闻 | 不需要 |
+| SEC | SEC 文件、公司搜索、13F 持仓、内部人交易 | 不需要 |
+| Federal Reserve | 国债收益率 (`arti economy treasury`) | 不需要 |
+| FRED | 美联储经济数据 (`arti economy fred/search`) | **需要**（免费） |
+| OECD | 国际经济数据（GDP、失业率、通胀等） | 不需要 |
+| ECB | 欧洲央行汇率 | 不需要 |
+
+> **FRED API Key 配置：** `arti economy fred` 和 `arti economy search` 需要 FRED API Key。前往 [https://fred.stlouisfed.org/docs/api/api_key.html](https://fred.stlouisfed.org/docs/api/api_key.html) 免费注册，然后配置：
+> ```bash
+> # 方式一：环境变量
+> export OPENBB_fred_api_key=YOUR_KEY
+>
+> # 方式二：写入 OpenBB 配置
+> echo '{"credentials":{"fred_api_key":"YOUR_KEY"}}' > ~/.openbb_platform/user_settings.json
+> ```
+> 其他所有命令（quote、market、scan、history、crypto、options 等）均无需 API Key。
 
 ## 命令详解
 
