@@ -25,6 +25,7 @@ import { searchCommand } from "./commands/search.js";
 import { setJsonMode } from "./output.js";
 import { checkForUpdate } from "./update-check.js";
 import { registerCommand, startRepl } from "./core/repl.js";
+import { parseArgs, type ReplCommandDef, type OptionDef } from "./core/registry.js";
 
 const program = new Command();
 
@@ -300,152 +301,148 @@ program
   $ arti completion zsh >> ~/.zshrc`)
   .action(completionCommand);
 
-// ── REPL 注册命令 ──
-registerCommand({
-  name: "quote", aliases: ["q"],
-  description: "查询实时行情", usage: "quote <symbol...>",
-  handler: (args) => quoteCommand(args),
-});
-registerCommand({
-  name: "market", aliases: ["m"],
-  description: "全球市场 / 涨跌榜", usage: "market [gainers|losers|active] [-l N]",
-  handler: (args) => {
-    const limitIdx = args.indexOf("-l");
-    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
-    const sub = args.find(a => ["gainers", "losers", "active"].includes(a));
-    return marketCommand(sub, limit ? { limit } : undefined);
-  },
-});
-registerCommand({
-  name: "scan", aliases: ["s"],
-  description: "技术指标扫描", usage: "scan <symbol>",
-  handler: (args) => scanCommand(args[0]),
-});
-registerCommand({
-  name: "predict", aliases: ["p"],
-  description: "综合预测分析", usage: "predict <symbol>",
-  handler: (args) => predictCommand(args[0]),
-});
-registerCommand({
-  name: "news", aliases: ["n"],
-  description: "财经新闻", usage: "news [symbol] [-l N]",
-  handler: (args) => {
-    const limitIdx = args.indexOf("-l");
-    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
-    const symbol = args.find(a => a !== "-l" && (limitIdx === -1 || a !== args[limitIdx + 1]));
-    return newsCommand(symbol, limit ? { limit } : undefined);
-  },
-});
-registerCommand({
-  name: "insights", aliases: ["i"],
-  description: "个人投研洞察", usage: "insights",
-  handler: () => insightsCommand(),
-});
-registerCommand({
-  name: "research", aliases: ["r"],
-  description: "三层级 AI 研报", usage: "research <symbol> [--agent <type>] [--mode full|layer1-only]",
-  handler: (args) => {
-    const symbol = args[0];
-    const agentIdx = Math.max(args.indexOf("-a"), args.indexOf("--agent"));
-    const agent = agentIdx !== -1 ? args[agentIdx + 1] : undefined;
-    const modeIdx = Math.max(args.indexOf("-m"), args.indexOf("--mode"));
-    const mode = modeIdx !== -1 ? args[modeIdx + 1] : undefined;
-    const full = args.includes("--full") || args.includes("-f");
-    return researchCommand(symbol, { agent, mode, full });
-  },
-});
-registerCommand({
-  name: "watchlist", aliases: ["wl"],
-  description: "自选股", usage: "watchlist [add|remove|list] [symbols...]",
-  handler: (args) => watchlistCommand(args[0], args.slice(1)),
-});
-registerCommand({
-  name: "watch", aliases: ["w"],
-  description: "实时行情 Dashboard", usage: "watch <symbol...> [-i N]",
-  handler: (args) => {
-    const intervalIdx = args.indexOf("-i");
-    const interval = intervalIdx !== -1 ? parseInt(args[intervalIdx + 1], 10) : undefined;
-    const symbols = args.filter((a, i) => i !== intervalIdx && (intervalIdx === -1 || i !== intervalIdx + 1));
-    return watchCommand(symbols, interval ? { interval } : undefined);
-  },
-});
-registerCommand({
-  name: "export", aliases: ["exp"],
-  description: "导出历史数据", usage: "export <symbol> [-f csv|json] [-d N]",
-  handler: (args) => {
-    const symbol = args[0];
-    const fmtIdx = args.indexOf("-f");
-    const format = fmtIdx !== -1 ? args[fmtIdx + 1] : undefined;
-    const daysIdx = args.indexOf("-d");
-    const days = daysIdx !== -1 ? parseInt(args[daysIdx + 1], 10) : undefined;
-    return exportCommand(symbol, { format, days });
-  },
-});
+// ── 共用选项定义 ──
+const OPT_LIMIT: OptionDef = { short: "-l", long: "--limit", key: "limit", type: "string" };
+const OPT_DAYS: OptionDef  = { short: "-d", long: "--days",  key: "days",  type: "string" };
 
-registerCommand({
-  name: "history", aliases: ["hist"],
-  description: "历史价格", usage: "history <symbol> [-d N]",
-  handler: (args) => {
-    const daysIdx = args.indexOf("-d");
-    const days = daysIdx !== -1 ? parseInt(args[daysIdx + 1], 10) : undefined;
-    const symbol = args.find((a, i) => i !== daysIdx && (daysIdx === -1 || i !== daysIdx + 1));
-    return historyCommand(symbol!, days ? { days } : undefined);
+/** 安全 parseInt：undefined 透传 */
+const int = (v: string | boolean | undefined): number | undefined =>
+  typeof v === "string" ? parseInt(v, 10) : undefined;
+
+// ── REPL 命令声明（parseArgs 统一解析参数） ──
+const replDefs: ReplCommandDef[] = [
+  {
+    name: "quote", aliases: ["q"],
+    description: "查询实时行情", usage: "quote <symbol...>",
+    options: [],
+    invoke: ({ positional }) => quoteCommand(positional),
   },
-});
-registerCommand({
-  name: "crypto", aliases: ["cr"],
-  description: "加密货币历史", usage: "crypto <symbol> [-d N]",
-  handler: (args) => {
-    const daysIdx = args.indexOf("-d");
-    const days = daysIdx !== -1 ? parseInt(args[daysIdx + 1], 10) : undefined;
-    const symbol = args.find((a, i) => i !== daysIdx && (daysIdx === -1 || i !== daysIdx + 1));
-    return cryptoCommand(symbol!, days ? { days } : undefined);
+  {
+    name: "market", aliases: ["m"],
+    description: "全球市场 / 涨跌榜", usage: "market [gainers|losers|active] [-l N]",
+    options: [OPT_LIMIT],
+    invoke: ({ positional, options }) => {
+      const sub = positional.find(a => ["gainers", "losers", "active"].includes(a));
+      return marketCommand(sub, int(options.limit) ? { limit: int(options.limit)! } : undefined);
+    },
   },
-});
-registerCommand({
-  name: "fundamental", aliases: ["fund"],
-  description: "基本面数据", usage: "fundamental <symbol> [--fields income,metrics]",
-  handler: (args) => {
-    const symbol = args[0];
-    const fieldsIdx = args.indexOf("--fields");
-    const fields = fieldsIdx !== -1 ? args[fieldsIdx + 1] : undefined;
-    return fundamentalCommand(symbol, fields ? { fields } : undefined);
+  {
+    name: "scan", aliases: ["s"],
+    description: "技术指标扫描", usage: "scan <symbol>",
+    options: [],
+    invoke: ({ positional }) => scanCommand(positional[0]),
   },
-});
-registerCommand({
-  name: "options", aliases: ["opt"],
-  description: "期权链", usage: "options <symbol> [-l N]",
-  handler: (args) => {
-    const limitIdx = args.indexOf("-l");
-    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
-    const symbol = args.find((a, i) => i !== limitIdx && (limitIdx === -1 || i !== limitIdx + 1));
-    return optionsCommand(symbol!, limit ? { limit } : undefined);
+  {
+    name: "predict", aliases: ["p"],
+    description: "综合预测分析", usage: "predict <symbol>",
+    options: [],
+    invoke: ({ positional }) => predictCommand(positional[0]),
   },
-});
-registerCommand({
-  name: "economy", aliases: ["eco"],
-  description: "宏观经济数据", usage: "economy treasury | fred <id> | search <keyword> [-l N]",
-  handler: (args) => {
-    const limitIdx = args.indexOf("-l");
-    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
-    const sub = args[0];
-    const rest = args.slice(1).filter((a, i) => {
-      const absIdx = i + 1;
-      return absIdx !== limitIdx && (limitIdx === -1 || absIdx !== limitIdx + 1);
-    });
-    return economyCommand(sub, rest, limit ? { limit } : undefined);
+  {
+    name: "news", aliases: ["n"],
+    description: "财经新闻", usage: "news [symbol] [-l N]",
+    options: [OPT_LIMIT],
+    invoke: ({ positional, options }) =>
+      newsCommand(positional[0], int(options.limit) ? { limit: int(options.limit)! } : undefined),
   },
-});
-registerCommand({
-  name: "search", aliases: ["find"],
-  description: "搜索股票代码", usage: "search <keyword> [-l N]",
-  handler: (args) => {
-    const limitIdx = args.indexOf("-l");
-    const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
-    const query = args.filter((a, i) => i !== limitIdx && (limitIdx === -1 || i !== limitIdx + 1)).join(" ");
-    return searchCommand(query, limit ? { limit } : undefined);
+  {
+    name: "insights", aliases: ["i"],
+    description: "个人投研洞察", usage: "insights",
+    options: [],
+    invoke: () => insightsCommand(),
   },
-});
+  {
+    name: "research", aliases: ["r"],
+    description: "三层级 AI 研报", usage: "research <symbol> [--agent <type>] [--mode full|layer1-only]",
+    options: [
+      { short: "-a", long: "--agent", key: "agent", type: "string" },
+      { short: "-m", long: "--mode",  key: "mode",  type: "string" },
+      { short: "-f", long: "--full",  key: "full",  type: "boolean" },
+    ],
+    invoke: ({ positional, options }) =>
+      researchCommand(positional[0], {
+        agent: options.agent as string | undefined,
+        mode: options.mode as string | undefined,
+        full: options.full as boolean | undefined,
+      }),
+  },
+  {
+    name: "watchlist", aliases: ["wl"],
+    description: "自选股", usage: "watchlist [add|remove|list] [symbols...]",
+    options: [],
+    invoke: ({ positional }) => watchlistCommand(positional[0], positional.slice(1)),
+  },
+  {
+    name: "watch", aliases: ["w"],
+    description: "实时行情 Dashboard", usage: "watch <symbol...> [-i N]",
+    options: [{ short: "-i", long: "--interval", key: "interval", type: "string" }],
+    invoke: ({ positional, options }) =>
+      watchCommand(positional, int(options.interval) ? { interval: int(options.interval)! } : undefined),
+  },
+  {
+    name: "export", aliases: ["exp"],
+    description: "导出历史数据", usage: "export <symbol> [-f csv|json] [-d N]",
+    options: [
+      { short: "-f", long: "--format", key: "format", type: "string" },
+      OPT_DAYS,
+    ],
+    invoke: ({ positional, options }) =>
+      exportCommand(positional[0], { format: options.format as string | undefined, days: int(options.days) }),
+  },
+  {
+    name: "history", aliases: ["hist"],
+    description: "历史价格", usage: "history <symbol> [-d N]",
+    options: [OPT_DAYS],
+    invoke: ({ positional, options }) =>
+      historyCommand(positional[0], int(options.days) ? { days: int(options.days)! } : undefined),
+  },
+  {
+    name: "crypto", aliases: ["cr"],
+    description: "加密货币历史", usage: "crypto <symbol> [-d N]",
+    options: [OPT_DAYS],
+    invoke: ({ positional, options }) =>
+      cryptoCommand(positional[0], int(options.days) ? { days: int(options.days)! } : undefined),
+  },
+  {
+    name: "fundamental", aliases: ["fund"],
+    description: "基本面数据", usage: "fundamental <symbol> [--fields income,metrics]",
+    options: [{ short: "", long: "--fields", key: "fields", type: "string" }],
+    invoke: ({ positional, options }) =>
+      fundamentalCommand(positional[0], options.fields ? { fields: options.fields as string } : undefined),
+  },
+  {
+    name: "options", aliases: ["opt"],
+    description: "期权链", usage: "options <symbol> [-l N]",
+    options: [OPT_LIMIT],
+    invoke: ({ positional, options }) =>
+      optionsCommand(positional[0], int(options.limit) ? { limit: int(options.limit)! } : undefined),
+  },
+  {
+    name: "economy", aliases: ["eco"],
+    description: "宏观经济数据", usage: "economy treasury | fred <id> | search <keyword> [-l N]",
+    options: [OPT_LIMIT],
+    invoke: ({ positional, options }) =>
+      economyCommand(positional[0], positional.slice(1), int(options.limit) ? { limit: int(options.limit)! } : undefined),
+  },
+  {
+    name: "search", aliases: ["find"],
+    description: "搜索股票代码", usage: "search <keyword> [-l N]",
+    options: [OPT_LIMIT],
+    invoke: ({ positional, options }) =>
+      searchCommand(positional.join(" "), int(options.limit) ? { limit: int(options.limit)! } : undefined),
+  },
+];
+
+// ── 统一注册到 REPL ──
+for (const def of replDefs) {
+  registerCommand({
+    name: def.name,
+    aliases: def.aliases,
+    description: def.description,
+    usage: def.usage,
+    handler: (args) => def.invoke(parseArgs(args, def.options)),
+  });
+}
 
 // ── 版本更新检查（静默、不阻塞） ──
 checkForUpdate("0.2.0");

@@ -48,3 +48,13 @@ export function parseArgs(args: string[], defs: OptionDef[]): ParsedArgs {
   const positional = args.filter((_, i) => !consumed.has(i));
   return { positional, options };
 }
+
+/** 声明式 REPL 命令定义 — 搭配 parseArgs 消除手写参数解析 */
+export interface ReplCommandDef {
+  name: string;
+  aliases: string[];
+  description: string;
+  usage: string;
+  options: OptionDef[];
+  invoke: (parsed: ParsedArgs) => Promise<void>;
+}
