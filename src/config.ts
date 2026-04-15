@@ -39,19 +39,31 @@ function ensureConfigDir(): void {
 }
 
 export function loadConfig(): ArtiConfig {
-  if (!existsSync(CONFIG_FILE)) return { ...DEFAULT_CONFIG };
-  try {
-    const raw = readFileSync(CONFIG_FILE, "utf-8");
-    const saved = JSON.parse(raw);
-    // 深度合并，保证新增字段有默认值
-    return {
-      api: { ...DEFAULT_CONFIG.api, ...saved.api },
-      display: { ...DEFAULT_CONFIG.display, ...saved.display },
-      watchlist: saved.watchlist ?? DEFAULT_CONFIG.watchlist,
-    };
-  } catch {
-    return { ...DEFAULT_CONFIG };
+  let config: ArtiConfig;
+  if (!existsSync(CONFIG_FILE)) {
+    config = { ...DEFAULT_CONFIG };
+  } else {
+    try {
+      const raw = readFileSync(CONFIG_FILE, "utf-8");
+      const saved = JSON.parse(raw);
+      config = {
+        api: { ...DEFAULT_CONFIG.api, ...saved.api },
+        display: { ...DEFAULT_CONFIG.display, ...saved.display },
+        watchlist: saved.watchlist ?? DEFAULT_CONFIG.watchlist,
+      };
+    } catch {
+      config = { ...DEFAULT_CONFIG };
+    }
   }
+
+  // 环境变量覆盖（优先级高于配置文件）
+  if (process.env.ARTI_API_URL) config.api.baseUrl = process.env.ARTI_API_URL;
+  if (process.env.ARTI_TIMEOUT) {
+    const t = Number(process.env.ARTI_TIMEOUT);
+    if (!isNaN(t) && t > 0) config.api.timeout = t;
+  }
+
+  return config;
 }
 
 export function saveConfig(config: ArtiConfig): void {
