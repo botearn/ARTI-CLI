@@ -44,28 +44,24 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
       return undefined;
     }
 
-    // 逐个 symbol 串行获取（每个 symbol 内 quote+historical 并行）
-    // 避免同时启动过多 Python/OpenBB 子进程导致资源竞争被杀
+    // 多 symbol 并行获取（daemon 模式下安全并发，共享同一 Python 进程）
     spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
-    const quotes: { quote: QuoteData; prices: number[] }[] = [];
 
-    for (let idx = 0; idx < resolved.length; idx++) {
-      const sym = resolved[idx];
-      spinner.text = resolved.length > 1
-        ? `获取 ${sym} 行情... (${idx + 1}/${resolved.length})`
-        : `获取 ${sym} 行情...`;
-      // 完全串行：避免并发子进程争抢 yfinance 资源导致下载失败
+    const fetchOne = async (sym: string): Promise<{ quote: QuoteData; prices: number[] } | null> => {
       let quote: QuoteData;
       try {
         quote = await getQuote(sym);
-      } catch { continue; }
+      } catch { return null; }
       let prices: number[] = [];
       try {
         const hist = await getHistorical(sym, 20);
         prices = hist.map(h => h.close);
       } catch { /* sparkline 非关键 */ }
-      quotes.push({ quote, prices });
-    }
+      return { quote, prices };
+    };
+
+    const results = await Promise.all(resolved.map(fetchOne));
+    const quotes = results.filter((r): r is NonNullable<typeof r> => r !== null);
 
     track("quote", resolved);
 

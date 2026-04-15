@@ -1,15 +1,21 @@
 /**
  * OpenBB 桥接层
- * 通过 child_process 调用 Python 脚本，封装为类型安全的异步函数
+ * 优化架构：
+ * 1. Python 常驻进程（daemon 模式） — 避免每次请求重新加载 OpenBB
+ * 2. 内存缓存（30s TTL） — 短时间内重复请求直接返回
+ * 3. 轻量快速报价（fast_quote） — 跳过 OpenBB 框架直接用 yfinance
+ * 4. 向后兼容 — daemon 不可用时自动降级为单次进程模式
  */
-import { execFile } from "node:child_process";
+import { spawn, execFile, type ChildProcess } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { createInterface, type Interface as RLInterface } from "node:readline";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "..");
-const SCRIPT_PATH = resolve(PROJECT_ROOT, "scripts", "openbb_query.py");
+const DAEMON_SCRIPT = resolve(PROJECT_ROOT, "scripts", "openbb_daemon.py");
+const LEGACY_SCRIPT = resolve(PROJECT_ROOT, "scripts", "openbb_query.py");
 
 /** 自动查找 .venv 中的 Python */
 function findPython(): string {
@@ -110,7 +116,185 @@ export interface SearchResult {
   [key: string]: unknown;
 }
 
-// ── 核心调用 ──
+export interface FundamentalData {
+  income?: Record<string, unknown>[];
+  income_error?: string;
+  balance?: Record<string, unknown>[];
+  balance_error?: string;
+  metrics?: Record<string, unknown>;
+  metrics_error?: string;
+  dividends?: Record<string, unknown>[];
+  dividends_error?: string;
+}
+
+export interface OptionsItem {
+  [key: string]: unknown;
+}
+
+export interface EconomyData {
+  data?: Record<string, unknown>[];
+}
+
+// ── 缓存层（30s TTL）──
+
+interface CacheEntry<T> {
+  data: T;
+  ts: number;
+}
+
+const CACHE_TTL = 30_000; // 30 秒
+const cache = new Map<string, CacheEntry<unknown>>();
+
+function cacheKey(command: string, params: Record<string, unknown>): string {
+  return `${command}:${JSON.stringify(params)}`;
+}
+
+function getFromCache<T>(key: string): T | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > CACHE_TTL) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry.data as T;
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache.set(key, { data, ts: Date.now() });
+  // 清理过期条目（防止内存泄漏）
+  if (cache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of cache) {
+      if (now - v.ts > CACHE_TTL) cache.delete(k);
+    }
+  }
+}
+
+// ── Python 常驻进程管理 ──
+
+interface DaemonResponse {
+  id: string | null;
+  ok: boolean;
+  data?: unknown;
+  error?: string;
+  ready?: boolean;
+}
+
+let daemon: ChildProcess | null = null;
+let daemonRL: RLInterface | null = null;
+let daemonReady = false;
+let daemonFailed = false;
+let readyPromise: Promise<void> | null = null;
+const pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+let reqCounter = 0;
+
+function startDaemon(): Promise<void> {
+  if (readyPromise) return readyPromise;
+  if (daemonFailed) return Promise.reject(new Error("daemon 启动失败"));
+
+  readyPromise = new Promise<void>((resolveReady, rejectReady) => {
+    const proc = spawn(PYTHON, [DAEMON_SCRIPT], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    daemon = proc;
+
+    proc.on("error", (err) => {
+      daemonFailed = true;
+      daemonReady = false;
+      daemon = null;
+      readyPromise = null;
+      rejectReady(err);
+    });
+
+    proc.on("exit", () => {
+      daemonReady = false;
+      daemon = null;
+      readyPromise = null;
+      // reject 所有 pending 请求
+      for (const [id, p] of pending) {
+        clearTimeout(p.timer);
+        p.reject(new Error("Python daemon 进程异常退出"));
+        pending.delete(id);
+      }
+    });
+
+    const rl = createInterface({ input: proc.stdout! });
+    daemonRL = rl;
+
+    rl.on("line", (line) => {
+      let resp: DaemonResponse;
+      try {
+        resp = JSON.parse(line);
+      } catch {
+        return;
+      }
+
+      // ready 信号
+      if (resp.ready) {
+        daemonReady = true;
+        resolveReady();
+        return;
+      }
+
+      // 匹配 pending 请求
+      const id = resp.id as string;
+      const p = pending.get(id);
+      if (!p) return;
+      pending.delete(id);
+      clearTimeout(p.timer);
+
+      if (resp.ok) {
+        p.resolve(resp.data);
+      } else {
+        p.reject(new Error(resp.error || "OpenBB 返回错误"));
+      }
+    });
+
+    // 5 秒内未 ready 则认为启动失败
+    setTimeout(() => {
+      if (!daemonReady) {
+        daemonFailed = true;
+        proc.kill();
+        rejectReady(new Error("daemon 启动超时"));
+      }
+    }, 5000);
+  });
+
+  return readyPromise;
+}
+
+function callDaemon<T>(command: string, params: Record<string, unknown>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (!daemon || !daemon.stdin || !daemonReady) {
+      reject(new Error("daemon 未就绪"));
+      return;
+    }
+
+    const id = String(++reqCounter);
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error("OpenBB 请求超时（>120s），请检查网络或重试"));
+    }, 120_000);
+
+    pending.set(id, {
+      resolve: resolve as (v: unknown) => void,
+      reject,
+      timer,
+    });
+
+    const msg = JSON.stringify({ id, command, params }) + "\n";
+    daemon.stdin.write(msg, (err) => {
+      if (err) {
+        pending.delete(id);
+        clearTimeout(timer);
+        reject(new Error(`写入 daemon 失败: ${err.message}`));
+      }
+    });
+  });
+}
+
+// ── 降级模式：单次进程调用（原有逻辑）──
 
 interface OpenBBResponse<T> {
   ok: boolean;
@@ -118,11 +302,11 @@ interface OpenBBResponse<T> {
   error?: string;
 }
 
-function callOpenBB<T>(command: string, params: Record<string, unknown> = {}): Promise<T> {
+function callLegacy<T>(command: string, params: Record<string, unknown> = {}): Promise<T> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       PYTHON,
-      [SCRIPT_PATH],
+      [LEGACY_SCRIPT],
       { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
@@ -151,14 +335,57 @@ function callOpenBB<T>(command: string, params: Record<string, unknown> = {}): P
       },
     );
 
-    // 注册 error 监听，防止 EPIPE 导致进程崩溃
     if (child.stdin) {
-      child.stdin.on("error", () => { /* 错误由 execFile 回调统一处理 */ });
+      child.stdin.on("error", () => {});
       child.stdin.write(JSON.stringify({ command, params }));
       child.stdin.end();
     }
   });
 }
+
+// ── 核心调用（daemon 优先，降级单次进程，带缓存）──
+
+async function callOpenBB<T>(command: string, params: Record<string, unknown> = {}): Promise<T> {
+  // 查缓存
+  const key = cacheKey(command, params);
+  const cached = getFromCache<T>(key);
+  if (cached !== undefined) return cached;
+
+  let result: T;
+
+  // 尝试 daemon 模式
+  if (!daemonFailed) {
+    try {
+      if (!daemonReady) await startDaemon();
+      result = await callDaemon<T>(command, params);
+      setCache(key, result);
+      return result;
+    } catch {
+      // daemon 失败，标记并降级
+      daemonFailed = true;
+    }
+  }
+
+  // 降级：单次进程
+  result = await callLegacy<T>(command, params);
+  setCache(key, result);
+  return result;
+}
+
+/** 关闭常驻进程（CLI 退出时调用） */
+export function shutdownDaemon(): void {
+  if (daemon && daemon.stdin && daemonReady) {
+    daemon.stdin.write(JSON.stringify({ id: "exit", command: "__exit__" }) + "\n");
+  }
+  if (daemonRL) daemonRL.close();
+  if (daemon) daemon.kill();
+  daemon = null;
+  daemonReady = false;
+  readyPromise = null;
+}
+
+// 进程退出时清理
+process.on("exit", shutdownDaemon);
 
 // ── 信号分类 ──
 
@@ -173,8 +400,13 @@ export function classifySignal(sig: string): "bull" | "bear" | "neutral" {
 
 // ── 公开 API ──
 
-/** 股票实时报价 */
+/** 股票实时报价（轻量模式：fast_quote） */
 export function getQuote(symbol: string): Promise<QuoteData> {
+  return callOpenBB<QuoteData>("fast_quote", { symbol });
+}
+
+/** 股票实时报价（完整 OpenBB 模式） */
+export function getQuoteFull(symbol: string): Promise<QuoteData> {
   return callOpenBB<QuoteData>("quote", { symbol });
 }
 
@@ -231,27 +463,6 @@ export function getCompanyNews(symbol: string, limit = 10): Promise<NewsItem[]> 
 /** 全球新闻 */
 export function getWorldNews(limit = 10): Promise<NewsItem[]> {
   return callOpenBB<NewsItem[]>("news_world", { limit });
-}
-
-// ── 新增：基本面 / 期权 / 宏观经济 ──
-
-export interface FundamentalData {
-  income?: Record<string, unknown>[];
-  income_error?: string;
-  balance?: Record<string, unknown>[];
-  balance_error?: string;
-  metrics?: Record<string, unknown>;
-  metrics_error?: string;
-  dividends?: Record<string, unknown>[];
-  dividends_error?: string;
-}
-
-export interface OptionsItem {
-  [key: string]: unknown;
-}
-
-export interface EconomyData {
-  data?: Record<string, unknown>[];
 }
 
 /** 基本面数据（财报 + 估值指标） */
