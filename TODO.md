@@ -7,13 +7,22 @@
 ## 当前状态
 
 核心功能已全部实现，进入稳定迭代阶段：
-- [x] 12 个 CLI 命令（quote / market / scan / predict / news / research / config / watchlist / insights / watch / export / completion）
-- [x] REPL 交互模式（session 状态管理 + 命令别名）
+- [x] 18 个 CLI 命令（quote / market / scan / predict / history / crypto / fundamental / options / economy / search / news / research / watchlist / watch / export / insights / completion / config）
+- [x] REPL 交互模式（session 状态管理 + 16 个命令别名 + 声明式注册）
+- [x] 统一命令注册表（core/registry.ts — parseArgs 消除 REPL 双重注册）
 - [x] OpenBB 本地数据源（yfinance，免费无 API Key）
 - [x] MCP Server（13 个工具）
 - [x] Supabase Edge Functions API 层（research 命令专用）
 - [x] 终端格式化工具（format.ts — chalk 涨跌着色、sparkline、置信度条）
 - [x] tsup 构建配置
+
+### 实测可用性（2026-04-15）
+
+| 状态 | 命令 |
+|---|---|
+| 16/18 正常 | quote, market, scan, predict, history, crypto, fundamental, options, economy treasury, search, news, watchlist, export, insights, config, completion |
+| 需后端服务 | research（依赖 Supabase Edge Function） |
+| 需 API Key | economy fred / search（FRED API Key，免费） |
 
 ---
 
@@ -264,6 +273,36 @@
 
 ---
 
+## Phase 7：待改进项
+
+> 实测发现的问题和优化方向
+
+### 7.1 输出格式优化
+- [ ] `economy treasury` 利率显示为原始小数（0.0374），应改为百分比（3.74%）
+- [ ] `economy treasury` 缺少日期列，无法判断各行对应哪天
+- [ ] `market gainers/losers` 公司名称被截断（如 "Bloom Energy Corporati"），需适配终端宽度或省略号处理
+- [ ] `options` 隐含波动率显示为百分比整数（410.9%），深度实值/虚值期权数值偏大，考虑筛选或标注
+
+### 7.2 功能完善
+- [ ] `research` 命令后端部署文档 — 补充 Supabase Edge Function 部署步骤，降低使用门槛
+- [ ] `economy fred` API Key 引导 — 首次使用无 Key 时给出注册链接和配置命令提示，而非报错
+- [ ] `predict` 涨跌幅显示 +0.00%（应为 -0.14%），数据源字段映射可能有误
+- [ ] `watch` 命令未做 REPL 可用性测试（交互式轮询）
+- [ ] `completion` 命令未做实际 Shell 集成测试
+
+### 7.3 代码质量
+- [ ] 测试覆盖 — 当前无自动化测试，需补充核心路径单测（openbb 桥接、parseArgs、format 工具函数）
+- [ ] `--json` 输出一致性 — 验证所有 18 个命令的 JSON 输出结构是否统一
+- [ ] REPL parseArgs 边界 — 空参数、重复 flag、未知 flag 的处理
+
+### 7.4 发布与分发
+- [ ] npm publish 发包
+- [ ] Homebrew formula 验证（brew tap + install 全流程）
+- [ ] install.sh 脚本实测（含 Python venv 自动创建）
+- [ ] CI/CD — GitHub Actions 自动构建 + 发版
+
+---
+
 ## 目标文件结构
 
 ```
@@ -292,6 +331,7 @@ src/
     export.ts       ← 数据导出（CSV / JSON）
     completion.ts   ← Shell 自动补全脚本生成
   core/
+    registry.ts     ← 统一命令注册表（parseArgs 声明式参数解析）
     handler.ts      ← 统一命令处理器
     session.ts      ← 会话状态管理
     repl.ts         ← REPL 交互模式
