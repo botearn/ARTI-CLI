@@ -8,7 +8,7 @@
  * 用法：arti research AAPL [--agent tony] [--mode full|layer1-only]
  */
 import chalk from "chalk";
-import ora, { type Ora } from "ora";
+import ora from "ora";
 import {
   streamOrchestrator,
   fetchResearch,
@@ -18,13 +18,20 @@ import {
   type ResearchReport,
   type MasterOpinion,
   type SynthesisResult,
-  type OrchestratorSSEEvent,
 } from "../api.js";
 import { getQuote } from "../openbb.js";
-import { title, divider, sentimentBadge, confidenceBar, colorChange } from "../format.js";
+import { title, divider, sentimentBadge, confidenceBar } from "../format.js";
 import { printError } from "../errors.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
+import {
+  assertSufficientCredits,
+  applyDeduction,
+  printDeductResult,
+  InsufficientCreditsError,
+  type BillingState,
+  type FeatureKey,
+} from "../billing.js";
 
 /** 渲染单个分析师报告（简洁模式） */
 function renderAnalystBrief(agent: string, report: ResearchReport): void {
@@ -123,19 +130,42 @@ export async function researchCommand(
   }
 
   symbol = symbol.toUpperCase();
+
+  // 判断功能档位：单分析师/layer1-only = 全景报告，完整三层 = 深度报告
+  const isDeep = !options.agent && options.mode !== "layer1-only";
+  const featureKey = isDeep ? "deepReport" : "panorama";
+
+  let billingState: BillingState;
+  try {
+    billingState = assertSufficientCredits(featureKey);
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      return;
+    }
+    printError(err);
+    return;
+  }
+
   track("research", [symbol]);
 
   // 单分析师模式：直接调 stock-research（不走 orchestrator）
   if (options.agent) {
-    return runSingleAgent(symbol, options.agent, options.full);
+    return runSingleAgent(symbol, options.agent, options.full, featureKey, billingState);
   }
 
   // 完整三层级模式：调 orchestrator SSE
-  return runOrchestrator(symbol, options);
+  return runOrchestrator(symbol, options, featureKey, billingState);
 }
 
 /** 单分析师快速分析 */
-async function runSingleAgent(symbol: string, agent: string, full?: boolean): Promise<void> {
+async function runSingleAgent(
+  symbol: string,
+  agent: string,
+  full: boolean | undefined,
+  featureKey: FeatureKey,
+  billingState: BillingState,
+): Promise<void> {
   const spinner = ora(`${AGENT_LABELS[agent] || agent} 分析 ${symbol}...`).start();
 
   try {
@@ -146,6 +176,7 @@ async function runSingleAgent(symbol: string, agent: string, full?: boolean): Pr
     } catch { /* ignore */ }
 
     const report = await fetchResearch(symbol, agent, stockData);
+    const deduct = applyDeduction(featureKey, billingState);
     spinner.stop();
 
     output({ symbol, agent, label: AGENT_LABELS[agent], ...report }, () => {
@@ -156,6 +187,7 @@ async function runSingleAgent(symbol: string, agent: string, full?: boolean): Pr
         console.log(report.fullReport.split("\n").map(l => `  ${l}`).join("\n"));
       }
       console.log(divider());
+      if (deduct) printDeductResult(deduct);
     });
   } catch (err) {
     spinner.fail("分析失败");
@@ -167,6 +199,8 @@ async function runSingleAgent(symbol: string, agent: string, full?: boolean): Pr
 async function runOrchestrator(
   symbol: string,
   options: { full?: boolean; mode?: string },
+  featureKey: FeatureKey,
+  billingState: BillingState,
 ): Promise<void> {
   let spinner = ora(`连接 ARTI 研报引擎...`).start();
 
@@ -311,11 +345,15 @@ async function runOrchestrator(
     };
 
     // JSON 模式下直接输出
+    const deduct = (reports.length || masterOpinions.length || synthesis)
+      ? applyDeduction(featureKey, billingState)
+      : undefined;
     output(jsonData, () => {
       // 终端模式已在 SSE 事件中实时渲染完毕
       if (!reports.length && !hasError) {
         console.log(chalk.yellow("  未获取到研报数据"));
       }
+      if (deduct) printDeductResult(deduct);
     });
   } catch (err) {
     spinner.fail("研报生成失败");

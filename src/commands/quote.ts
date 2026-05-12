@@ -8,6 +8,8 @@ import { colorChange, kvLine, divider, title, sparkline } from "../format.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
+import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
+import { printError } from "../errors.js";
 
 export async function quoteCommand(symbols: string[]): Promise<void> {
   if (!symbols.length) {
@@ -15,61 +17,76 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
     return;
   }
 
-  const result = await handleCommand("获取行情数据...", async ({ spinner }) => {
-    // 解析 symbols：标准代码直接用，中文名先搜索
-    const resolved: string[] = [];
-    for (const s of symbols) {
-      if (/^[A-Z0-9.^=]+$/i.test(s)) {
-        resolved.push(s.toUpperCase());
-      } else {
-        spinner.text = `搜索 "${s}"...`;
-        try {
-          const results = await searchEquity(s, 1);
-          if (results.length && results[0].symbol) {
-            resolved.push(results[0].symbol);
-            spinner.text = `"${s}" → ${results[0].symbol}`;
-          } else {
-            spinner.warn(`无法识别 "${s}"，已跳过`);
+  let billed;
+  try {
+    billed = await withBilling("chat", () => handleCommand("获取行情数据...", async ({ spinner }) => {
+      // 解析 symbols：标准代码直接用，中文名先搜索
+      const resolved: string[] = [];
+      for (const s of symbols) {
+        if (/^[A-Z0-9.^=]+$/i.test(s)) {
+          resolved.push(s.toUpperCase());
+        } else {
+          spinner.text = `搜索 "${s}"...`;
+          try {
+            const results = await searchEquity(s, 1);
+            if (results.length && results[0].symbol) {
+              resolved.push(results[0].symbol);
+              spinner.text = `"${s}" → ${results[0].symbol}`;
+            } else {
+              spinner.warn(`无法识别 "${s}"，已跳过`);
+              spinner.start();
+            }
+          } catch {
+            spinner.warn(`搜索 "${s}" 失败，已跳过`);
             spinner.start();
           }
-        } catch {
-          spinner.warn(`搜索 "${s}" 失败，已跳过`);
-          spinner.start();
         }
       }
+
+      if (!resolved.length) {
+        spinner.fail("没有可查询的股票代码");
+        return undefined;
+      }
+
+      // 多 symbol 并行获取（daemon 模式下安全并发，共享同一 Python 进程）
+      spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
+
+      const fetchOne = async (sym: string): Promise<{ quote: QuoteData; prices: number[] } | null> => {
+        let quote: QuoteData;
+        try {
+          quote = await getQuote(sym);
+        } catch { return null; }
+        let prices: number[] = [];
+        try {
+          const hist = await getHistorical(sym, 20);
+          prices = hist.map(h => h.close);
+        } catch { /* sparkline 非关键 */ }
+        return { quote, prices };
+      };
+
+      const results = await Promise.all(resolved.map(fetchOne));
+      const quotes = results.filter((r): r is NonNullable<typeof r> => r !== null);
+      if (!quotes.length) {
+        spinner.fail("未获取到行情数据");
+        return undefined;
+      }
+
+      track("quote", resolved);
+
+      return { quotes: quotes.map(q => ({ ...q.quote, sparkline: q.prices })), _quotes: quotes };
+    }));
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      return;
     }
+    printError(err);
+    return;
+  }
 
-    if (!resolved.length) {
-      spinner.fail("没有可查询的股票代码");
-      return undefined;
-    }
+  if (!billed) return;
 
-    // 多 symbol 并行获取（daemon 模式下安全并发，共享同一 Python 进程）
-    spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
-
-    const fetchOne = async (sym: string): Promise<{ quote: QuoteData; prices: number[] } | null> => {
-      let quote: QuoteData;
-      try {
-        quote = await getQuote(sym);
-      } catch { return null; }
-      let prices: number[] = [];
-      try {
-        const hist = await getHistorical(sym, 20);
-        prices = hist.map(h => h.close);
-      } catch { /* sparkline 非关键 */ }
-      return { quote, prices };
-    };
-
-    const results = await Promise.all(resolved.map(fetchOne));
-    const quotes = results.filter((r): r is NonNullable<typeof r> => r !== null);
-
-    track("quote", resolved);
-
-    return { quotes: quotes.map(q => ({ ...q.quote, sparkline: q.prices })), _quotes: quotes };
-  });
-
-  if (!result) return;
-
+  const { result, deduct } = billed;
   const { _quotes: quotes } = result;
 
   output({ quotes: result.quotes }, () => {
@@ -106,5 +123,7 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
 
       console.log(divider());
     }
+
+    printDeductResult(deduct);
   });
 }

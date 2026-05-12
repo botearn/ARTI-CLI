@@ -8,49 +8,63 @@ import { getCompanyNews, getWorldNews, type NewsItem } from "../openbb.js";
 import { title, divider } from "../format.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
-import { handleCommandWithOutput } from "../core/handler.js";
+import { handleCommand } from "../core/handler.js";
+import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
+import { printError } from "../errors.js";
 
 export async function newsCommand(symbol?: string, options?: { limit?: number }): Promise<void> {
   const limit = options?.limit || 15;
   const isCompany = !!symbol;
   const label = isCompany ? `${symbol!.toUpperCase()} 公司新闻` : "全球财经新闻";
 
-  await handleCommandWithOutput(`获取${label}...`, async () => {
-    const news: NewsItem[] = isCompany
-      ? await getCompanyNews(symbol!.toUpperCase(), limit)
-      : await getWorldNews(limit);
+  let billed;
+  try {
+    billed = await withBilling("chat", () => handleCommand(`获取${label}...`, async () => {
+      const news: NewsItem[] = isCompany
+        ? await getCompanyNews(symbol!.toUpperCase(), limit)
+        : await getWorldNews(limit);
 
-    track("news", isCompany ? [symbol!.toUpperCase()] : []);
+      track("news", isCompany ? [symbol!.toUpperCase()] : []);
+      return { symbol: symbol?.toUpperCase() || null, news };
+    }));
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      return;
+    }
+    printError(err);
+    return;
+  }
 
-    const data = { symbol: symbol?.toUpperCase() || null, news };
-    return {
-      data,
-      render: () => {
-        console.log(title(label));
+  if (!billed) return;
 
-        if (!news.length) {
-          console.log(chalk.yellow("  暂无新闻"));
-          if (isCompany) {
-            console.log(chalk.gray("  提示: 部分非美股代码可能无新闻覆盖，试试 arti news 查看全球新闻"));
-          }
-          return;
-        }
+  const { result: data, deduct } = billed;
+  output(data, () => {
+    console.log(title(label));
 
-        for (let i = 0; i < news.length; i++) {
-          const n = news[i];
-          const num = chalk.gray(`${String(i + 1).padStart(2)}.`);
-          const date = n.date ? chalk.gray(`[${n.date.slice(0, 10)}]`) : "";
-          const source = n.source ? chalk.blue(`(${n.source})`) : "";
+    if (!data.news.length) {
+      console.log(chalk.yellow("  暂无新闻"));
+      if (isCompany) {
+        console.log(chalk.gray("  提示: 部分非美股代码可能无新闻覆盖，试试 arti news 查看全球新闻"));
+      }
+      printDeductResult(deduct);
+      return;
+    }
 
-          console.log(`  ${num} ${date} ${chalk.white(n.title)} ${source}`);
-          if (n.url) {
-            console.log(`      ${chalk.gray.underline(n.url)}`);
-          }
-          console.log();
-        }
+    for (let i = 0; i < data.news.length; i++) {
+      const n = data.news[i];
+      const num = chalk.gray(`${String(i + 1).padStart(2)}.`);
+      const date = n.date ? chalk.gray(`[${n.date.slice(0, 10)}]`) : "";
+      const source = n.source ? chalk.blue(`(${n.source})`) : "";
 
-        console.log(divider());
-      },
-    };
+      console.log(`  ${num} ${date} ${chalk.white(n.title)} ${source}`);
+      if (n.url) {
+        console.log(`      ${chalk.gray.underline(n.url)}`);
+      }
+      console.log();
+    }
+
+    console.log(divider());
+    printDeductResult(deduct);
   });
 }

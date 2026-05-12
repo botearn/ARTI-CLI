@@ -24,6 +24,7 @@ import { fundamentalCommand } from "./commands/fundamental.js";
 import { optionsCommand } from "./commands/options.js";
 import { economyCommand } from "./commands/economy.js";
 import { searchCommand } from "./commands/search.js";
+import { creditsCommand } from "./commands/credits.js";
 import chalk from "chalk";
 import { setJsonMode } from "./output.js";
 import { checkForUpdate } from "./update-check.js";
@@ -301,6 +302,19 @@ const defs: CommandDef[] = [
     options: [],
     examples: [],
     invoke: () => insightsCommand(),
+  },
+  {
+    name: "credits", aliases: ["cred"],
+    description: "查看 Credit 余额与套餐详情",
+    usage: "credits",
+    args: [],
+    options: [{ short: "", long: "--set-plan", key: "setPlan", type: "string", desc: "本地切换套餐: free|basic|pro|flagship", hint: "<plan>" }],
+    examples: [
+      "$ arti credits            # 查看余额和套餐",
+      "$ arti credits --set-plan pro   # 本地切换到专业版",
+      "$ arti credits --json     # JSON 格式输出",
+    ],
+    invoke: ({ options }) => creditsCommand({ setPlan: options.setPlan as string | undefined }),
   },
   {
     name: "completion", aliases: [],

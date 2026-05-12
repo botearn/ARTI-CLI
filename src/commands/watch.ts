@@ -7,6 +7,8 @@ import chalk from "chalk";
 import { getQuote, type QuoteData } from "../openbb.js";
 import { colorChange, sparkline } from "../format.js";
 import { track } from "../tracker.js";
+import { withBilling, InsufficientCreditsError } from "../billing.js";
+import { printError } from "../errors.js";
 
 interface WatchOptions {
   interval?: number;
@@ -22,7 +24,21 @@ export async function watchCommand(symbols: string[], opts?: WatchOptions): Prom
   const intervalSec = opts?.interval ?? 15;
   const priceHistory: Map<string, number[]> = new Map();
 
-  track("watch", resolved);
+  try {
+    const billed = await withBilling("chat", async () => {
+      track("watch", resolved);
+      return true;
+    });
+    if (!billed) return;
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      return;
+    }
+    printError(err);
+    return;
+  }
+
   console.log(chalk.cyan(`\n  实时行情 Dashboard — 每 ${intervalSec}s 刷新 (Ctrl+C 退出)\n`));
 
   async function refresh(): Promise<void> {

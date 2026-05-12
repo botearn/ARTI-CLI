@@ -8,11 +8,27 @@
 import chalk from "chalk";
 import { getWatchlist, watchlistAdd, watchlistRemove } from "../core/session.js";
 import { quoteCommand } from "./quote.js";
+import { assertWatchlistCapacity, PlanAccessError } from "../billing.js";
+import { printError } from "../errors.js";
 
 export async function watchlistCommand(sub?: string, symbols?: string[]): Promise<void> {
   if (sub === "add") {
     if (!symbols?.length) {
       console.log(chalk.red("请提供股票代码，例如：arti watchlist add AAPL NVDA"));
+      return;
+    }
+    try {
+      const existing = new Set(getWatchlist());
+      const uniqueAdds = symbols
+        .map((symbol) => symbol.toUpperCase().trim())
+        .filter((symbol, index, arr) => symbol && arr.indexOf(symbol) === index && !existing.has(symbol));
+      assertWatchlistCapacity(existing.size + uniqueAdds.length);
+    } catch (err) {
+      if (err instanceof PlanAccessError) {
+        console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+        return;
+      }
+      printError(err);
       return;
     }
     const added = watchlistAdd(...symbols);

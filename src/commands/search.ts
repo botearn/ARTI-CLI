@@ -7,7 +7,10 @@ import chalk from "chalk";
 import { searchEquity, type SearchResult } from "../openbb.js";
 import { title, divider } from "../format.js";
 import { track } from "../tracker.js";
-import { handleCommandWithOutput } from "../core/handler.js";
+import { output } from "../output.js";
+import { handleCommand } from "../core/handler.js";
+import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
+import { printError } from "../errors.js";
 
 export async function searchCommand(query: string, options?: { limit?: number }): Promise<void> {
   if (!query) {
@@ -17,33 +20,45 @@ export async function searchCommand(query: string, options?: { limit?: number })
 
   const limit = options?.limit ?? 10;
 
-  await handleCommandWithOutput(`搜索 "${query}"...`, async () => {
-    const results = await searchEquity(query, limit);
-    track("search", [query]);
+  let billed;
+  try {
+    billed = await withBilling("chat", () => handleCommand(`搜索 "${query}"...`, async () => {
+      const results = await searchEquity(query, limit);
+      track("search", [query]);
+      return { query, results };
+    }));
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      return;
+    }
+    printError(err);
+    return;
+  }
 
-    const data = { query, results };
-    return {
-      data,
-      render: () => {
-        console.log(title(`搜索: "${query}"`));
+  if (!billed) return;
 
-        if (!results.length) {
-          console.log(chalk.yellow("  未找到匹配结果"));
-          return;
-        }
+  const { result: data, deduct } = billed;
+  output(data, () => {
+    console.log(title(`搜索: "${query}"`));
 
-        console.log(chalk.gray("  代码".padEnd(14) + "公司名称"));
-        console.log(chalk.gray("  " + "─".repeat(50)));
+    if (!data.results.length) {
+      console.log(chalk.yellow("  未找到匹配结果"));
+      printDeductResult(deduct);
+      return;
+    }
 
-        for (const r of results) {
-          const sym = chalk.bold((r.symbol || "").padEnd(12));
-          const name = chalk.white(r.name || "");
-          console.log(`  ${sym}${name}`);
-        }
+    console.log(chalk.gray("  代码".padEnd(14) + "公司名称"));
+    console.log(chalk.gray("  " + "─".repeat(50)));
 
-        console.log(divider());
-        console.log(chalk.gray(`  共 ${results.length} 条结果\n`));
-      },
-    };
+    for (const r of data.results) {
+      const sym = chalk.bold((r.symbol || "").padEnd(12));
+      const name = chalk.white(r.name || "");
+      console.log(`  ${sym}${name}`);
+    }
+
+    console.log(divider());
+    console.log(chalk.gray(`  共 ${data.results.length} 条结果\n`));
+    printDeductResult(deduct);
   });
 }

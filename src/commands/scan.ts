@@ -8,6 +8,8 @@ import { title, kvLine, divider, colorChange } from "../format.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
+import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
+import { printError } from "../errors.js";
 
 export async function scanCommand(symbol: string): Promise<void> {
   if (!symbol) {
@@ -17,14 +19,25 @@ export async function scanCommand(symbol: string): Promise<void> {
 
   symbol = symbol.toUpperCase();
 
-  const data = await handleCommand(`扫描 ${symbol} 技术指标...`, async () => {
-    const result = await getTechnical(symbol);
-    track("scan", [symbol]);
-    return result;
-  });
+  let billed;
+  try {
+    billed = await withBilling("quickScan", () => handleCommand(`扫描 ${symbol} 技术指标...`, async () => {
+      const result = await getTechnical(symbol);
+      track("scan", [symbol]);
+      return result;
+    }));
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      return;
+    }
+    printError(err);
+    return;
+  }
 
-  if (!data) return;
+  if (!billed) return;
 
+  const { result: data, deduct } = billed;
   if (data.error) {
     console.log(chalk.red(`  ${data.error}`));
     return;
@@ -115,5 +128,6 @@ export async function scanCommand(symbol: string): Promise<void> {
     console.log(`\n  ${chalk.bold("综合研判:")} ${signalColor(data.overall_signal)}`);
 
     console.log(divider());
+    printDeductResult(deduct);
   });
 }

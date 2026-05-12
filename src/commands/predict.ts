@@ -4,11 +4,13 @@
  * 用法：arti predict AAPL
  */
 import chalk from "chalk";
-import { getQuote, getTechnical, getCompanyNews, classifySignal, type QuoteData, type TechnicalData, type NewsItem } from "../openbb.js";
-import { title, divider, sentimentBadge, colorChange, kvLine, sparkline, confidenceBar } from "../format.js";
+import { getQuote, getTechnical, getCompanyNews, classifySignal, type QuoteData, type TechnicalData } from "../openbb.js";
+import { title, divider, sentimentBadge, colorChange, kvLine, confidenceBar } from "../format.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
+import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
+import { printError } from "../errors.js";
 
 /** 根据技术指标生成综合预测 */
 function generatePrediction(quote: QuoteData | null, tech: TechnicalData) {
@@ -69,21 +71,32 @@ export async function predictCommand(symbol: string): Promise<void> {
 
   symbol = symbol.toUpperCase();
 
-  const result = await handleCommand(`获取 ${symbol} 数据进行综合预测...`, async () => {
-    // 串行获取：避免并发子进程争抢 yfinance 资源
-    let quote = null;
-    try { quote = await getQuote(symbol); } catch { /* ignore */ }
-    let tech = null;
-    try { tech = await getTechnical(symbol); } catch { /* ignore */ }
-    let news: Awaited<ReturnType<typeof getCompanyNews>> = [];
-    try { news = await getCompanyNews(symbol, 5); } catch { /* ignore */ }
-    track("predict", [symbol]);
+  let billed;
+  try {
+    billed = await withBilling("quickScan", () => handleCommand(`获取 ${symbol} 数据进行综合预测...`, async () => {
+      // 串行获取：避免并发子进程争抢 yfinance 资源
+      let quote = null;
+      try { quote = await getQuote(symbol); } catch { /* ignore */ }
+      let tech = null;
+      try { tech = await getTechnical(symbol); } catch { /* ignore */ }
+      let news: Awaited<ReturnType<typeof getCompanyNews>> = [];
+      try { news = await getCompanyNews(symbol, 5); } catch { /* ignore */ }
+      track("predict", [symbol]);
 
-    return { quote, tech, news };
-  });
+      return { quote, tech, news };
+    }));
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      return;
+    }
+    printError(err);
+    return;
+  }
 
-  if (!result) return;
+  if (!billed) return;
 
+  const { result, deduct } = billed;
   const { quote, tech, news } = result;
 
   if (!tech || tech.error) {
@@ -163,5 +176,6 @@ export async function predictCommand(symbol: string): Promise<void> {
     console.log(divider());
     console.log(chalk.gray("  * 以上分析基于 OpenBB 技术指标自动生成，仅供参考，不构成投资建议"));
     console.log();
+    printDeductResult(deduct);
   });
 }
