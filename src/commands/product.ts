@@ -28,7 +28,7 @@ export async function fullReportCommand(
   }
 
   return researchCommand(symbol, {
-    mode: "panorama",
+    mode: "layer1-only",  // 修复：全景报告对应后端的 layer1-only
     full: options?.full,
   });
 }
@@ -43,7 +43,7 @@ export async function deepReportCommand(
   }
 
   return researchCommand(symbol, {
-    mode: "deep",
+    mode: "full",  // 修复：深度报告对应后端的 full（包含 Layer 1+2+3）
     full: options?.full,
   });
 }

@@ -437,7 +437,7 @@ export async function* streamOrchestratorBackend(
       },
       body: JSON.stringify({
         symbol,
-        mode: opts?.mode || "full",
+        mode: opts?.mode || "layer1-only",  // 修复：默认全景报告而非深度报告
         layer1Agents: opts?.layer1Agents,
         layer2Masters: opts?.layer2Masters,
       }),
