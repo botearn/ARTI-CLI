@@ -13,6 +13,11 @@ export interface ArtiConfig {
     baseUrl: string;
     timeout: number;
   };
+  backend: {
+    enabled: boolean;
+    url: string;
+    timeout: number;
+  };
   auth: {
     token: string;
     userId: string;
@@ -35,6 +40,11 @@ const DEFAULT_CONFIG: ArtiConfig = {
   api: {
     baseUrl: "https://laoclhqedllwjuboyqib.supabase.co/functions/v1",
     timeout: 30000,
+  },
+  backend: {
+    enabled: true,
+    url: "",
+    timeout: 60000,
   },
   auth: {
     token: "",
@@ -70,6 +80,7 @@ export function loadConfig(): ArtiConfig {
       const saved = JSON.parse(raw);
       config = {
         api: { ...DEFAULT_CONFIG.api, ...saved.api },
+        backend: { ...DEFAULT_CONFIG.backend, ...saved.backend },
         auth: { ...DEFAULT_CONFIG.auth, ...saved.auth },
         data: { ...DEFAULT_CONFIG.data, ...saved.data },
         display: { ...DEFAULT_CONFIG.display, ...saved.display },
@@ -85,6 +96,14 @@ export function loadConfig(): ArtiConfig {
   if (process.env.ARTI_TIMEOUT) {
     const t = Number(process.env.ARTI_TIMEOUT);
     if (!isNaN(t) && t > 0) config.api.timeout = t;
+  }
+  if (process.env.ARTI_BACKEND_URL) config.backend.url = process.env.ARTI_BACKEND_URL;
+  if (process.env.ARTI_BACKEND_ENABLED !== undefined) {
+    config.backend.enabled = process.env.ARTI_BACKEND_ENABLED !== "false";
+  }
+  if (process.env.ARTI_BACKEND_TIMEOUT) {
+    const t = Number(process.env.ARTI_BACKEND_TIMEOUT);
+    if (!isNaN(t) && t > 0) config.backend.timeout = t;
   }
   if (process.env.ARTI_AUTH_TOKEN) config.auth.token = process.env.ARTI_AUTH_TOKEN;
   if (process.env.ARTI_USER_ID) config.auth.userId = process.env.ARTI_USER_ID;
@@ -124,6 +143,7 @@ export function getConfigValue(key: string): unknown {
 
 const ALLOWED_CONFIG_KEYS = new Set([
   "api.baseUrl", "api.timeout",
+  "backend.enabled", "backend.url", "backend.timeout",
   "auth.token", "auth.userId", "auth.email",
   "data.provider", "data.artiDataBaseUrl", "data.artiDataTimeout", "data.artiDataInternalKey",
   "display.market", "display.lang",

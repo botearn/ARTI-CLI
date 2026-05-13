@@ -9,6 +9,12 @@ ARTI 是一个基于 OpenBB 的金融数据命令行工具，同时提供 MCP Se
 - `src/openbb.ts` — OpenBB Python 桥接层（通过 child_process 调用）
 - `scripts/openbb_query.py` — Python 端 OpenBB 数据查询脚本
 - `src/commands/` — CLI 各命令实现
+- `prompts/` — AI 研报 prompt 定义（从 ARTI_backend 同步）
+  - `layer1/` — 8 位分析师 prompt（Natasha/Steve/Tony/Thor/Clint/Sam/Vision/Wanda）
+  - `layer2/` — 7 位投资大师 prompt（巴菲特/林奇/马克斯/索罗斯/达里奥/德鲁肯米勒/段永平）
+  - `panorama_synthesizer.yaml` — 全景研报综合裁定
+  - `synthesizer.yaml` — 深度研报综合裁定
+  - `_common.yaml` — 公共 prompt 片段
 
 ## 依赖环境
 

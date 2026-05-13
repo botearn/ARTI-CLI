@@ -235,6 +235,15 @@ async function runOrchestrator(
   spinner.text = `正在获取 ${symbol} 行情与技术数据...`;
   const context = await buildResearchStockContext(symbol);
   const stockData = context.stockData;
+
+  // 调试日志
+  console.log(chalk.gray(`\n  [调试] stockData 长度: ${stockData.length} 字符`));
+  if (stockData.length > 0) {
+    console.log(chalk.gray(`  [调试] stockData 预览: ${stockData.substring(0, 100)}...`));
+  } else {
+    console.log(chalk.red(`  [调试] ⚠️ stockData 为空！`));
+  }
+
   spinner.text = `连接 ARTI 研报引擎...`;
 
   // 收集所有结果
@@ -301,7 +310,12 @@ async function runOrchestrator(
           const bearish = reports.filter(r => r.report.sentiment === "看空").length;
           const neutral = reports.filter(r => r.report.sentiment === "中性").length;
 
-          console.log(chalk.bold.cyan(`\n  ━━━ ${symbol} 核心结论 ━━━\n`));
+          // 判断报告类型（根据分析师数量和模式）
+          const isPanoramaReport = options.mode === "layer1-only" || reports.length <= 5;
+          const reportTypeLabel = isPanoramaReport ? "全景报告" : "深度研报";
+          const reportIconLabel = isPanoramaReport ? "📊" : "📈";
+
+          console.log(chalk.bold.cyan(`\n  ${reportIconLabel} ${symbol} ${reportTypeLabel} · 核心结论\n`));
           const consensusSentiment = bullish > bearish + neutral ? "看多" :
                                       bearish > bullish + neutral ? "看空" : "中性";
           const avgConfidence = Math.round(
@@ -309,7 +323,7 @@ async function runOrchestrator(
           );
           console.log(
             `  ${sentimentBadge(consensusSentiment)} ` +
-            `${chalk.gray("综合置信度")} ${confidenceBar(avgConfidence)}`
+            `${chalk.gray("综合置信度")} ${confidenceBar(avgConfidence)} ${chalk.gray(`(${avgConfidence}%)`)}`
           );
           console.log(
             `  ${chalk.gray("分析师共识:")} ` +
@@ -317,6 +331,13 @@ async function runOrchestrator(
             `${chalk.green(`看空 ${bearish}`)} | ` +
             `${chalk.yellow(`中性 ${neutral}`)}`
           );
+
+          // 显示报告覆盖范围
+          if (isPanoramaReport) {
+            console.log(chalk.gray(`  ${chalk.dim("覆盖范围:")} 宏观环境 · 板块轮动 · 技术面 · 基本面 · 风控`));
+          } else {
+            console.log(chalk.gray(`  ${chalk.dim("覆盖范围:")} 8维全面分析 · 量化验证 · 组合策略`));
+          }
 
           // R3: 消除暂无数据尴尬 - 过滤掉置信度过低或明显缺数据的分析师
           const validReports = reports.filter(r => {
@@ -373,25 +394,63 @@ async function runOrchestrator(
           break;
 
         case "layer2_complete":
-          spinner.succeed(`Layer 2 完成 — ${masterOpinions.length} 位大师辩论`);
+          const isPanoramaMode = masterOpinions.length <= 4;
+          const debateType = isPanoramaMode ? "轻量辩论" : "完整辩论";
+          spinner.succeed(`Layer 2 完成 — ${masterOpinions.length} 位大师${debateType}`);
+
           // 渲染大师辩论
-          console.log(title(`投资大师圆桌 (Layer 2)`));
+          const debateIcon = isPanoramaMode ? "💬" : "🎯";
+          console.log(title(`${debateIcon} 投资大师圆桌 (Layer 2)`));
+
+          if (isPanoramaMode) {
+            console.log(chalk.gray(`  ${chalk.dim("模式:")} 全景模式 — 聚焦核心分歧，快速定位关键风险`));
+          } else {
+            console.log(chalk.gray(`  ${chalk.dim("模式:")} 深度模式 — 七位大师完整辩论，多空充分博弈`));
+          }
+
           if (routeRule) {
-            console.log(chalk.gray(`  路由策略: ${routeRule}`));
+            console.log(chalk.gray(`  ${chalk.dim("路由策略:")} ${routeRule}`));
             if (routeReasoning) console.log(chalk.gray(`  ${routeReasoning}\n`));
           }
           for (const { master, opinion } of masterOpinions) {
             renderMasterOpinion(master, opinion);
           }
           console.log(divider());
-          spinner = ora("Synthesis — 生成最终裁定...").start();
+
+          const synthesisType = isPanoramaMode ? "压缩总结" : "深度裁定";
+          spinner = ora(`Synthesis — 生成${synthesisType}...`).start();
           break;
 
         case "synthesis":
           synthesis = event.opinion || null;
-          spinner.succeed("Synthesis 完成");
+          const isFinalPanorama = masterOpinions.length <= 4;
+          const synthesisLabel = isFinalPanorama ? "全景总结" : "深度裁定";
+
+          spinner.succeed(`${synthesisLabel}完成`);
+
           if (synthesis) {
             renderSynthesis(synthesis);
+          }
+
+          // 显示报告完成状态
+          const finalReportType = isFinalPanorama ? "全景报告" : "深度研报";
+          const finalReportIcon = isFinalPanorama ? "📊" : "📈";
+          console.log(chalk.bold.green(`\n  ${finalReportIcon} ${finalReportType}已生成完成\n`));
+
+          // 显示关键指标总结
+          const finalBullish = reports.filter(r => r.report.sentiment === "看多").length;
+          const finalBearish = reports.filter(r => r.report.sentiment === "看空").length;
+          const finalAvgConf = Math.round(
+            reports.reduce((sum, r) => sum + r.report.confidence, 0) / reports.length
+          );
+
+          console.log(chalk.gray(`  分析师维度: ${reports.length} 位 | 大师辩论: ${masterOpinions.length} 位`));
+          console.log(chalk.gray(`  多空比: ${chalk.red(finalBullish)}:${chalk.green(finalBearish)} | 平均置信度: ${finalAvgConf}%`));
+
+          if (isFinalPanorama) {
+            console.log(chalk.gray(`  用途场景: 快速全景扫描 · 日常监控 · 趋势判断`));
+          } else {
+            console.log(chalk.gray(`  用途场景: 重仓决策 · 深度研究 · 投委会报告`));
           }
 
           // R4: 最终展示详细报告（可选）
@@ -418,7 +477,7 @@ async function runOrchestrator(
             }
           } else {
             console.log(
-              chalk.gray("\n  提示: 使用 --full 选项查看完整详细报告\n")
+              chalk.gray("\n  💡 提示: 使用 --full 选项查看完整详细报告\n")
             );
           }
 
