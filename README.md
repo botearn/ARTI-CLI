@@ -1,6 +1,21 @@
-# ARTI CLI
+# ARTI CLI 
 
-智能投研命令行工具 — OpenBB 驱动的股票分析终端 + MCP Server
+<div align="center">
+
+**🚀 智能投研命令行工具 — OpenBB 驱动的股票分析终端 + MCP Server**
+
+[![Version](https://img.shields.io/badge/version-0.2.0--beta-orange)](https://github.com/botearn/ARTI-CLI)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
+
+</div>
+
+---
+
+> ⚠️ **当前版本为 Public Beta，正在积极开发中。**  
+> 基础功能（行情、技术面、预测）已稳定可用。  
+> 高级研报功能（`full`/`deep`）需额外配置后端服务。
 
 ```
 $ arti market
@@ -62,23 +77,45 @@ npm link
 
 ### 2. 首次体验
 
-```bash
-arti quick-scan AAPL
-arti full NVDA
-arti deep TSLA
-```
-
-如果你只想体验公开基础能力，也可以用：
+#### 🎯 推荐体验路径（3 步快速上手）
 
 ```bash
-arti quote AAPL
-arti market
-arti scan AAPL
-arti history AAPL -d 30
-arti predict NVDA
+# 步骤 1：查看实时行情
+$ arti quote AAPL
+  苹果公司 (AAPL)                               2025-01-15 16:00:00
+  ────────────────────────────────────────────────────────────────
+  当前价格     $234.56     ▲ $2.34 (1.01%)
+  开盘         $232.22     52周最高    $250.00
+  最高         $235.00     52周最低    $180.00
+  最低         $231.80     50日均线    $230.45
+  成交量       45.2M       近期走势    ▁▂▃▅▆█▇▆
+
+# 步骤 2：技术面扫描
+$ arti scan AAPL
+  [显示 MA/RSI/MACD/布林带等 8 项技术指标]
+
+# 步骤 3：综合研判
+$ arti quick-scan AAPL
+  [整合行情 + 技术面 + 新闻，生成多空判断]
 ```
 
-`quick-scan` 默认走本地 OpenBB + yfinance 免费链路；`full` / `deep` 需要单独 research 后端。
+#### 🚀 高级能力体验（需配置后端）
+
+```bash
+arti full NVDA      # 多分析师全景报告
+arti deep TSLA      # 三层级深度研报
+```
+
+#### 💡 更多基础功能
+
+```bash
+arti market                 # 全球市场概览
+arti market gainers         # 今日涨幅榜
+arti history AAPL -d 30     # 30 天历史数据
+arti predict NVDA           # AI 综合预测
+arti news AAPL              # 公司新闻
+arti watchlist add AAPL     # 加入自选股
+```
 
 ## 主产品三档
 
@@ -607,8 +644,15 @@ ARTI-CLI/
 │       ├── insights.ts       # 投研洞察
 │       ├── completion.ts     # Shell 补全脚本生成
 │       └── config.ts         # 配置管理命令
+├── prompts/                  # AI 研报 prompt 定义（从 ARTI_backend 同步）
+│   ├── layer1/               # 8 位分析师 prompt
+│   ├── layer2/               # 7 位投资大师 prompt
+│   ├── panorama_synthesizer.yaml  # 全景研报综合裁定
+│   ├── synthesizer.yaml      # 深度研报综合裁定
+│   └── _common.yaml          # 公共 prompt 片段
 ├── scripts/
 │   └── openbb_query.py       # OpenBB 数据查询脚本
+├── docs/                     # 项目文档
 ├── package.json
 ├── tsconfig.json
 └── CLAUDE.md                 # AI 助手项目说明

@@ -3,8 +3,7 @@
  * 测试 renderAnalystBrief 对异常数据的容错
  */
 
-import { describe, it } from "node:test";
-import assert from "node:assert";
+import { describe, it, expect } from "vitest";
 
 describe("keyPoints 容错处理", () => {
   it("应该处理 keyPoints 为字符串的情况", () => {
@@ -19,13 +18,13 @@ describe("keyPoints 容错处理", () => {
     };
 
     // 测试 Array.isArray 检查
-    assert.strictEqual(Array.isArray(report.keyPoints), false);
+    expect(Array.isArray(report.keyPoints)).toBe(false);
 
     // 测试字符串转数组
     if (typeof report.keyPoints === "string") {
       const points = report.keyPoints.split("\n").filter((line: string) => line.trim());
-      assert.strictEqual(points.length, 3);
-      assert.strictEqual(points[0], "第一点");
+      expect(points.length).toBe(3);
+      expect(points[0]).toBe("第一点");
     }
   });
 
@@ -39,8 +38,8 @@ describe("keyPoints 容错处理", () => {
       fullReport: "完整报告内容",
     };
 
-    assert.strictEqual(Array.isArray(report.keyPoints), true);
-    assert.strictEqual(report.keyPoints.length, 3);
+    expect(Array.isArray(report.keyPoints)).toBe(true);
+    expect(report.keyPoints.length).toBe(3);
   });
 
   it("应该处理 keyPoints 为 null 或 undefined 的情况", () => {
@@ -63,8 +62,8 @@ describe("keyPoints 容错处理", () => {
     };
 
     // 测试不会崩溃
-    assert.ok(!report1.keyPoints);
-    assert.ok(!report2.keyPoints);
+    expect(report1.keyPoints).toBeFalsy();
+    expect(report2.keyPoints).toBeFalsy();
   });
 
   it("应该处理 keyPoints 为空数组的情况", () => {
@@ -77,8 +76,8 @@ describe("keyPoints 容错处理", () => {
       fullReport: "完整报告内容",
     };
 
-    assert.strictEqual(Array.isArray(report.keyPoints), true);
-    assert.strictEqual(report.keyPoints.length, 0);
+    expect(Array.isArray(report.keyPoints)).toBe(true);
+    expect(report.keyPoints.length).toBe(0);
   });
 
   it("应该处理 keyPoints 为对象的情况", () => {
@@ -91,8 +90,8 @@ describe("keyPoints 容错处理", () => {
       fullReport: "完整报告内容",
     };
 
-    assert.strictEqual(Array.isArray(report.keyPoints), false);
-    assert.strictEqual(typeof report.keyPoints, "object");
+    expect(Array.isArray(report.keyPoints)).toBe(false);
+    expect(typeof report.keyPoints).toBe("object");
     // 这种情况下代码会跳过显示 keyPoints，不会崩溃
   });
 });
