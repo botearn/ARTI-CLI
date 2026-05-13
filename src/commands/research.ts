@@ -42,9 +42,25 @@ function renderAnalystBrief(agent: string, report: ResearchReport): void {
   );
   console.log(`  ${chalk.bold(report.title)}`);
   console.log(`  ${chalk.gray(report.summary)}`);
-  if (report.keyPoints?.length) {
-    for (const p of report.keyPoints.slice(0, 3)) {
-      console.log(`    ${chalk.yellow("•")} ${p}`);
+
+  // E1: 防御性检查 keyPoints 字段
+  if (report.keyPoints) {
+    let points: string[] = [];
+
+    // 如果是数组，直接使用
+    if (Array.isArray(report.keyPoints)) {
+      points = report.keyPoints;
+    }
+    // 如果是字符串，尝试按行拆分
+    else if (typeof report.keyPoints === "string") {
+      points = report.keyPoints.split("\n").filter(line => line.trim());
+    }
+
+    // 显示前 3 个要点
+    if (points.length > 0) {
+      for (const p of points.slice(0, 3)) {
+        console.log(`    ${chalk.yellow("•")} ${p}`);
+      }
     }
   }
   console.log();
@@ -213,10 +229,13 @@ async function runOrchestrator(
   featureKey: FeatureKey,
   billingState: BillingState,
 ): Promise<void> {
-  let spinner = ora(`连接 ARTI 研报引擎...`).start();
+  let spinner = ora(`正在搜索股票代码 ${symbol}...`).start();
 
+  // R1: 实时进度反馈 - 显示数据获取阶段
+  spinner.text = `正在获取 ${symbol} 行情与技术数据...`;
   const context = await buildResearchStockContext(symbol);
   const stockData = context.stockData;
+  spinner.text = `连接 ARTI 研报引擎...`;
 
   // 收集所有结果
   const reports: { agent: string; report: ResearchReport }[] = [];
@@ -227,6 +246,22 @@ async function runOrchestrator(
   let routeReasoning = "";
   let layer1Count = 0;
   let hasError = false;
+
+  // R5: 超时保护 - 60秒后显示提示
+  const startTime = Date.now();
+  let timeoutWarningShown = false;
+  const timeoutChecker = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    if (elapsed >= 60 && !timeoutWarningShown) {
+      spinner.warn(
+        chalk.yellow(
+          `分析耗时较长（已等待 ${elapsed}s），您可以按 Ctrl+C 取消，或继续等待...`
+        )
+      );
+      timeoutWarningShown = true;
+      spinner = ora(`继续等待研报生成...`).start();
+    }
+  }, 5000);
 
   try {
     const events = streamOrchestrator(symbol, {
@@ -248,28 +283,73 @@ async function runOrchestrator(
           if (event.report && event.agent) {
             reports.push({ agent: event.agent, report: event.report });
             layer1Count++;
-            spinner.text = `Layer 1 — ${layer1Count} 位分析师完成 (${event.label || event.agent}: ${event.report.sentiment})`;
+            // R1: 实时进度反馈 - 显示每个分析师完成状态
+            const label = event.label || AGENT_LABELS[event.agent] || event.agent;
+            spinner.text = `Layer 1 — ${label} 完成 (${event.report.sentiment}, 置信度 ${event.report.confidence}%) | 进度 ${layer1Count}/8`;
           } else if (event.error) {
-            spinner.text = `Layer 1 — ${event.agent || "?"} 失败，继续...`;
+            layer1Count++;
+            const label = event.label || AGENT_LABELS[event.agent || ""] || event.agent || "?";
+            spinner.text = `Layer 1 — ${label} 数据不足，跳过 | 进度 ${layer1Count}/8`;
           }
           break;
 
         case "layer1_complete":
           spinner.succeed(`Layer 1 完成 — ${reports.length} 位分析师`);
-          // 即时渲染 Layer 1 结果
-          console.log(title(`${symbol} 多维度分析 (Layer 1)`));
-          for (const { agent, report } of reports) {
-            renderAnalystBrief(agent, report);
-          }
+
+          // R2: 快速结论先行 - 显示核心摘要
           const bullish = reports.filter(r => r.report.sentiment === "看多").length;
           const bearish = reports.filter(r => r.report.sentiment === "看空").length;
           const neutral = reports.filter(r => r.report.sentiment === "中性").length;
+
+          console.log(chalk.bold.cyan(`\n  ━━━ ${symbol} 核心结论 ━━━\n`));
+          const consensusSentiment = bullish > bearish + neutral ? "看多" :
+                                      bearish > bullish + neutral ? "看空" : "中性";
+          const avgConfidence = Math.round(
+            reports.reduce((sum, r) => sum + r.report.confidence, 0) / reports.length
+          );
           console.log(
-            `  ${chalk.bold("分析师共识:")} ` +
+            `  ${sentimentBadge(consensusSentiment)} ` +
+            `${chalk.gray("综合置信度")} ${confidenceBar(avgConfidence)}`
+          );
+          console.log(
+            `  ${chalk.gray("分析师共识:")} ` +
             `${chalk.red(`看多 ${bullish}`)} | ` +
             `${chalk.green(`看空 ${bearish}`)} | ` +
             `${chalk.yellow(`中性 ${neutral}`)}`
           );
+
+          // R3: 消除暂无数据尴尬 - 过滤掉置信度过低或明显缺数据的分析师
+          const validReports = reports.filter(r => {
+            const report = r.report;
+            // 置信度低于30%视为数据不足
+            if (report.confidence < 30) return false;
+            // 摘要包含"暂无"/"数据缺失"等关键词
+            if (/(暂无|数据缺失|无法获取|缺少.*数据)/i.test(report.summary)) return false;
+            return true;
+          });
+
+          // R4: 分层展示详情 - 先显示简洁列表
+          console.log(chalk.bold(`\n  ── 8位分析师观点 ──\n`));
+          let idx = 1;
+          for (const { agent, report } of reports) {
+            // 如果数据不足，简短说明后跳过
+            if (!validReports.find(r => r.agent === agent)) {
+              console.log(
+                `  ${chalk.gray(`${idx}. ${AGENT_LABELS[agent]}`)} ${chalk.dim("数据获取中，跳过")}`
+              );
+              idx++;
+              continue;
+            }
+            const label = AGENT_LABELS[agent] || agent;
+            console.log(
+              `  ${chalk.bold(`${idx}. ${label}`)} ` +
+              `${sentimentBadge(report.sentiment)} ` +
+              `${confidenceBar(report.confidence)}`
+            );
+            idx++;
+          }
+
+          console.log(chalk.gray(`\n  提示: 详细报告将在 Layer 2 大师辩论后一并展示\n`));
           console.log(divider());
           spinner = ora("Layer 2 — 大师路由中...").start();
           break;
@@ -313,6 +393,35 @@ async function runOrchestrator(
           if (synthesis) {
             renderSynthesis(synthesis);
           }
+
+          // R4: 最终展示详细报告（可选）
+          if (options.full) {
+            console.log(chalk.bold.cyan("\n  ━━━ 详细分析报告 ━━━\n"));
+            console.log(title(`${symbol} 多维度分析 (Layer 1)`));
+            const validReports = reports.filter(r => {
+              const report = r.report;
+              if (report.confidence < 30) return false;
+              if (/(暂无|数据缺失|无法获取|缺少.*数据)/i.test(report.summary)) return false;
+              return true;
+            });
+            for (const { agent, report } of validReports) {
+              renderAnalystBrief(agent, report);
+            }
+            console.log(divider());
+
+            if (masterOpinions.length) {
+              console.log(title(`投资大师圆桌 (Layer 2)`));
+              for (const { master, opinion } of masterOpinions) {
+                renderMasterOpinion(master, opinion);
+              }
+              console.log(divider());
+            }
+          } else {
+            console.log(
+              chalk.gray("\n  提示: 使用 --full 选项查看完整详细报告\n")
+            );
+          }
+
           console.log("\n" + divider());
           break;
 
@@ -362,12 +471,15 @@ async function runOrchestrator(
       if (deduct) printDeductResult(deduct);
     });
   } catch (err) {
+    clearInterval(timeoutChecker);
     spinner.fail("研报生成失败");
     printError(err);
 
     // Fallback：orchestrator 不可用时回退到直接调用分析师
     console.log(chalk.yellow("\n  尝试回退到直接分析模式...\n"));
     return runFallback(symbol, options.full);
+  } finally {
+    clearInterval(timeoutChecker);
   }
 }
 
