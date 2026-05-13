@@ -3,14 +3,15 @@ import { getHybridTechnical } from "./hybrid.js";
 
 export interface ResearchStockContext {
   stockData: string;
-  technicalSource: "arti-data" | "openbb" | null;
+  backendStockData: string;
+  technicalSource: "backend" | "arti-data" | "openbb" | null;
 }
 
 export function formatResearchStockData(
   symbol: string,
   quote: QuoteData | null,
   technical: TechnicalData | null,
-  technicalSource: "arti-data" | "openbb" | null,
+  technicalSource: "backend" | "arti-data" | "openbb" | null,
 ): string {
   const parts: string[] = [];
 
@@ -39,6 +40,49 @@ export function formatResearchStockData(
   return parts.join(" | ");
 }
 
+export function formatBackendResearchStockData(
+  symbol: string,
+  quote: QuoteData | null,
+  technical: TechnicalData | null,
+  technicalSource: "backend" | "arti-data" | "openbb" | null,
+): string {
+  const payload: Record<string, unknown> = { symbol };
+
+  if (quote) {
+    payload.quote = {
+      price: quote.last_price ?? quote.prev_close ?? null,
+      change: quote.change ?? null,
+      changePercent: quote.change_percent ?? null,
+      volume: quote.volume ?? null,
+      ma50: quote.ma_50d ?? null,
+      yearHigh: quote.year_high ?? null,
+      yearLow: quote.year_low ?? null,
+    };
+  }
+
+  if (technical && !technical.error) {
+    payload.technical = {
+      price: technical.price,
+      change: technical.change,
+      changePercent: technical.change_percent,
+      ma: technical.ma,
+      rsi: technical.rsi,
+      macd: technical.macd,
+      bbands: technical.bbands,
+      atr: technical.atr,
+      adx: technical.adx,
+      signals: technical.signals,
+      overallSignal: technical.overall_signal,
+    };
+  }
+
+  if (technicalSource) {
+    payload.technicalSource = technicalSource;
+  }
+
+  return Object.keys(payload).length > 1 ? JSON.stringify(payload) : "";
+}
+
 export async function buildResearchStockContext(symbol: string): Promise<ResearchStockContext> {
   const [quoteSettled, technicalSettled] = await Promise.allSettled([
     getQuote(symbol),
@@ -51,6 +95,7 @@ export async function buildResearchStockContext(symbol: string): Promise<Researc
 
   return {
     stockData: formatResearchStockData(symbol, quote, technical, technicalSource),
+    backendStockData: formatBackendResearchStockData(symbol, quote, technical, technicalSource),
     technicalSource,
   };
 }

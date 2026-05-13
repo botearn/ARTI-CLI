@@ -7,6 +7,8 @@ import { join } from "node:path";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+const LEGACY_API_BASE_URL = "https://laoclhqedllwjuboyqib.supabase.co/functions/v1";
+const DEFAULT_API_BASE_URL = "https://wklskhbrjnyppqfmxhxa.supabase.co/functions/v1";
 
 export interface ArtiConfig {
   api: {
@@ -38,7 +40,7 @@ export interface ArtiConfig {
 
 const DEFAULT_CONFIG: ArtiConfig = {
   api: {
-    baseUrl: "https://laoclhqedllwjuboyqib.supabase.co/functions/v1",
+    baseUrl: DEFAULT_API_BASE_URL,
     timeout: 30000,
   },
   backend: {
@@ -72,6 +74,7 @@ function ensureConfigDir(): void {
 
 export function loadConfig(): ArtiConfig {
   let config: ArtiConfig;
+  let shouldPersistMigration = false;
   if (!existsSync(CONFIG_FILE)) {
     config = { ...DEFAULT_CONFIG };
   } else {
@@ -86,6 +89,12 @@ export function loadConfig(): ArtiConfig {
         display: { ...DEFAULT_CONFIG.display, ...saved.display },
         watchlist: saved.watchlist ?? DEFAULT_CONFIG.watchlist,
       };
+
+      // 将历史默认 Supabase Edge 地址迁移到当前统一项目，避免 CLI 与 backend 分属不同项目。
+      if (!process.env.ARTI_API_URL && config.api.baseUrl === LEGACY_API_BASE_URL) {
+        config.api.baseUrl = DEFAULT_API_BASE_URL;
+        shouldPersistMigration = true;
+      }
     } catch {
       config = { ...DEFAULT_CONFIG };
     }
@@ -119,6 +128,10 @@ export function loadConfig(): ArtiConfig {
   if (process.env.ARTI_DATA_TIMEOUT) {
     const t = Number(process.env.ARTI_DATA_TIMEOUT);
     if (!isNaN(t) && t > 0) config.data.artiDataTimeout = t;
+  }
+
+  if (shouldPersistMigration) {
+    saveConfig(config);
   }
 
   return config;

@@ -13,7 +13,25 @@ export interface HybridTechnicalResult {
  * 转换 Backend StockData 到 CLI TechnicalData 格式
  */
 function convertBackendToTechnical(backendData: BackendStockData): TechnicalData {
-  const tech = backendData.tech;
+  const tech = "tech" in backendData && backendData.tech
+    ? backendData.tech
+    : {
+        trend: backendData.trend_signal ?? backendData.overall_signal ?? "中性",
+        ma5: backendData.ma5,
+        ma10: backendData.ma10,
+        ma20: backendData.ma20,
+        ma60: backendData.ma60,
+        rsi: backendData.rsi,
+        macd: backendData.macd,
+        bb_pos: backendData.bb_pos,
+        bb_up: backendData.bb_up,
+        bb_dn: backendData.bb_dn,
+        atr: backendData.atr,
+        atr_stop: backendData.atr_stop,
+        atr_pct: backendData.atr_pct,
+        support: backendData.support,
+        resist: backendData.resist,
+      };
   return {
     price: backendData.price,
     change: backendData.price * (backendData.pct / 100), // 从百分比算回绝对值

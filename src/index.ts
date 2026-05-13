@@ -27,6 +27,7 @@ import { economyCommand } from "./commands/economy.js";
 import { searchCommand } from "./commands/search.js";
 import { creditsCommand } from "./commands/credits.js";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
+import { shutdownDaemon } from "./openbb.js";
 import chalk from "chalk";
 import { setJsonMode } from "./output.js";
 import { checkForUpdate } from "./update-check.js";
@@ -451,10 +452,22 @@ configCmd.command("reset").description("重置为默认配置")
 checkForUpdate("0.2.0");
 
 // ── 入口 ──
-if (process.argv.includes("--install-completion")) {
-  installCompletion();
-} else if (process.argv.length <= 2) {
-  startRepl();
-} else {
-  program.parse();
+async function main(): Promise<void> {
+  if (process.argv.includes("--install-completion")) {
+    installCompletion();
+    return;
+  }
+
+  if (process.argv.length <= 2) {
+    startRepl();
+    return;
+  }
+
+  try {
+    await program.parseAsync(process.argv);
+  } finally {
+    shutdownDaemon();
+  }
 }
+
+void main();

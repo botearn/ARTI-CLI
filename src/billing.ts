@@ -143,6 +143,7 @@ export interface DeductResult {
   balanceBefore: number;
   balanceAfter: number;
   feature: FeatureKey;
+  skipped?: boolean;
 }
 
 function currentYM(): string {
@@ -273,6 +274,11 @@ export function getRecommendedPlanForFeature(feature: FeatureKey): Plan {
   return PLANS[FEATURE_RECOMMENDED_PLAN[feature]];
 }
 
+function isBillingBypassed(): boolean {
+  const value = process.env.ARTI_BILLING_BYPASS?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
 // ── 核心：检查并扣费 ──
 
 export class InsufficientCreditsError extends Error {
@@ -299,6 +305,10 @@ export class PlanAccessError extends Error {
 }
 
 export function assertSufficientCredits(feature: FeatureKey, state = getActiveBillingState()): BillingState {
+  if (isBillingBypassed()) {
+    return state;
+  }
+
   const cost = FEATURE_COSTS[feature];
   if (state.balance < cost) {
     throw new InsufficientCreditsError(cost, state.balance, feature);
@@ -316,6 +326,16 @@ export function checkAndDeduct(feature: FeatureKey): DeductResult {
 }
 
 export function applyDeduction(feature: FeatureKey, state = getActiveBillingState()): DeductResult {
+  if (isBillingBypassed()) {
+    return {
+      cost: 0,
+      balanceBefore: state.balance,
+      balanceAfter: state.balance,
+      feature,
+      skipped: true,
+    };
+  }
+
   const cost = FEATURE_COSTS[feature];
   const balanceBefore = state.balance;
 
@@ -371,6 +391,16 @@ export function assertWatchlistCapacity(nextCount: number, state = getActiveBill
 
 /** 命令执行后打印「已消耗 X Credits，余额 Y」 */
 export function printDeductResult(result: DeductResult): void {
+  if (result.skipped) {
+    console.log(
+      chalk.gray(
+        `  ─ ${FEATURE_LABELS[result.feature]} ${chalk.cyan("[测试模式未扣费]")}` +
+        `  余额 ${chalk.cyan(result.balanceAfter.toString())} Credits`
+      )
+    );
+    return;
+  }
+
   const label = FEATURE_LABELS[result.feature];
   console.log(
     chalk.gray(

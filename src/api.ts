@@ -31,6 +31,37 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function extractSseEvents(
+  buffer: string,
+): { events: OrchestratorSSEEvent[]; remainder: string } {
+  const chunks = buffer.split(/\r?\n\r?\n/);
+  const remainder = chunks.pop() || "";
+  const events: OrchestratorSSEEvent[] = [];
+
+  for (const chunk of chunks) {
+    const trimmed = chunk.trim();
+    if (!trimmed || trimmed.startsWith(":")) continue;
+
+    const dataLines = trimmed
+      .split(/\r?\n/)
+      .filter(line => line.startsWith("data: "))
+      .map(line => line.slice(6));
+
+    if (!dataLines.length) continue;
+
+    const payload = dataLines.join("\n").trim();
+    if (!payload || payload === "[DONE]") continue;
+
+    try {
+      events.push(JSON.parse(payload) as OrchestratorSSEEvent);
+    } catch {
+      // 非 JSON 行，跳过
+    }
+  }
+
+  return { events, remainder };
+}
+
 export async function callEdge<T>(
   functionName: string,
   body: Record<string, unknown>,
@@ -213,6 +244,7 @@ export async function* streamOrchestrator(
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 600_000); // 10 分钟超时
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
   try {
     const res = await fetch(`${baseUrl}/orchestrator`, {
@@ -236,7 +268,7 @@ export async function* streamOrchestrator(
 
     if (!res.body) throw new Error("SSE 响应无 body");
 
-    const reader = res.body.getReader();
+    reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
@@ -245,25 +277,29 @@ export async function* streamOrchestrator(
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
+      const parsed = extractSseEvents(buffer);
+      buffer = parsed.remainder;
 
-      // 解析 SSE：以 \n\n 分割事件
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
+      for (const event of parsed.events) {
+        yield event;
+      }
+    }
 
-      for (const part of parts) {
-        const trimmed = part.trim();
-        if (!trimmed || trimmed.startsWith(":")) continue; // 心跳或注释
-        const dataLine = trimmed.split("\n").find(l => l.startsWith("data: "));
-        if (!dataLine) continue;
-        try {
-          const event = JSON.parse(dataLine.slice(6)) as OrchestratorSSEEvent;
-          yield event;
-        } catch {
-          // 非 JSON 行，跳过
-        }
+    if (buffer.trim()) {
+      const parsed = extractSseEvents(`${buffer}\n\n`);
+      for (const event of parsed.events) {
+        yield event;
       }
     }
   } finally {
+    if (reader) {
+      try {
+        await reader.cancel();
+      } catch {
+        // 连接已结束或已取消，忽略
+      }
+    }
+    controller.abort();
     clearTimeout(timer);
   }
 }
@@ -354,9 +390,25 @@ export interface BackendStockData {
   name: string | null;
   price: number;
   pct: number;
+  ma5?: number | null;
+  ma10?: number | null;
+  ma20?: number | null;
+  ma60?: number | null;
+  rsi?: number | null;
+  macd?: number | null;
+  atr?: number | null;
+  atr_stop?: number | null;
+  atr_pct?: number | null;
+  bb_pos?: number | null;
+  bb_up?: number | null;
+  bb_dn?: number | null;
   vol_ratio: number;
   curr_vol: number | string;
   turnover: number | null;
+  support?: number | null;
+  resist?: number | null;
+  overall_signal?: string | null;
+  trend_signal?: string | null;
   tech: {
     trend: string;
     ma5: number | null;
@@ -415,7 +467,7 @@ export async function generateReport(req: GenerateReportRequest): Promise<Genera
 
 export async function* streamOrchestratorBackend(
   symbol: string,
-  opts?: { mode?: string; layer1Agents?: string[]; layer2Masters?: string[] },
+  opts?: { stockData?: string; mode?: string; layer1Agents?: string[]; layer2Masters?: string[] },
 ): AsyncGenerator<OrchestratorSSEEvent> {
   const config = loadConfig();
   const baseUrl = config.backend.url;
@@ -427,6 +479,7 @@ export async function* streamOrchestratorBackend(
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 600_000); // 10 分钟超时
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
   try {
     const res = await fetch(`${baseUrl}/v1/orchestrator`, {
@@ -437,6 +490,7 @@ export async function* streamOrchestratorBackend(
       },
       body: JSON.stringify({
         symbol,
+        stockData: opts?.stockData || "",
         mode: opts?.mode || "layer1-only",  // 修复：默认全景报告而非深度报告
         layer1Agents: opts?.layer1Agents,
         layer2Masters: opts?.layer2Masters,
@@ -451,7 +505,7 @@ export async function* streamOrchestratorBackend(
 
     if (!res.body) throw new Error("SSE 响应无 body");
 
-    const reader = res.body.getReader();
+    reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
@@ -460,25 +514,29 @@ export async function* streamOrchestratorBackend(
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
+      const parsed = extractSseEvents(buffer);
+      buffer = parsed.remainder;
 
-      // 解析 SSE：以 \n\n 分割事件
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
+      for (const event of parsed.events) {
+        yield event;
+      }
+    }
 
-      for (const part of parts) {
-        const trimmed = part.trim();
-        if (!trimmed || trimmed.startsWith(":")) continue; // 心跳或注释
-        const dataLine = trimmed.split("\n").find(l => l.startsWith("data: "));
-        if (!dataLine) continue;
-        try {
-          const event = JSON.parse(dataLine.slice(6)) as OrchestratorSSEEvent;
-          yield event;
-        } catch {
-          // 非 JSON 行，跳过
-        }
+    if (buffer.trim()) {
+      const parsed = extractSseEvents(`${buffer}\n\n`);
+      for (const event of parsed.events) {
+        yield event;
       }
     }
   } finally {
+    if (reader) {
+      try {
+        await reader.cancel();
+      } catch {
+        // 连接已结束或已取消，忽略
+      }
+    }
+    controller.abort();
     clearTimeout(timer);
   }
 }
