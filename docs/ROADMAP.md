@@ -1,30 +1,50 @@
 # ARTI CLI 开发路线图
 
-> 智能投研命令行工具 — 框架完善计划
+**智能投研命令行工具 — 长期开发计划**
+
+**当前版本**: v0.2.0-beta  
+**最后更新**: 2025-01-15  
+**状态**: 🚀 Public Beta 已发布
 
 ---
 
-## 当前状态
+## 🎉 v0.2.0-beta 已完成功能
 
-核心功能已全部实现，进入稳定迭代阶段：
-- [x] 18 个 CLI 命令（quote / market / scan / predict / history / crypto / fundamental / options / economy / search / news / research / watchlist / watch / export / insights / completion / config）
-- [x] 主产品三档主路径（quick-scan / full / deep）
-- [x] 用户登录基础设施第一版（login / logout / whoami + token 持久化 + API Bearer 鉴权）
-- [x] REPL 交互模式（session 状态管理 + 16 个命令别名 + 声明式注册）
-- [x] 统一命令注册表（core/registry.ts — parseArgs 消除 REPL 双重注册）
-- [x] OpenBB 本地数据源（yfinance，免费无 API Key）
-- [x] MCP Server（13 个工具）
-- [x] Supabase Edge Functions API 层（research 命令专用）
-- [x] 终端格式化工具（format.ts — chalk 涨跌着色、sparkline、置信度条）
-- [x] tsup 构建配置
+### 核心命令（21 个）
+- ✅ 行情与市场：quote / market / history / crypto / search
+- ✅ 技术分析：scan / predict / quick-scan
+- ✅ 新闻与资讯：news
+- ✅ 基本面与衍生品：fundamental / options / economy
+- ✅ AI 研报：research / full / deep
+- ✅ 自选与监控：watchlist / watch
+- ✅ 数据导出：export / insights
+- ✅ 系统管理：config / completion / credits / login / logout / whoami
 
-### 实测可用性（2026-04-15）
+### 基础设施
+- ✅ OpenBB 本地数据源（yfinance，免费无 API Key）
+- ✅ MCP Server（13 个金融数据工具）
+- ✅ REPL 交互模式（session 状态管理 + 命令别名）
+- ✅ 统一命令注册表（core/registry.ts）
+- ✅ 终端格式化（chalk 涨跌着色、sparkline、置信度条）
+- ✅ JSON 输出模式（`--json` 全局选项）
+- ✅ 错误处理与友好提示
+- ✅ 用户登录第一版（token 持久化 + API Bearer 鉴权）
+- ✅ Credit 计费系统（本地模拟）
+- ✅ 版本更新检查
+- ✅ Shell 自动补全（bash/zsh）
+
+### 测试与质量
+- ✅ 11 个测试文件，39 个测试用例全部通过
+- ✅ TypeScript 严格模式 + ESM 模块
+- ✅ 构建成功（ESM + DTS）
+
+### 可用性状态
 
 | 状态 | 命令 |
 |---|---|
-| 16/18 正常 | quote, market, scan, predict, history, crypto, fundamental, options, economy treasury, search, news, watchlist, export, insights, config, completion |
-| 需后端服务 | research（依赖 Supabase Edge Function） |
-| 需 API Key | economy fred / search（FRED API Key，免费） |
+| ✅ 开箱即用 | quote, market, scan, predict, quick-scan, history, crypto, fundamental, options, economy treasury, search, news, watchlist, watch, export, insights, config, completion, credits |
+| ⚠️ 需后端服务 | full, deep, research |
+| ⚠️ 需 API Key | economy fred / search（FRED API Key，免费申请） |
 
 ---
 
