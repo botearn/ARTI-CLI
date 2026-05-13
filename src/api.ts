@@ -38,6 +38,7 @@ export async function callEdge<T>(
   const config = loadConfig();
   const baseUrl = config.api.baseUrl;
   const timeout = config.api.timeout;
+  const authToken = config.auth.token;
 
   let lastError: unknown;
 
@@ -48,7 +49,10 @@ export async function callEdge<T>(
 
       const res = await fetch(`${baseUrl}/${functionName}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
@@ -205,6 +209,7 @@ export async function* streamOrchestrator(
 ): AsyncGenerator<OrchestratorSSEEvent> {
   const config = loadConfig();
   const baseUrl = config.api.baseUrl;
+  const authToken = config.auth.token;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 600_000); // 10 分钟超时
@@ -212,7 +217,10 @@ export async function* streamOrchestrator(
   try {
     const res = await fetch(`${baseUrl}/orchestrator`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
       body: JSON.stringify({
         symbol,
         stockData: opts?.stockData || "",

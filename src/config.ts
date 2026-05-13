@@ -13,6 +13,17 @@ export interface ArtiConfig {
     baseUrl: string;
     timeout: number;
   };
+  auth: {
+    token: string;
+    userId: string;
+    email: string;
+  };
+  data: {
+    provider: "openbb" | "arti-data" | "hybrid";
+    artiDataBaseUrl: string;
+    artiDataTimeout: number;
+    artiDataInternalKey: string;
+  };
   display: {
     market: "US" | "HK" | "CN";
     lang: "zh" | "en";
@@ -24,6 +35,17 @@ const DEFAULT_CONFIG: ArtiConfig = {
   api: {
     baseUrl: "https://laoclhqedllwjuboyqib.supabase.co/functions/v1",
     timeout: 30000,
+  },
+  auth: {
+    token: "",
+    userId: "",
+    email: "",
+  },
+  data: {
+    provider: "hybrid",
+    artiDataBaseUrl: "",
+    artiDataTimeout: 15000,
+    artiDataInternalKey: "",
   },
   display: {
     market: "US",
@@ -48,6 +70,8 @@ export function loadConfig(): ArtiConfig {
       const saved = JSON.parse(raw);
       config = {
         api: { ...DEFAULT_CONFIG.api, ...saved.api },
+        auth: { ...DEFAULT_CONFIG.auth, ...saved.auth },
+        data: { ...DEFAULT_CONFIG.data, ...saved.data },
         display: { ...DEFAULT_CONFIG.display, ...saved.display },
         watchlist: saved.watchlist ?? DEFAULT_CONFIG.watchlist,
       };
@@ -61,6 +85,21 @@ export function loadConfig(): ArtiConfig {
   if (process.env.ARTI_TIMEOUT) {
     const t = Number(process.env.ARTI_TIMEOUT);
     if (!isNaN(t) && t > 0) config.api.timeout = t;
+  }
+  if (process.env.ARTI_AUTH_TOKEN) config.auth.token = process.env.ARTI_AUTH_TOKEN;
+  if (process.env.ARTI_USER_ID) config.auth.userId = process.env.ARTI_USER_ID;
+  if (process.env.ARTI_USER_EMAIL) config.auth.email = process.env.ARTI_USER_EMAIL;
+  if (process.env.ARTI_DATA_PROVIDER) {
+    const provider = process.env.ARTI_DATA_PROVIDER;
+    if (provider === "openbb" || provider === "arti-data" || provider === "hybrid") {
+      config.data.provider = provider;
+    }
+  }
+  if (process.env.ARTI_DATA_API_URL) config.data.artiDataBaseUrl = process.env.ARTI_DATA_API_URL;
+  if (process.env.ARTI_DATA_INTERNAL_KEY) config.data.artiDataInternalKey = process.env.ARTI_DATA_INTERNAL_KEY;
+  if (process.env.ARTI_DATA_TIMEOUT) {
+    const t = Number(process.env.ARTI_DATA_TIMEOUT);
+    if (!isNaN(t) && t > 0) config.data.artiDataTimeout = t;
   }
 
   return config;
@@ -85,6 +124,8 @@ export function getConfigValue(key: string): unknown {
 
 const ALLOWED_CONFIG_KEYS = new Set([
   "api.baseUrl", "api.timeout",
+  "auth.token", "auth.userId", "auth.email",
+  "data.provider", "data.artiDataBaseUrl", "data.artiDataTimeout", "data.artiDataInternalKey",
   "display.market", "display.lang",
   "watchlist",
 ]);

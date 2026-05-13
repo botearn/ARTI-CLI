@@ -8,6 +8,8 @@
 
 核心功能已全部实现，进入稳定迭代阶段：
 - [x] 18 个 CLI 命令（quote / market / scan / predict / history / crypto / fundamental / options / economy / search / news / research / watchlist / watch / export / insights / completion / config）
+- [x] 主产品三档主路径（quick-scan / full / deep）
+- [x] 用户登录基础设施第一版（login / logout / whoami + token 持久化 + API Bearer 鉴权）
 - [x] REPL 交互模式（session 状态管理 + 16 个命令别名 + 声明式注册）
 - [x] 统一命令注册表（core/registry.ts — parseArgs 消除 REPL 双重注册）
 - [x] OpenBB 本地数据源（yfinance，免费无 API Key）
@@ -267,7 +269,7 @@
 - [x] REPL 交互模式（`arti` 无参数进入，支持命令别名和 session 状态）
 - [x] `arti insights` — 个人投研洞察（HTML 可分享）
 - [x] `arti watchlist` — 自选股管理（add / remove / list + 行情展示）
-- [ ] `arti login` — 用户认证（如果需要）
+- [x] `arti login` / `arti logout` / `arti whoami` — 用户登录第一版（access token）
 - [x] 版本更新检查提示
 - [x] MCP Server 增加 fundamental / economy / options 工具
 
@@ -284,6 +286,11 @@
 - [ ] `options` 隐含波动率显示为百分比整数（410.9%），深度实值/虚值期权数值偏大，考虑筛选或标注
 
 ### 7.2 功能完善
+- [ ] 主产品真实登录流 — 从 `arti login --token` 升级为正式登录协议（邮箱验证码 / magic link / OAuth / Supabase session 其一）
+- [ ] 登录后真实用户态同步 — 用服务端 `user_id / email / plan / credits` 替代本地模拟身份
+- [ ] `credits` 服务端化 — 当前仍是本地 `~/.config/arti/billing.json` 假数据，需要改成登录后查询主产品真实余额与套餐
+- [ ] 扣费服务端化 — `quick-scan / full / deep` 当前是本地扣 credits，需要改成服务端记账，避免本地篡改
+- [ ] 未登录体验 — 对需要账户的命令给出明确登录引导，而不是只报余额不足或后端错误
 - [ ] `research` 命令后端部署文档 — 补充 Supabase Edge Function 部署步骤，降低使用门槛
 - [ ] `economy fred` API Key 引导 — 首次使用无 Key 时给出注册链接和配置命令提示，而非报错
 - [ ] `predict` 涨跌幅显示 +0.00%（应为 -0.14%），数据源字段映射可能有误

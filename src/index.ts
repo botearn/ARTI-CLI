@@ -10,6 +10,7 @@ import { quoteCommand } from "./commands/quote.js";
 import { researchCommand } from "./commands/research.js";
 import { scanCommand } from "./commands/scan.js";
 import { predictCommand } from "./commands/predict.js";
+import { quickScanCommand, fullReportCommand, deepReportCommand } from "./commands/product.js";
 import { marketCommand } from "./commands/market.js";
 import { newsCommand } from "./commands/news.js";
 import { watchlistCommand } from "./commands/watchlist.js";
@@ -25,6 +26,7 @@ import { optionsCommand } from "./commands/options.js";
 import { economyCommand } from "./commands/economy.js";
 import { searchCommand } from "./commands/search.js";
 import { creditsCommand } from "./commands/credits.js";
+import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import chalk from "chalk";
 import { setJsonMode } from "./output.js";
 import { checkForUpdate } from "./update-check.js";
@@ -56,6 +58,97 @@ const int = (v: string | boolean | undefined, fallback = 0): number =>
 
 // ── 统一命令定义（一次定义，CLI + REPL 共享） ──
 const defs: CommandDef[] = [
+  {
+    name: "quick-scan", aliases: ["quick", "qs"],
+    description: "主产品 Quick Scan（行情 + 技术面 + 新闻的快速研判）",
+    usage: "quick-scan <symbol>",
+    args: [{ spec: "<symbol>", desc: "股票代码" }],
+    options: [],
+    examples: [
+      "$ arti quick-scan AAPL         # 主产品 Quick Scan",
+      "$ arti quick NVDA              # 短别名",
+      "$ arti quick-scan TSLA --json  # JSON 输出",
+    ],
+    invoke: ({ positional }) => quickScanCommand(positional[0]),
+  },
+  {
+    name: "full", aliases: ["panorama", "fr"],
+    description: "主产品 Full 全景研报（多分析师 Layer 1）",
+    usage: "full <symbol> [--full]",
+    args: [{ spec: "<symbol>", desc: "股票代码" }],
+    options: [
+      { short: "-f", long: "--full", key: "full", type: "boolean", desc: "显示完整报告（默认仅摘要）" },
+    ],
+    examples: [
+      "$ arti full AAPL               # 主产品 Full 全景研报",
+      "$ arti panorama NVDA           # 同义别名",
+      "$ arti full TSLA -f            # 展示完整分析内容",
+    ],
+    invoke: ({ positional, options }) =>
+      fullReportCommand(positional[0], {
+        full: options.full as boolean | undefined,
+      }),
+  },
+  {
+    name: "deep", aliases: ["dr"],
+    description: "主产品 Deep 深度研报（三层级辩论 + 圆桌裁定）",
+    usage: "deep <symbol> [--full]",
+    args: [{ spec: "<symbol>", desc: "股票代码" }],
+    options: [
+      { short: "-f", long: "--full", key: "full", type: "boolean", desc: "显示完整报告（默认仅摘要）" },
+    ],
+    examples: [
+      "$ arti deep AAPL               # 主产品 Deep 深度研报",
+      "$ arti deep NVDA -f            # 展示完整分析内容",
+    ],
+    invoke: ({ positional, options }) =>
+      deepReportCommand(positional[0], {
+        full: options.full as boolean | undefined,
+      }),
+  },
+  {
+    name: "login", aliases: [],
+    description: "登录 ARTI 账户（当前支持 access token 登录）",
+    usage: "login --token <token> [--email <email>] [--user-id <id>]",
+    args: [],
+    options: [
+      { short: "", long: "--token", key: "token", type: "string", desc: "ARTI access token", hint: "<token>" },
+      { short: "", long: "--email", key: "email", type: "string", desc: "用户邮箱（可选）", hint: "<email>" },
+      { short: "", long: "--user-id", key: "userId", type: "string", desc: "用户 ID（可选）", hint: "<id>" },
+    ],
+    examples: [
+      "$ arti login --token <token>",
+      "$ arti login --token <token> --email you@example.com",
+    ],
+    invoke: ({ options }) => Promise.resolve(loginCommand({
+      token: options.token as string | undefined,
+      email: options.email as string | undefined,
+      userId: options.userId as string | undefined,
+    })),
+  },
+  {
+    name: "logout", aliases: [],
+    description: "退出当前 ARTI 账户",
+    usage: "logout",
+    args: [],
+    options: [],
+    examples: [
+      "$ arti logout",
+    ],
+    invoke: () => Promise.resolve(logoutCommand()),
+  },
+  {
+    name: "whoami", aliases: [],
+    description: "查看当前登录状态",
+    usage: "whoami",
+    args: [],
+    options: [],
+    examples: [
+      "$ arti whoami",
+      "$ arti whoami --json",
+    ],
+    invoke: () => Promise.resolve(whoamiCommand()),
+  },
   {
     name: "quote", aliases: ["q"],
     description: "查询实时行情（支持股票代码和中文名称搜索）",
@@ -220,19 +313,19 @@ const defs: CommandDef[] = [
   },
   {
     name: "research", aliases: ["r"],
-    description: "三层级 AI 研报（分析师 → 大师辩论 → 圆桌裁定）",
-    usage: "research <symbol> [--agent <type>] [--mode full|layer1-only]",
+    description: "底层研报命令（兼容入口，建议优先使用 full / deep）",
+    usage: "research <symbol> [--agent <type>] [--mode panorama|deep]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [
       { short: "-a", long: "--agent", key: "agent", type: "string", desc: "仅调单个分析师: natasha|steve|tony|thor|clint|sam|vision|wanda", hint: "<type>" },
       { short: "-f", long: "--full", key: "full", type: "boolean", desc: "显示完整报告（默认仅摘要）" },
-      { short: "-m", long: "--mode", key: "mode", type: "string", desc: "研报模式: full | layer1-only", hint: "<mode>", defaultValue: "full" },
+      { short: "-m", long: "--mode", key: "mode", type: "string", desc: "研报模式: panorama | deep（兼容 layer1-only | full）", hint: "<mode>", defaultValue: "deep" },
     ],
     examples: [
-      "$ arti research AAPL             # 完整三层级研报",
+      "$ arti research AAPL             # 默认等同于 deep",
       "$ arti research NVDA -a tony     # 仅 Tony（技术面）快速分析",
-      "$ arti research TSLA -f          # 显示完整报告",
-      "$ arti research AAPL -m layer1-only  # 仅 Layer 1 分析师",
+      "$ arti research TSLA -m panorama # 仅 Layer 1 分析师",
+      "$ arti research AAPL -m deep -f  # 深度研报 + 完整输出",
     ],
     invoke: ({ positional, options }) =>
       researchCommand(positional[0], {

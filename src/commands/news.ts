@@ -55,9 +55,8 @@ export async function newsCommand(symbol?: string, options?: { limit?: number })
       const n = data.news[i];
       const num = chalk.gray(`${String(i + 1).padStart(2)}.`);
       const date = n.date ? chalk.gray(`[${n.date.slice(0, 10)}]`) : "";
-      const source = n.source ? chalk.blue(`(${n.source})`) : "";
 
-      console.log(`  ${num} ${date} ${chalk.white(n.title)} ${source}`);
+      console.log(`  ${num} ${date} ${chalk.white(n.title)}`);
       if (n.url) {
         console.log(`      ${chalk.gray.underline(n.url)}`);
       }

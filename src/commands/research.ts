@@ -5,7 +5,7 @@
  * Layer 2: 投资大师圆桌辩论（动态路由选择）
  * Layer 3: 综合裁定（Synthesis）
  *
- * 用法：arti research AAPL [--agent tony] [--mode full|layer1-only]
+ * 用法：arti research AAPL [--agent tony] [--mode deep|panorama]
  */
 import chalk from "chalk";
 import ora from "ora";
@@ -19,7 +19,6 @@ import {
   type MasterOpinion,
   type SynthesisResult,
 } from "../api.js";
-import { getQuote } from "../openbb.js";
 import { title, divider, sentimentBadge, confidenceBar } from "../format.js";
 import { printError } from "../errors.js";
 import { output } from "../output.js";
@@ -32,6 +31,7 @@ import {
   type BillingState,
   type FeatureKey,
 } from "../billing.js";
+import { buildResearchStockContext } from "../data/research-context.js";
 
 /** 渲染单个分析师报告（简洁模式） */
 function renderAnalystBrief(agent: string, report: ResearchReport): void {
@@ -130,9 +130,10 @@ export async function researchCommand(
   }
 
   symbol = symbol.toUpperCase();
+  const normalizedMode = normalizeResearchMode(options.mode);
 
   // 判断功能档位：单分析师/layer1-only = 全景报告，完整三层 = 深度报告
-  const isDeep = !options.agent && options.mode !== "layer1-only";
+  const isDeep = !options.agent && normalizedMode !== "layer1-only";
   const featureKey = isDeep ? "deepReport" : "panorama";
 
   let billingState: BillingState;
@@ -155,7 +156,21 @@ export async function researchCommand(
   }
 
   // 完整三层级模式：调 orchestrator SSE
-  return runOrchestrator(symbol, options, featureKey, billingState);
+  return runOrchestrator(symbol, { ...options, mode: normalizedMode }, featureKey, billingState);
+}
+
+export function normalizeResearchMode(mode?: string): "full" | "layer1-only" {
+  switch ((mode || "").trim().toLowerCase()) {
+    case "":
+    case "full":
+    case "deep":
+      return "full";
+    case "layer1-only":
+    case "panorama":
+      return "layer1-only";
+    default:
+      return "full";
+  }
 }
 
 /** 单分析师快速分析 */
@@ -169,17 +184,13 @@ async function runSingleAgent(
   const spinner = ora(`${AGENT_LABELS[agent] || agent} 分析 ${symbol}...`).start();
 
   try {
-    let stockData = "";
-    try {
-      const q = await getQuote(symbol);
-      stockData = `当前价格: $${q.last_price}, 涨跌: ${q.change} (${q.change_percent}%), 成交量: ${q.volume}`;
-    } catch { /* ignore */ }
+    const context = await buildResearchStockContext(symbol);
 
-    const report = await fetchResearch(symbol, agent, stockData);
+    const report = await fetchResearch(symbol, agent, context.stockData);
     const deduct = applyDeduction(featureKey, billingState);
     spinner.stop();
 
-    output({ symbol, agent, label: AGENT_LABELS[agent], ...report }, () => {
+    output({ symbol, agent, label: AGENT_LABELS[agent], technicalSource: context.technicalSource, ...report }, () => {
       console.log(title(`${symbol} ${AGENT_LABELS[agent] || agent}分析`));
       renderAnalystBrief(agent, report);
       if (full) {
@@ -204,14 +215,8 @@ async function runOrchestrator(
 ): Promise<void> {
   let spinner = ora(`连接 ARTI 研报引擎...`).start();
 
-  // 先获取 OpenBB 行情作为上下文
-  let stockData = "";
-  try {
-    const q = await getQuote(symbol);
-    stockData = `${symbol}: $${q.last_price} ${q.change >= 0 ? "+" : ""}${q.change_percent?.toFixed(2)}% 成交量:${q.volume?.toLocaleString()}`;
-    if (q.ma_50d) stockData += ` MA50:${q.ma_50d}`;
-    if (q.year_high && q.year_low) stockData += ` 52周:${q.year_low}-${q.year_high}`;
-  } catch { /* ignore */ }
+  const context = await buildResearchStockContext(symbol);
+  const stockData = context.stockData;
 
   // 收集所有结果
   const reports: { agent: string; report: ResearchReport }[] = [];
@@ -341,6 +346,7 @@ async function runOrchestrator(
           ...m.opinion,
         })),
       },
+      technicalSource: context.technicalSource,
       synthesis,
     };
 
@@ -370,11 +376,8 @@ async function runFallback(symbol: string, full?: boolean): Promise<void> {
   const spinner = ora(`直接模式 — 7 位分析师并行分析 ${symbol}...`).start();
 
   try {
-    let stockData = "";
-    try {
-      const q = await getQuote(symbol);
-      stockData = `当前价格: $${q.last_price}, 涨跌: ${q.change} (${q.change_percent}%), 成交量: ${q.volume}`;
-    } catch { /* ignore */ }
+    const context = await buildResearchStockContext(symbol);
+    const stockData = context.stockData;
 
     const agents: string[] = [...AGENT_TYPES].filter(a => a !== "wanda");
     const settled = await Promise.allSettled(
@@ -390,6 +393,7 @@ async function runFallback(symbol: string, full?: boolean): Promise<void> {
     const jsonData = {
       symbol,
       mode: "fallback",
+      technicalSource: context.technicalSource,
       layer1: {
         reports: completed.map(r => ({
           agent: r.agent,

@@ -12,7 +12,7 @@ import { execSync } from "node:child_process";
 const BASH_COMPLETION = `###-begin-arti-completions-###
 _arti_completions() {
   local cur="\${COMP_WORDS[COMP_CWORD]}"
-  local commands="quote market scan predict news research config watchlist insights watch export completion"
+  local commands="login logout whoami quick-scan quick qs full panorama fr deep dr quote market scan predict news research config watchlist insights watch export completion credits"
   local market_subs="gainers losers active"
   local config_subs="set get list reset"
   local watchlist_subs="add remove list"
@@ -35,6 +35,12 @@ const ZSH_COMPLETION = `###-begin-arti-completions-###
 _arti() {
   local -a commands market_subs config_subs watchlist_subs
   commands=(
+    'quick-scan:主产品 Quick Scan'
+    'full:主产品 Full 全景研报'
+    'deep:主产品 Deep 深度研报'
+    'login:登录 ARTI 账户'
+    'logout:退出当前账户'
+    'whoami:查看当前登录状态'
     'quote:查询实时行情'
     'market:全球市场概览'
     'scan:技术指标扫描'
@@ -46,6 +52,7 @@ _arti() {
     'insights:投研洞察'
     'watch:实时行情 Dashboard'
     'export:导出历史数据'
+    'credits:查看 Credits 与套餐'
     'completion:生成自动补全脚本'
   )
   market_subs=('gainers:涨幅榜' 'losers:跌幅榜' 'active:活跃榜')

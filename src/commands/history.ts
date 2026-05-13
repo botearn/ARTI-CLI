@@ -10,6 +10,7 @@ import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
+import { canUseArtiDataHistory, fetchHistoryFromArtiData } from "../data/client.js";
 
 export async function historyCommand(symbol: string, options?: { days?: number }): Promise<void> {
   if (!symbol) {
@@ -23,9 +24,20 @@ export async function historyCommand(symbol: string, options?: { days?: number }
   let billed;
   try {
     billed = await withBilling("chat", () => handleCommand(`获取 ${sym} 历史价格...`, async () => {
-      const bars = await getHistorical(sym, days);
+      let bars;
+      let source: "arti-data" | "openbb" = "openbb";
+      if (canUseArtiDataHistory(sym)) {
+        try {
+          bars = await fetchHistoryFromArtiData(sym, days);
+          source = "arti-data";
+        } catch {
+          bars = await getHistorical(sym, days);
+        }
+      } else {
+        bars = await getHistorical(sym, days);
+      }
       track("history", [sym]);
-      return { symbol: sym, days, bars };
+      return { symbol: sym, days, bars, source };
     }));
   } catch (err) {
     if (err instanceof InsufficientCreditsError) {

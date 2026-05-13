@@ -19,66 +19,36 @@ $ arti market
     日经225           56,502.77      -421.34 -0.74%
 ```
 
-## 功能一览
+## Public Beta
 
-| 命令 | 说明 | 计费 / 限制 |
-|---|---|---|
-| `arti quote AAPL NVDA` | 实时行情（支持多股、港股、中文名搜索） | `1 Credit` / 次 |
-| `arti market` | 全球指数概览（美股 / 亚太 / 欧洲） | `1 Credit` / 次 |
-| `arti market gainers` | 今日涨幅榜 | `1 Credit` / 次 |
-| `arti market losers` | 今日跌幅榜 | `1 Credit` / 次 |
-| `arti market active` | 今日活跃榜 | `1 Credit` / 次 |
-| `arti scan AAPL` | 技术指标扫描（MA / RSI / MACD / 布林带 / ATR / ADX / KDJ / OBV） | `5 Credits` / 次 |
-| `arti predict AAPL` | 综合预测（行情 + 技术面 + 新闻 → 多空研判） | `5 Credits` / 次 |
-| `arti history AAPL -d 30` | 历史价格（OHLCV 表格） | `1 Credit` / 次 |
-| `arti crypto BTCUSD` | 加密货币历史价格 | 当前未接入 Credit 扣费 |
-| `arti fundamental AAPL` | 基本面数据（财报 / 估值 / 分红） | 当前未接入 Credit 扣费 |
-| `arti options AAPL` | 期权链（行权价 / IV / 持仓量） | 当前未接入 Credit 扣费 |
-| `arti economy treasury` | 宏观经济（国债利率 / FRED 数据） | 当前未接入 Credit 扣费 |
-| `arti search 苹果` | 搜索股票代码（模糊匹配） | `1 Credit` / 次 |
-| `arti news AAPL` | 公司新闻 | `1 Credit` / 次 |
-| `arti news` | 全球财经新闻 | `1 Credit` / 次 |
-| `arti research AAPL` | AI 三层级研报（8 位分析师 → 大师辩论 → 综合裁定） | `30 / 100 Credits` |
-| `arti watchlist` | 查看自选股行情 | 查看行情时 `1 Credit` / 次 |
-| `arti watchlist add AAPL` | 添加 / 移除自选股 | 受套餐自选上限限制 |
-| `arti watch AAPL NVDA` | 实时行情 Dashboard（自动轮询，Ctrl+C 退出） | 启动时 `1 Credit` |
-| `arti export AAPL -f csv` | 导出历史数据到 CSV / JSON 文件 | 当前未接入 Credit 扣费 |
-| `arti insights` | 个人投研洞察报告（HTML 可分享） | 当前未接入 Credit 扣费 |
-| `arti credits` | 查看余额、套餐与权益 | 不扣费 |
-| `arti completion zsh` | 生成 Shell 自动补全脚本 | 不扣费 |
-| `arti config list` | 查看 / 修改配置 | 不扣费 |
+当前仓库适合以公开 beta / preview 的方式发布。
 
-所有命令支持 `--json` 输出结构化 JSON，适合脚本和管道。
+- 开箱即可用：`quote`、`market`、`history`、`scan`、`predict`、`news`、`search`、`watchlist`、`watch`、`fundamental`、`options`、`economy`、`crypto`
+- 主产品主路径已对齐到三档：`quick-scan`、`full`、`deep`
+- 公开安装默认不需要 `arti-data`、Supabase、数据库或额外 API key（`economy fred/search` 除外）
+- `research` 不是纯本地能力，默认公开安装不保证可用，需要单独接入后端 orchestrator
+- `arti-data hybrid` 是高级 / 内部增强链路，主要用于 A 股技术面数据增强，不是首次体验必需项
 
-## Credit 计费
+## Quick Start
 
-- 套餐与主产品对齐：`free` / `basic` / `pro` / `flagship`
-- `Free` 新用户首月默认 400 Credits，常规月配额 100 Credits
-- 消耗规则：普通查询 `1`、快速扫描 `5`、全景报告 `30`、深度报告 `100`
-- 自选股上限按套餐限制：`1 / 5 / 20 / 无限`
-- `arti research --agent ...` 或 `arti research -m layer1-only` 记作全景报告 `30 Credits`
-- `arti research` 默认完整三层研报，记作深度报告 `100 Credits`
-- 可用 `arti credits` 查看余额与权益；本地联调可用 `arti credits --set-plan pro` 切换模拟套餐
-- 详细的下载体验、升级提示与真实付费边界见 [BILLING_FLOW.md](/Users/nicolechen/ARTI-CLI/BILLING_FLOW.md)
-
-## 安装
+### 1. 安装
 
 需要 Node.js >= 18 和 Python >= 3.9。
 
-### Homebrew (macOS / Linux)
+#### Homebrew (macOS / Linux)
 
 ```bash
 brew tap botearn/arti https://github.com/botearn/homebrew-arti
 brew install arti
 ```
 
-### Shell script
+#### Shell script
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/botearn/ARTI-CLI/master/install.sh | sh
 ```
 
-### Build from source
+#### Build from source
 
 ```bash
 git clone https://github.com/botearn/ARTI-CLI.git
@@ -89,6 +59,103 @@ npm link
 ```
 
 安装完成后即可使用 `arti` 命令。无参数运行 `arti` 会进入交互式 REPL 终端。
+
+### 2. 首次体验
+
+```bash
+arti quick-scan AAPL
+arti full NVDA
+arti deep TSLA
+```
+
+如果你只想体验公开基础能力，也可以用：
+
+```bash
+arti quote AAPL
+arti market
+arti scan AAPL
+arti history AAPL -d 30
+arti predict NVDA
+```
+
+`quick-scan` 默认走本地 OpenBB + yfinance 免费链路；`full` / `deep` 需要单独 research 后端。
+
+## 主产品三档
+
+| 命令 | 对应主产品能力 | 说明 |
+|---|---|---|
+| `arti quick-scan AAPL` | Quick Scan | 快速研判，整合行情、技术面、新闻 |
+| `arti full AAPL` | Full 全景研报 | 多分析师 Layer 1 全景报告 |
+| `arti deep AAPL` | Deep 深度研报 | 三层级研报，含大师辩论和综合裁定 |
+
+### 3. 可选环境变量
+
+复制 [.env.example](/Users/nicolechen/ARTI-CLI/.env.example) 按需配置。对公开用户来说，通常只需要关心：
+
+```bash
+export ARTI_API_URL=https://your-research-backend
+export ARTI_TIMEOUT=30000
+export ARTI_AUTH_TOKEN=your-access-token
+```
+
+如果你不打算启用 `arti research` 或内部 hybrid 数据源，这一步可以跳过。
+
+### 4. 登录
+
+CLI 现已支持用户登录态。当前第一版采用 access token 登录：
+
+```bash
+arti login --token <your-access-token>
+arti whoami
+arti logout
+```
+
+登录后，CLI 调用后端 Edge Functions / orchestrator 时会自动附带 `Authorization: Bearer <token>`。
+
+## 功能一览
+
+| 命令 | 说明 | 公开可用性 | 计费 / 限制 |
+|---|---|---|---|
+| `arti quote AAPL NVDA` | 实时行情（支持多股、港股、中文名搜索） | 公开可用 | `1 Credit` / 次 |
+| `arti market` | 全球指数概览（美股 / 亚太 / 欧洲） | 公开可用 | `1 Credit` / 次 |
+| `arti market gainers` | 今日涨幅榜 | 公开可用 | `1 Credit` / 次 |
+| `arti market losers` | 今日跌幅榜 | 公开可用 | `1 Credit` / 次 |
+| `arti market active` | 今日活跃榜 | 公开可用 | `1 Credit` / 次 |
+| `arti quick-scan AAPL` | 主产品 Quick Scan（行情 + 技术面 + 新闻） | 公开可用 | `5 Credits` / 次 |
+| `arti full AAPL` | 主产品 Full 全景研报（Layer 1） | 高级功能，需单独后端 | `30 Credits` / 次 |
+| `arti deep AAPL` | 主产品 Deep 深度研报（三层级） | 高级功能，需单独后端 | `100 Credits` / 次 |
+| `arti scan AAPL` | 技术指标扫描（MA / RSI / MACD / 布林带 / ATR / ADX / KDJ / OBV） | 公开可用 | `5 Credits` / 次 |
+| `arti predict AAPL` | 综合预测（行情 + 技术面 + 新闻 → 多空研判） | 公开可用 | `5 Credits` / 次 |
+| `arti history AAPL -d 30` | 历史价格（OHLCV 表格） | 公开可用 | `1 Credit` / 次 |
+| `arti crypto BTCUSD` | 加密货币历史价格 | 公开可用 | 当前未接入 Credit 扣费 |
+| `arti fundamental AAPL` | 基本面数据（财报 / 估值 / 分红） | 公开可用 | 当前未接入 Credit 扣费 |
+| `arti options AAPL` | 期权链（行权价 / IV / 持仓量） | 公开可用 | 当前未接入 Credit 扣费 |
+| `arti economy treasury` | 宏观经济（国债利率 / FRED 数据） | 公开可用 | 当前未接入 Credit 扣费 |
+| `arti search 苹果` | 搜索股票代码（模糊匹配） | 公开可用 | `1 Credit` / 次 |
+| `arti news AAPL` | 公司新闻 | 公开可用 | `1 Credit` / 次 |
+| `arti news` | 全球财经新闻 | 公开可用 | `1 Credit` / 次 |
+| `arti research AAPL` | AI 三层级研报（8 位分析师 → 大师辩论 → 综合裁定） | 高级功能，需单独后端 | `30 / 100 Credits` |
+| `arti watchlist` | 查看自选股行情 | 公开可用 | 查看行情时 `1 Credit` / 次 |
+| `arti watchlist add AAPL` | 添加 / 移除自选股 | 公开可用 | 受套餐自选上限限制 |
+| `arti watch AAPL NVDA` | 实时行情 Dashboard（自动轮询，Ctrl+C 退出） | 公开可用 | 启动时 `1 Credit` |
+| `arti export AAPL -f csv` | 导出历史数据到 CSV / JSON 文件 | 公开可用 | 当前未接入 Credit 扣费 |
+| `arti insights` | 个人投研洞察报告（HTML 可分享） | 公开可用 | 当前未接入 Credit 扣费 |
+| `arti credits` | 查看余额、套餐与权益 | 公开可用 | 不扣费 |
+| `arti completion zsh` | 生成 Shell 自动补全脚本 | 公开可用 | 不扣费 |
+| `arti config list` | 查看 / 修改配置 | 公开可用 | 不扣费 |
+
+所有命令支持 `--json` 输出结构化 JSON，适合脚本和管道。
+
+## Credit 计费
+
+- 套餐与主产品对齐：`free` / `basic` / `pro` / `flagship`
+- `Free` 新用户首月默认 400 Credits，常规月配额 100 Credits
+- 消耗规则：普通查询 `1`、快速扫描 `5`、全景报告 `30`、深度报告 `100`
+- 自选股上限按套餐限制：`1 / 5 / 20 / 无限`
+- `arti full`、`arti research --agent ...` 或 `arti research -m panorama` 记作全景报告 `30 Credits`
+- `arti deep`、`arti research` 或 `arti research -m deep` 记作深度报告 `100 Credits`
+- 可用 `arti credits` 查看余额与权益；本地联调可用 `arti credits --set-plan pro` 切换模拟套餐
+- 下载体验、升级提示与真实付费边界见 [BILLING_FLOW.md](/Users/nicolechen/ARTI-CLI/BILLING_FLOW.md)
 
 ## 两种使用模式
 
@@ -308,11 +375,20 @@ arti news AAPL -l 5      # 只看 5 条
 
 ### research — AI 三层级研报
 
+如果你只是按主产品能力使用，优先使用：
+
+```bash
+arti full AAPL
+arti deep AAPL
+```
+
+`research` 更适合作为底层兼容入口或调试入口。
+
 ```bash
 arti research AAPL                     # 完整三层级研报
 arti research NVDA -a tony             # 仅 Tony（技术面）快速分析
-arti research TSLA -f                  # 显示完整报告
-arti research AAPL -m layer1-only     # 仅 Layer 1，跳过大师辩论
+arti research TSLA -m panorama         # 仅 Layer 1，跳过大师辩论
+arti research AAPL -m deep -f          # 深度研报 + 完整输出
 ```
 
 三层结构：
@@ -320,11 +396,15 @@ arti research AAPL -m layer1-only     # 仅 Layer 1，跳过大师辩论
 - **Layer 2** — 投资大师圆桌辩论（动态路由）：巴菲特、林奇、马克斯、索罗斯、达里奥、德鲁肯米勒、段永平
 - **Layer 3** — 综合裁定（多空联盟 + 分歧点 + 失败信号）
 
-> 需要后端服务支持（Supabase Edge Function）。
+公开 beta 说明：
+
+- `research` 默认不是纯本地能力，公开安装不保证直接可用
+- 需要可访问的后端 `api.baseUrl`，当前默认协议是 Supabase Edge Function / orchestrator SSE
+- 如果没有单独部署 research 后端，建议先使用 `quote`、`scan`、`predict`、`history` 作为公开体验主路径
 
 计费：
-- `arti research AAPL` 默认完整三层，扣 `100 Credits`
-- `arti research NVDA -a tony` 或 `arti research AAPL -m layer1-only` 扣 `30 Credits`
+- `arti deep AAPL`、`arti research AAPL` 或 `arti research -m deep` 默认扣 `100 Credits`
+- `arti full AAPL`、`arti research NVDA -a tony` 或 `arti research -m panorama` 扣 `30 Credits`
 
 ### watchlist — 自选股管理
 
@@ -386,6 +466,15 @@ arti config reset              # 重置为默认
 
 配置文件位于 `~/.config/arti/config.json`。
 
+常见配置：
+
+- `api.baseUrl`：`arti research` 使用的后端地址
+- `api.timeout`：后端请求超时
+- `data.provider`：`openbb | arti-data | hybrid`
+- `data.artiDataBaseUrl` / `data.artiDataInternalKey`：仅高级 / 内部 hybrid 链路需要
+
+也可通过环境变量覆盖配置文件，示例见 [.env.example](/Users/nicolechen/ARTI-CLI/.env.example)。
+
 ### completion — Shell 补全
 
 ```bash
@@ -446,6 +535,38 @@ arti --json news AAPL | jq '.[].title'
 > echo '{"credentials":{"fred_api_key":"YOUR_KEY"}}' > ~/.openbb_platform/user_settings.json
 > ```
 > 其他所有命令（quote、market、scan、history、crypto、options 等）均无需 API Key。
+
+## Internal / Advanced: arti-data Hybrid 数据源
+
+这部分不是公开用户首次安装的必需项。当前主要用于 A 股技术面增强和内部链路对齐。
+
+- 当前第一步已接入：`history`
+- 当前第二步已接入：A 股 `scan`
+- 当前第三步已接入：A 股 `predict` 的技术面部分
+- 当前第四步已接入：A 股 `research` 的技术面上下文增强
+- 仅 A 股 `history` 会优先尝试 `arti-data`
+- A 股 `scan` 会优先使用 `arti-data` 日线，并在 CLI 内计算技术指标
+- A 股 `predict` 会复用同一套 hybrid 技术面链路
+- A 股 `research` 会把 hybrid 技术面摘要拼进传给 agent/orchestrator 的 `stockData`
+- 其他市场或 `arti-data` 不可用时，会自动 fallback 到现有 OpenBB/yfinance 链路
+
+高级环境变量：
+
+```bash
+export ARTI_DATA_PROVIDER=hybrid
+export ARTI_DATA_API_URL=https://your-arti-data-host
+export ARTI_DATA_INTERNAL_KEY=your-internal-key
+export ARTI_DATA_TIMEOUT=15000
+```
+
+高级配置项：
+
+- `data.provider`：`openbb | arti-data | hybrid`
+- `data.artiDataBaseUrl`
+- `data.artiDataInternalKey`
+- `data.artiDataTimeout`
+
+实现细节和接入计划见 [ARTI_DATA_INTEGRATION_PLAN.md](/Users/nicolechen/ARTI-CLI/ARTI_DATA_INTEGRATION_PLAN.md)。
 
 ## 项目结构
 
@@ -525,6 +646,16 @@ npm run test:watch             # 监听模式
 - **构建** — [tsup](https://github.com/egoist/tsup)（ESM, 带 .d.ts）
 - **测试** — [Vitest](https://vitest.dev)
 - **终端** — [chalk](https://github.com/chalk/chalk) + [ora](https://github.com/sindresorhus/ora)
+
+## 文档
+
+项目文档位于 `docs/` 目录：
+
+- [agents.md](docs/agents.md) — AI 分析师系统架构与角色说明
+- [ARTI_DATA_INTEGRATION_PLAN.md](docs/ARTI_DATA_INTEGRATION_PLAN.md) — arti-data 高级数据源接入计划
+- [BILLING_FLOW.md](docs/BILLING_FLOW.md) — Credit 计费流程、套餐对比与升级引导
+- [CLI_FEATURES.md](docs/CLI_FEATURES.md) — CLI 功能清单与开发进度
+- [codex.md](docs/codex.md) — Codex 集成说明
 
 ## License
 

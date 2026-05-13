@@ -4,13 +4,14 @@
  * 用法：arti predict AAPL
  */
 import chalk from "chalk";
-import { getQuote, getTechnical, getCompanyNews, classifySignal, type QuoteData, type TechnicalData } from "../openbb.js";
+import { getQuote, getCompanyNews, classifySignal, type QuoteData, type TechnicalData } from "../openbb.js";
 import { title, divider, sentimentBadge, colorChange, kvLine, confidenceBar } from "../format.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
+import { getHybridTechnical } from "../data/hybrid.js";
 
 /** 根据技术指标生成综合预测 */
 function generatePrediction(quote: QuoteData | null, tech: TechnicalData) {
@@ -78,12 +79,17 @@ export async function predictCommand(symbol: string): Promise<void> {
       let quote = null;
       try { quote = await getQuote(symbol); } catch { /* ignore */ }
       let tech = null;
-      try { tech = await getTechnical(symbol); } catch { /* ignore */ }
+      let technicalSource: "arti-data" | "openbb" = "openbb";
+      try {
+        const hybrid = await getHybridTechnical(symbol, 220);
+        tech = hybrid.technical;
+        technicalSource = hybrid.source;
+      } catch { /* ignore */ }
       let news: Awaited<ReturnType<typeof getCompanyNews>> = [];
       try { news = await getCompanyNews(symbol, 5); } catch { /* ignore */ }
       track("predict", [symbol]);
 
-      return { quote, tech, news };
+      return { quote, tech, news, technicalSource };
     }));
   } catch (err) {
     if (err instanceof InsufficientCreditsError) {
@@ -97,7 +103,7 @@ export async function predictCommand(symbol: string): Promise<void> {
   if (!billed) return;
 
   const { result, deduct } = billed;
-  const { quote, tech, news } = result;
+  const { quote, tech, news, technicalSource } = result;
 
   if (!tech || tech.error) {
     console.log(chalk.red(`  无法获取 ${symbol} 技术数据: ${tech?.error || "未知错误"}`));
@@ -105,7 +111,7 @@ export async function predictCommand(symbol: string): Promise<void> {
   }
 
   const prediction = generatePrediction(quote, tech);
-  const jsonData = { symbol, quote, technical: tech, news, prediction };
+  const jsonData = { symbol, quote, technical: tech, technicalSource, news, prediction };
 
   output(jsonData, () => {
     console.log(title(`${symbol} 综合预测分析`));
@@ -174,7 +180,7 @@ export async function predictCommand(symbol: string): Promise<void> {
     }
 
     console.log(divider());
-    console.log(chalk.gray("  * 以上分析基于 OpenBB 技术指标自动生成，仅供参考，不构成投资建议"));
+    console.log(chalk.gray("  * 以上分析基于 ARTI-CLI 技术指标与行情数据自动生成，仅供参考，不构成投资建议"));
     console.log();
     printDeductResult(deduct);
   });

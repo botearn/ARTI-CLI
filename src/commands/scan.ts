@@ -3,13 +3,14 @@
  * 用法：arti scan AAPL
  */
 import chalk from "chalk";
-import { getTechnical, classifySignal, type TechnicalData } from "../openbb.js";
+import { classifySignal } from "../openbb.js";
 import { title, kvLine, divider, colorChange } from "../format.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
+import { getHybridTechnical } from "../data/hybrid.js";
 
 export async function scanCommand(symbol: string): Promise<void> {
   if (!symbol) {
@@ -22,7 +23,7 @@ export async function scanCommand(symbol: string): Promise<void> {
   let billed;
   try {
     billed = await withBilling("quickScan", () => handleCommand(`扫描 ${symbol} 技术指标...`, async () => {
-      const result = await getTechnical(symbol);
+      const result = await getHybridTechnical(symbol, 220);
       track("scan", [symbol]);
       return result;
     }));
@@ -37,13 +38,14 @@ export async function scanCommand(symbol: string): Promise<void> {
 
   if (!billed) return;
 
-  const { result: data, deduct } = billed;
+  const { result, deduct } = billed;
+  const { technical: data, source } = result;
   if (data.error) {
     console.log(chalk.red(`  ${data.error}`));
     return;
   }
 
-  output(data, () => {
+  output({ ...data, source }, () => {
     console.log(title(`${symbol} 技术扫描`));
 
     // 基础信息
