@@ -21,7 +21,14 @@ Thumbs.db
 # 缓存
 .ruff_cache/
 
+# Python 编译缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 # 演绎法系统运行时文件
 .deductive/logs/
 .deductive/evidence/
 .deductive/DISABLED
+.gstack/

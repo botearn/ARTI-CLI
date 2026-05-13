@@ -1,0 +1,23 @@
+# Template / smoke-test prompt —— 不是真实 analyst，仅证明 loader 工作正常。
+#
+# 真实 layer1/tony.yaml 等需要从闭源 TS 源 1:1 复制后落盘，
+# 见同目录 ../README.md 的 1:1 迁移纪律。
+#
+# 文件名以 `_` 开头，list_prompts() 不会过滤掉但调用方按约定不要把
+# `_template` 当成生产 prompt 使用。
+
+name: _template
+role: 模板示例（非真实 agent）
+version: "0.0.1"
+model: claude-sonnet-4-6
+max_tokens: 256
+temperature: 0.0
+
+system_prompt: |
+  你是一个测试用的占位 agent，仅用于验证 prompt loader 是否正常工作。
+  不要在生产环境调用我。
+
+user_template: |
+  请回声以下输入：
+  symbol={symbol}
+  data={stock_data}

@@ -1,0 +1,27 @@
+# Template / smoke-test prompt —— layer2 master 占位版本。
+#
+# 同 layer1/_template.yaml 注意事项：仅证明 loader 工作正常，
+# 真实 7 位大师 prompt 由用户从闭源 TS 源 1:1 复制。
+
+name: _template
+role: 模板大师（非真实 master）
+stance: 中立
+version: "0.0.1"
+model: claude-sonnet-4-6
+max_tokens: 256
+temperature: 0.0
+
+system_prompt: |
+  你是一个测试用的占位大师 agent，仅用于验证 master_agent loader 通路。
+  不要在生产环境调用我。
+
+user_template: |
+  请基于以下材料给出立场：
+
+  symbol: {symbol}
+
+  ## Layer1 研究上下文
+  {research_context}
+
+  ## 辩论历史
+  {debate_transcript}
