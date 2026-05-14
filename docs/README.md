@@ -35,6 +35,14 @@
 
 ### 集成
 
+- [**BACKEND_READY.md**](BACKEND_READY.md) — Backend 集成完成总览
+  - 当前配置、Hybrid 工作模式与测试结果
+  - 工具脚本与验收标准
+
+- [**QUICK_START_BACKEND.md**](QUICK_START_BACKEND.md) — Backend 集成快速参考
+  - JWT 配置步骤
+  - 常用验证命令与排查入口
+
 - [**codex.md**](codex.md) — Codex 集成说明
   - 与 OpenAI Codex CLI 的集成方案
   - 代码审查与挑战模式使用方式
@@ -45,6 +53,8 @@
 - 需要接入 A 股数据？→ [ARTI_DATA_INTEGRATION_PLAN.md](ARTI_DATA_INTEGRATION_PLAN.md)
 - 想知道计费规则？→ [BILLING_FLOW.md](BILLING_FLOW.md)
 - 查看功能完成度？→ [CLI_FEATURES.md](CLI_FEATURES.md)
+- 查看 Backend 集成总览？→ [BACKEND_READY.md](BACKEND_READY.md)
+- 需要快速参考 Backend 启用？→ [QUICK_START_BACKEND.md](QUICK_START_BACKEND.md)
 - 集成 Codex？→ [codex.md](codex.md)
 
 ## 返回主文档
