@@ -109,8 +109,8 @@ const defs: CommandDef[] = [
   },
   {
     name: "login", aliases: [],
-    description: "登录 ARTI 账户（支持邮箱密码或 access+refresh token）",
-    usage: "login (--email <email> --password <password>) | (--token <token> [--refresh-token <token>])",
+    description: "登录 ARTI 账户（默认打开官网登录，也兼容邮箱密码或 token）",
+    usage: "login | login --email <email> --password <password> | login --token <token> [--refresh-token <token>]",
     args: [],
     options: [
       { short: "", long: "--token", key: "token", type: "string", desc: "ARTI access token", hint: "<token>" },
@@ -120,8 +120,10 @@ const defs: CommandDef[] = [
       { short: "", long: "--user-id", key: "userId", type: "string", desc: "用户 ID（可选）", hint: "<id>" },
       { short: "", long: "--supabase-url", key: "supabaseUrl", type: "string", desc: "Supabase URL（可选）", hint: "<url>" },
       { short: "", long: "--publishable-key", key: "publishableKey", type: "string", desc: "Supabase publishable key（可选）", hint: "<key>" },
+      { short: "", long: "--web-auth-url", key: "webAuthUrl", type: "string", desc: "网页登录地址（调试用）", hint: "<url>" },
     ],
     examples: [
+      "$ arti login",
       "$ arti login --email you@example.com --password '***'",
       "$ arti login --token <token> --refresh-token <token>",
     ],
@@ -133,6 +135,7 @@ const defs: CommandDef[] = [
       userId: options.userId as string | undefined,
       supabaseUrl: options.supabaseUrl as string | undefined,
       publishableKey: options.publishableKey as string | undefined,
+      webAuthUrl: options.webAuthUrl as string | undefined,
     })),
   },
   {

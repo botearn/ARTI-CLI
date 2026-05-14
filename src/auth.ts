@@ -18,7 +18,7 @@ export interface AuthState {
   publishableKey: string;
 }
 
-interface SupabaseAuthResponse {
+export interface SupabaseAuthResponse {
   access_token: string;
   refresh_token?: string;
   expires_at?: number;
@@ -127,6 +127,13 @@ export async function refreshAuthSession(current = getAuthState()): Promise<Auth
     "refresh_token",
     { refresh_token: current.refreshToken },
   );
+  return persistSession(session, current);
+}
+
+export function saveSupabaseSession(
+  session: SupabaseAuthResponse,
+  current?: Partial<AuthState>,
+): AuthState {
   return persistSession(session, current);
 }
 

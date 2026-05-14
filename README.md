@@ -132,20 +132,24 @@ arti watchlist add AAPL     # 加入自选股
 ```bash
 export ARTI_API_URL=https://your-research-backend
 export ARTI_TIMEOUT=30000
-export ARTI_SUPABASE_URL=https://wklskhbrjnyppqfmxhxa.supabase.co
-export ARTI_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
 如果你不打算启用 `arti research` 或内部 hybrid 数据源，这一步可以跳过。
 
 ### 4. 登录
 
-CLI 现已支持可续期登录态，优先推荐邮箱密码登录：
+CLI 现已支持可续期登录态。默认方式是直接打开官网登录，登录完成后自动回到终端：
+
+```bash
+arti login
+arti whoami
+arti logout
+```
+
+如果你在脚本环境里不方便弹浏览器，也兼容邮箱密码登录：
 
 ```bash
 arti login --email you@example.com --password '***'
-arti whoami
-arti logout
 ```
 
 如你已有现成会话，也可直接传入 access token + refresh token：

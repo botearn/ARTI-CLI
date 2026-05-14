@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { loginWithBrowser } from "../browser-login.js";
 import {
   clearAuthState,
   decodeJwtPayload,
@@ -20,6 +21,7 @@ interface LoginOptions {
   userId?: string;
   supabaseUrl?: string;
   publishableKey?: string;
+  webAuthUrl?: string;
 }
 
 export async function loginCommand(options?: LoginOptions): Promise<void> {
@@ -34,6 +36,7 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
     || process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
     || process.env.SUPABASE_ANON_KEY?.trim()
     || "";
+  const webAuthUrl = options?.webAuthUrl?.trim() || process.env.ARTI_WEB_AUTH_URL?.trim() || "";
 
   if (supabaseUrl || publishableKey) {
     saveAuthState({ supabaseUrl, publishableKey });
@@ -47,9 +50,10 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
     }
 
     if (!token) {
-      console.log(chalk.red("请提供 access token，或使用邮箱密码登录"));
-      console.log(chalk.gray("例如：arti login --token <token> --refresh-token <token>"));
-      console.log(chalk.gray("或：arti login --email you@example.com --password '***'"));
+      console.log(chalk.gray("  正在打开 ARTI 官网登录页…"));
+      console.log();
+      const auth = await loginWithBrowser({ webAuthUrl });
+      printLoginSuccess(auth.email, auth.userId, auth.token, Boolean(auth.refreshToken));
       return;
     }
 
@@ -123,7 +127,7 @@ export async function whoamiCommand(): Promise<void> {
       console.log(chalk.gray("  ─────────────────────────────────────"));
       if (!isLoggedIn(auth)) {
         console.log(chalk.yellow("  未登录"));
-        console.log(chalk.gray("  使用 arti login --token <token> 或 arti login --email <email> --password <password> 登录"));
+        console.log(chalk.gray("  使用 arti login 打开官网登录，或使用兼容参数手动登录"));
         console.log();
         return;
       }

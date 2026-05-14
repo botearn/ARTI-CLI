@@ -8,6 +8,7 @@ import { join } from "node:path";
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 const DEFAULT_SUPABASE_URL = "https://wklskhbrjnyppqfmxhxa.supabase.co";
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_5SIVwCD2q2QjtijkX8zn5Q_NSiocgl5";
 const LEGACY_API_BASE_URL = "https://laoclhqedllwjuboyqib.supabase.co/functions/v1";
 const DEFAULT_API_BASE_URL = `${DEFAULT_SUPABASE_URL}/functions/v1`;
 
@@ -60,7 +61,7 @@ const DEFAULT_CONFIG: ArtiConfig = {
     userId: "",
     email: "",
     supabaseUrl: DEFAULT_SUPABASE_URL,
-    publishableKey: "",
+    publishableKey: DEFAULT_SUPABASE_PUBLISHABLE_KEY,
   },
   data: {
     provider: "hybrid",
@@ -106,6 +107,10 @@ export function loadConfig(): ArtiConfig {
       }
       if (!config.auth.supabaseUrl) {
         config.auth.supabaseUrl = deriveSupabaseUrlFromApiBase(config.api.baseUrl);
+        shouldPersistMigration = true;
+      }
+      if (!config.auth.publishableKey) {
+        config.auth.publishableKey = DEFAULT_SUPABASE_PUBLISHABLE_KEY;
         shouldPersistMigration = true;
       }
     } catch {
@@ -242,6 +247,10 @@ export function getConfigPath(): string {
 
 export function getDefaultSupabaseUrl(): string {
   return DEFAULT_SUPABASE_URL;
+}
+
+export function getDefaultSupabasePublishableKey(): string {
+  return DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 }
 
 export function deriveSupabaseUrlFromApiBase(baseUrl: string): string {

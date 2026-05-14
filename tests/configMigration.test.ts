@@ -62,9 +62,10 @@ describe("config legacy API migration", () => {
     expect(config.auth.refreshToken).toBe("");
     expect(config.auth.expiresAt).toBeNull();
     expect(config.auth.supabaseUrl).toBe("https://wklskhbrjnyppqfmxhxa.supabase.co");
-    expect(config.auth.publishableKey).toBe("");
+    expect(config.auth.publishableKey).toBe("sb_publishable_5SIVwCD2q2QjtijkX8zn5Q_NSiocgl5");
 
     const persisted = JSON.parse(readFileSync(configFile, "utf-8"));
     expect(persisted.api.baseUrl).toBe("https://wklskhbrjnyppqfmxhxa.supabase.co/functions/v1");
+    expect(persisted.auth.publishableKey).toBe("sb_publishable_5SIVwCD2q2QjtijkX8zn5Q_NSiocgl5");
   });
 });
