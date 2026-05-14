@@ -593,7 +593,7 @@ export async function routeIntent(
 // ── Backend: stock-quotes (可选，可保留 yfinance 作为 fallback) ──
 
 export async function fetchQuotesBackend(symbols: string): Promise<{ quotes: StockQuote[]; indices: MarketIndex[] }> {
-  return callBackend("/v1/stock-quotes", { symbol: symbols });
+  return callBackend("/v1/stock-quotes", { symbols });
 }
 
 // ── Backend: resolve-stock ──

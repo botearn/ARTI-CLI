@@ -11,6 +11,7 @@ const DEFAULT_SUPABASE_URL = "https://wklskhbrjnyppqfmxhxa.supabase.co";
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_5SIVwCD2q2QjtijkX8zn5Q_NSiocgl5";
 const LEGACY_API_BASE_URL = "https://laoclhqedllwjuboyqib.supabase.co/functions/v1";
 const DEFAULT_API_BASE_URL = `${DEFAULT_SUPABASE_URL}/functions/v1`;
+const DEFAULT_BACKEND_URL = "https://api-gateway-production-b656.up.railway.app";
 
 export interface ArtiConfig {
   api: {
@@ -51,7 +52,7 @@ const DEFAULT_CONFIG: ArtiConfig = {
   },
   backend: {
     enabled: true,
-    url: "",
+    url: DEFAULT_BACKEND_URL,
     timeout: 60000,
   },
   auth: {

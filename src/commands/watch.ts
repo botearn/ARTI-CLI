@@ -1,14 +1,16 @@
 /**
  * watch 命令 — 实时行情轮询 Dashboard
+ * 数据源优先级：Backend API → OpenBB (yfinance)
  * 用法：arti watch AAPL NVDA TSLA
  *       arti watch AAPL -i 10      (10秒间隔)
  */
 import chalk from "chalk";
-import { getQuote, type QuoteData } from "../openbb.js";
+import { type QuoteData } from "../openbb.js";
 import { colorChange, sparkline } from "../format.js";
 import { track } from "../tracker.js";
 import { withBilling, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
+import { getHybridQuote } from "../data/quote.js";
 
 interface WatchOptions {
   interval?: number;
@@ -46,7 +48,7 @@ export async function watchCommand(symbols: string[], opts?: WatchOptions): Prom
 
     for (const sym of resolved) {
       try {
-        const q = await getQuote(sym);
+        const { quote: q } = await getHybridQuote(sym);
         const history = priceHistory.get(sym) || [];
         history.push(q.last_price || q.prev_close || 0);
         if (history.length > 20) history.shift();

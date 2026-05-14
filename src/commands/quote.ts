@@ -1,15 +1,17 @@
 /**
- * quote 命令 — 实时行情查询（OpenBB 数据源）
+ * quote 命令 — 实时行情查询
+ * 数据源优先级：Backend API → OpenBB (yfinance)
  * 用法：arti quote AAPL NVDA BTCUSD
  */
 import chalk from "chalk";
-import { getQuote, getHistorical, searchEquity, type QuoteData } from "../openbb.js";
+import { searchEquity, type QuoteData } from "../openbb.js";
 import { colorChange, kvLine, divider, title, sparkline } from "../format.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
+import { getHybridQuotes, type HybridQuoteResult } from "../data/quote.js";
 
 export async function quoteCommand(symbols: string[]): Promise<void> {
   if (!symbols.length) {
@@ -20,7 +22,6 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
   let billed;
   try {
     billed = await withBilling("chat", () => handleCommand("获取行情数据...", async ({ spinner }) => {
-      // 解析 symbols：标准代码直接用，中文名先搜索
       const resolved: string[] = [];
       for (const s of symbols) {
         if (/^[A-Z0-9.^=]+$/i.test(s)) {
@@ -48,24 +49,9 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
         return undefined;
       }
 
-      // 多 symbol 并行获取（daemon 模式下安全并发，共享同一 Python 进程）
       spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
 
-      const fetchOne = async (sym: string): Promise<{ quote: QuoteData; prices: number[] } | null> => {
-        let quote: QuoteData;
-        try {
-          quote = await getQuote(sym);
-        } catch { return null; }
-        let prices: number[] = [];
-        try {
-          const hist = await getHistorical(sym, 20);
-          prices = hist.map(h => h.close);
-        } catch { /* sparkline 非关键 */ }
-        return { quote, prices };
-      };
-
-      const results = await Promise.all(resolved.map(fetchOne));
-      const quotes = results.filter((r): r is NonNullable<typeof r> => r !== null);
+      const quotes = await getHybridQuotes(resolved);
       if (!quotes.length) {
         spinner.fail("未获取到行情数据");
         return undefined;
@@ -86,8 +72,9 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
 
   if (!billed) return;
 
-  const { result, deduct } = billed;
-  const { _quotes: quotes } = result;
+  const { result: rawResult, deduct } = billed;
+  const result = rawResult!;
+  const { _quotes: quotes } = result as unknown as { _quotes: HybridQuoteResult[] };
 
   output({ quotes: result.quotes }, () => {
     if (!quotes.length) {
