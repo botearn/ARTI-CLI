@@ -1,14 +1,10 @@
-import { randomBytes } from "node:crypto";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
 import { getDefaultSupabasePublishableKey, getDefaultSupabaseUrl } from "./config.js";
 import { getAuthState, saveSupabaseSession, type AuthState, type SupabaseAuthResponse } from "./auth.js";
 
 const DEFAULT_WEB_AUTH_URL = "https://www.artifin.ai/auth";
-const CALLBACK_HOST = "127.0.0.1";
-const CALLBACK_PATH = "/cli-auth/callback";
-const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000;
-const MAX_BODY_BYTES = 64 * 1024;
+const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_POLL_INTERVAL_MS = 2000;
 
 interface BrowserLoginOptions {
   webAuthUrl?: string;
@@ -17,123 +13,55 @@ interface BrowserLoginOptions {
   onLoginUrl?: (url: string) => void;
 }
 
-interface CallbackPayload {
-  access_token?: string;
-  refresh_token?: string;
-  expires_at?: number | string;
-  expires_in?: number | string;
-  user_id?: string;
-  email?: string;
-  state?: string;
+interface CliAuthStartResponse {
+  session_id: string;
+  code: string;
+  poll_token: string;
+  login_url: string;
+  expires_at?: string;
+  poll_interval_ms?: number;
 }
 
-export function buildBrowserLoginUrl(webAuthUrl: string, callbackUrl: string, state: string): string {
-  const url = new URL(webAuthUrl || DEFAULT_WEB_AUTH_URL);
-  url.searchParams.set("cli", "1");
-  url.searchParams.set("callback_url", callbackUrl);
-  url.searchParams.set("state", state);
-  return url.toString();
+interface CliAuthPollResponse {
+  status: "pending" | "approved" | "expired" | "consumed";
+  code?: string;
+  poll_after_ms?: number;
+  expires_at?: string;
+  session?: SupabaseAuthResponse;
 }
 
 export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<AuthState> {
   const auth = getAuthState();
-  const state = randomBytes(16).toString("hex");
-  const timeoutMs = options?.timeoutMs ?? CALLBACK_TIMEOUT_MS;
+  const timeoutMs = options?.timeoutMs ?? LOGIN_TIMEOUT_MS;
+  const started = await startLoginSession();
 
-  return await new Promise<AuthState>((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error("浏览器登录超时，请重新执行 arti login"));
-    }, timeoutMs);
+  options?.onLoginUrl?.(started.login_url);
+  if (options?.onOpenUrl) {
+    await options.onOpenUrl(started.login_url);
+  } else {
+    await openExternalUrl(started.login_url);
+  }
 
-    const server = createServer(async (req, res) => {
-      try {
-        if (!req.url) {
-          writeJson(res, 404, { error: "not_found" });
-          return;
-        }
+  const deadline = Date.now() + timeoutMs;
+  const pollIntervalMs = started.poll_interval_ms || DEFAULT_POLL_INTERVAL_MS;
 
-        const url = new URL(req.url, `http://${CALLBACK_HOST}`);
-        if (req.method === "OPTIONS" && url.pathname === CALLBACK_PATH) {
-          writeCors(res);
-          res.statusCode = 204;
-          res.end();
-          return;
-        }
+  while (Date.now() < deadline) {
+    const polled = await pollLoginSession(started.session_id, started.poll_token);
+    if (polled.status === "approved" && polled.session?.access_token) {
+      return saveSupabaseSession(polled.session, {
+        supabaseUrl: auth.supabaseUrl || getDefaultSupabaseUrl(),
+        publishableKey: auth.publishableKey || getDefaultSupabasePublishableKey(),
+        userId: polled.session.user?.id || auth.userId,
+        email: polled.session.user?.email || auth.email,
+      });
+    }
+    if (polled.status === "expired") {
+      throw new Error("网页登录已过期，请重新执行 arti login");
+    }
+    await delay(polled.poll_after_ms || pollIntervalMs);
+  }
 
-        if (req.method === "GET" && url.pathname === "/") {
-          writeHtml(
-            res,
-            "ARTI CLI 登录中",
-            "请回到 ARTI CLI 完成登录。",
-          );
-          return;
-        }
-
-        if (req.method !== "POST" || url.pathname !== CALLBACK_PATH) {
-          writeJson(res, 404, { error: "not_found" });
-          return;
-        }
-
-        const body = await readJsonBody(req);
-        const payload = normalizePayload(body);
-        const saved = completeBrowserLogin(payload, state, auth);
-
-        writeJson(res, 200, {
-          ok: true,
-          email: saved.email,
-          userId: saved.userId,
-          message: "ARTI CLI 登录成功，请回到终端继续使用。",
-        });
-
-        settled = true;
-        cleanup();
-        resolve(saved);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        writeJson(res, 400, { error: message });
-      }
-    });
-    server.once("error", (error) => {
-      cleanup();
-      reject(error instanceof Error ? error : new Error(String(error)));
-    });
-
-    const cleanup = () => {
-      clearTimeout(timer);
-      if (server.listening) {
-        server.close();
-      }
-    };
-
-    server.listen(0, CALLBACK_HOST, async () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        cleanup();
-        reject(new Error("无法启动本地登录回调服务"));
-        return;
-      }
-
-      const callbackUrl = `http://${CALLBACK_HOST}:${address.port}${CALLBACK_PATH}`;
-      const webAuthUrl = options?.webAuthUrl || process.env.ARTI_WEB_AUTH_URL?.trim() || DEFAULT_WEB_AUTH_URL;
-      const loginUrl = buildBrowserLoginUrl(webAuthUrl, callbackUrl, state);
-
-      try {
-        options?.onLoginUrl?.(loginUrl);
-        if (options?.onOpenUrl) {
-          await options.onOpenUrl(loginUrl);
-        } else {
-          await openExternalUrl(loginUrl);
-        }
-      } catch (error) {
-        if (!settled) {
-          cleanup();
-          reject(error instanceof Error ? error : new Error(String(error)));
-        }
-      }
-    });
-  });
+  throw new Error("浏览器登录超时，请重新执行 arti login");
 }
 
 export async function openExternalUrl(url: string): Promise<void> {
@@ -161,125 +89,55 @@ export async function openExternalUrl(url: string): Promise<void> {
   });
 }
 
-export function completeBrowserLogin(
-  payload: CallbackPayload,
-  expectedState: string,
-  currentAuth = getAuthState(),
-): AuthState {
-  if (!payload.access_token) {
-    throw new Error("missing_access_token");
-  }
-  if (payload.state !== expectedState) {
-    throw new Error("state_mismatch");
-  }
+export function buildBrowserLoginUrl(webAuthUrl: string, sessionId: string, code: string): string {
+  const url = new URL(webAuthUrl || DEFAULT_WEB_AUTH_URL);
+  url.searchParams.set("cli", "1");
+  url.searchParams.set("session_id", sessionId);
+  url.searchParams.set("code", code);
+  return url.toString();
+}
 
-  const session: SupabaseAuthResponse = {
-    access_token: payload.access_token,
-    refresh_token: payload.refresh_token,
-    expires_at: payload.expires_at,
-    expires_in: payload.expires_in,
-    user: {
-      id: payload.user_id,
-      email: payload.email,
+async function startLoginSession(): Promise<CliAuthStartResponse> {
+  const auth = getAuthState();
+  const res = await fetch(`${auth.supabaseUrl}/functions/v1/cli-auth`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: auth.publishableKey,
     },
-  };
-
-  return saveSupabaseSession(session, {
-    supabaseUrl: currentAuth.supabaseUrl || getDefaultSupabaseUrl(),
-    publishableKey: currentAuth.publishableKey || getDefaultSupabasePublishableKey(),
-    userId: payload.user_id || currentAuth.userId,
-    email: payload.email || currentAuth.email,
+    body: JSON.stringify({ action: "start" }),
   });
-}
-
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let total = 0;
-
-  for await (const chunk of req) {
-    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    total += buf.length;
-    if (total > MAX_BODY_BYTES) {
-      throw new Error("callback payload too large");
-    }
-    chunks.push(buf);
+  if (!res.ok) {
+    throw new Error(`启动网页登录失败: ${await safeText(res)}`);
   }
-
-  const raw = Buffer.concat(chunks).toString("utf-8").trim();
-  if (!raw) return {};
-
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    throw new Error("invalid_json");
-  }
-}
-
-function normalizePayload(body: unknown): Required<Pick<CallbackPayload, "access_token" | "state">> & CallbackPayload {
-  if (!body || typeof body !== "object") {
-    throw new Error("invalid_payload");
-  }
-
-  const payload = body as Record<string, unknown>;
+  const data = await res.json() as CliAuthStartResponse;
+  const webAuthUrl = process.env.ARTI_WEB_AUTH_URL?.trim() || DEFAULT_WEB_AUTH_URL;
   return {
-    access_token: toStringValue(payload.access_token),
-    refresh_token: toOptionalStringValue(payload.refresh_token),
-    expires_at: toOptionalNumberValue(payload.expires_at),
-    expires_in: toOptionalNumberValue(payload.expires_in),
-    user_id: toOptionalStringValue(payload.user_id),
-    email: toOptionalStringValue(payload.email),
-    state: toStringValue(payload.state),
+    ...data,
+    login_url: data.login_url || buildBrowserLoginUrl(webAuthUrl, data.session_id, data.code),
   };
 }
 
-function toStringValue(value: unknown): string {
-  if (typeof value !== "string" || !value.trim()) {
-    throw new Error("invalid_string");
+async function pollLoginSession(sessionId: string, pollToken: string): Promise<CliAuthPollResponse> {
+  const auth = getAuthState();
+  const url = new URL(`${auth.supabaseUrl}/functions/v1/cli-auth`);
+  url.searchParams.set("session_id", sessionId);
+  url.searchParams.set("poll_token", pollToken);
+  const res = await fetch(url, {
+    headers: {
+      apikey: auth.publishableKey,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`查询网页登录状态失败: ${await safeText(res)}`);
   }
-  return value.trim();
+  return await res.json() as CliAuthPollResponse;
 }
 
-function toOptionalStringValue(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed || undefined;
+async function safeText(res: Response): Promise<string> {
+  return await res.text().catch(() => "unknown error");
 }
 
-function toOptionalNumberValue(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string" && value.trim()) {
-    const num = Number(value);
-    if (Number.isFinite(num)) return num;
-  }
-  return undefined;
-}
-
-function writeCors(res: ServerResponse): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-}
-
-function writeJson(res: ServerResponse, statusCode: number, data: unknown): void {
-  writeCors(res);
-  res.statusCode = statusCode;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(data));
-}
-
-function writeHtml(res: ServerResponse, title: string, message: string): void {
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.end(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></body></html>`);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
