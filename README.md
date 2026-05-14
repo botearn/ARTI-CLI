@@ -132,49 +132,58 @@ arti watchlist add AAPL     # 加入自选股
 ```bash
 export ARTI_API_URL=https://your-research-backend
 export ARTI_TIMEOUT=30000
-export ARTI_AUTH_TOKEN=your-access-token
+export ARTI_SUPABASE_URL=https://wklskhbrjnyppqfmxhxa.supabase.co
+export ARTI_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
 如果你不打算启用 `arti research` 或内部 hybrid 数据源，这一步可以跳过。
 
 ### 4. 登录
 
-CLI 现已支持用户登录态。当前第一版采用 access token 登录：
+CLI 现已支持可续期登录态，优先推荐邮箱密码登录：
 
 ```bash
-arti login --token <your-access-token>
+arti login --email you@example.com --password '***'
 arti whoami
 arti logout
 ```
 
-登录后，CLI 调用后端 Edge Functions / orchestrator 时会自动附带 `Authorization: Bearer <token>`。
+如你已有现成会话，也可直接传入 access token + refresh token：
+
+```bash
+arti login --token <access-token> --refresh-token <refresh-token>
+```
+
+登录后，CLI 会在调用后端 Edge Functions / orchestrator / Credits 接口前自动检查 token，并在需要时自动续期。
+
+> 迁移说明：旧版本只保存 access token。升级到当前版本后，老用户通常需要重新登录一次，才能启用自动续期和服务端 Credits。
 
 ## 功能一览
 
 | 命令 | 说明 | 公开可用性 | 计费 / 限制 |
 |---|---|---|---|
-| `arti quote AAPL NVDA` | 实时行情（支持多股、港股、中文名搜索） | 公开可用 | `1 Credit` / 次 |
-| `arti market` | 全球指数概览（美股 / 亚太 / 欧洲） | 公开可用 | `1 Credit` / 次 |
-| `arti market gainers` | 今日涨幅榜 | 公开可用 | `1 Credit` / 次 |
-| `arti market losers` | 今日跌幅榜 | 公开可用 | `1 Credit` / 次 |
-| `arti market active` | 今日活跃榜 | 公开可用 | `1 Credit` / 次 |
-| `arti quick-scan AAPL` | 主产品 Quick Scan（行情 + 技术面 + 新闻） | 公开可用 | `5 Credits` / 次 |
-| `arti full AAPL` | 主产品 Full 全景研报（Layer 1） | 高级功能，需单独后端 | `30 Credits` / 次 |
-| `arti deep AAPL` | 主产品 Deep 深度研报（三层级） | 高级功能，需单独后端 | `100 Credits` / 次 |
-| `arti scan AAPL` | 技术指标扫描（MA / RSI / MACD / 布林带 / ATR / ADX / KDJ / OBV） | 公开可用 | `5 Credits` / 次 |
-| `arti predict AAPL` | 综合预测（行情 + 技术面 + 新闻 → 多空研判） | 公开可用 | `5 Credits` / 次 |
-| `arti history AAPL -d 30` | 历史价格（OHLCV 表格） | 公开可用 | `1 Credit` / 次 |
+| `arti quote AAPL NVDA` | 实时行情（支持多股、港股、中文名搜索） | 公开可用 | 服务端实时定价 |
+| `arti market` | 全球指数概览（美股 / 亚太 / 欧洲） | 公开可用 | 服务端实时定价 |
+| `arti market gainers` | 今日涨幅榜 | 公开可用 | 服务端实时定价 |
+| `arti market losers` | 今日跌幅榜 | 公开可用 | 服务端实时定价 |
+| `arti market active` | 今日活跃榜 | 公开可用 | 服务端实时定价 |
+| `arti quick-scan AAPL` | 主产品 Quick Scan（行情 + 技术面 + 新闻） | 公开可用 | 服务端实时定价 |
+| `arti full AAPL` | 主产品 Full 全景研报（Layer 1） | 高级功能，需单独后端 | 服务端实时定价 |
+| `arti deep AAPL` | 主产品 Deep 深度研报（三层级） | 高级功能，需单独后端 | 服务端实时定价 |
+| `arti scan AAPL` | 技术指标扫描（MA / RSI / MACD / 布林带 / ATR / ADX / KDJ / OBV） | 公开可用 | 服务端实时定价 |
+| `arti predict AAPL` | 综合预测（行情 + 技术面 + 新闻 → 多空研判） | 公开可用 | 服务端实时定价 |
+| `arti history AAPL -d 30` | 历史价格（OHLCV 表格） | 公开可用 | 服务端实时定价 |
 | `arti crypto BTCUSD` | 加密货币历史价格 | 公开可用 | 当前未接入 Credit 扣费 |
 | `arti fundamental AAPL` | 基本面数据（财报 / 估值 / 分红） | 公开可用 | 当前未接入 Credit 扣费 |
 | `arti options AAPL` | 期权链（行权价 / IV / 持仓量） | 公开可用 | 当前未接入 Credit 扣费 |
 | `arti economy treasury` | 宏观经济（国债利率 / FRED 数据） | 公开可用 | 当前未接入 Credit 扣费 |
-| `arti search 苹果` | 搜索股票代码（模糊匹配） | 公开可用 | `1 Credit` / 次 |
-| `arti news AAPL` | 公司新闻 | 公开可用 | `1 Credit` / 次 |
-| `arti news` | 全球财经新闻 | 公开可用 | `1 Credit` / 次 |
-| `arti research AAPL` | AI 三层级研报（8 位分析师 → 大师辩论 → 综合裁定） | 高级功能，需单独后端 | `30 / 100 Credits` |
-| `arti watchlist` | 查看自选股行情 | 公开可用 | 查看行情时 `1 Credit` / 次 |
+| `arti search 苹果` | 搜索股票代码（模糊匹配） | 公开可用 | 服务端实时定价 |
+| `arti news AAPL` | 公司新闻 | 公开可用 | 服务端实时定价 |
+| `arti news` | 全球财经新闻 | 公开可用 | 服务端实时定价 |
+| `arti research AAPL` | AI 三层级研报（8 位分析师 → 大师辩论 → 综合裁定） | 高级功能，需单独后端 | 服务端实时定价 |
+| `arti watchlist` | 查看自选股行情 | 公开可用 | 查看行情时按服务端定价 |
 | `arti watchlist add AAPL` | 添加 / 移除自选股 | 公开可用 | 受套餐自选上限限制 |
-| `arti watch AAPL NVDA` | 实时行情 Dashboard（自动轮询，Ctrl+C 退出） | 公开可用 | 启动时 `1 Credit` |
+| `arti watch AAPL NVDA` | 实时行情 Dashboard（自动轮询，Ctrl+C 退出） | 公开可用 | 启动时按服务端定价 |
 | `arti export AAPL -f csv` | 导出历史数据到 CSV / JSON 文件 | 公开可用 | 当前未接入 Credit 扣费 |
 | `arti insights` | 个人投研洞察报告（HTML 可分享） | 公开可用 | 当前未接入 Credit 扣费 |
 | `arti credits` | 查看余额、套餐与权益 | 公开可用 | 不扣费 |
@@ -185,13 +194,12 @@ arti logout
 
 ## Credit 计费
 
-- 套餐与主产品对齐：`free` / `basic` / `pro` / `flagship`
-- `Free` 新用户首月默认 400 Credits，常规月配额 100 Credits
-- 消耗规则：普通查询 `1`、快速扫描 `5`、全景报告 `30`、深度报告 `100`
-- 自选股上限按套餐限制：`1 / 5 / 20 / 无限`
-- `arti full`、`arti research --agent ...` 或 `arti research -m panorama` 记作全景报告 `30 Credits`
-- `arti deep`、`arti research` 或 `arti research -m deep` 记作深度报告 `100 Credits`
-- 可用 `arti credits` 查看余额与权益；本地联调可用 `arti credits --set-plan pro` 切换模拟套餐
+- Credits 现已以服务端为准，不再使用本地 `billing.json` 作为真源
+- `arti credits` 会展示真实套餐、周包剩余、永久余额、5h 窗口与动作定价
+- 定价、套餐和限额以生产环境 `credit_pricing / usage_tiers / subscribers / user_credits` 为准
+- 自选股上限仍按套餐限制：`1 / 5 / 20 / 无限`
+- `arti credits --set-plan ...` 已废弃，仅保留兼容提示
+- 临时联调可用 `ARTI_BILLING_BYPASS=true arti full AAPL --full` 跳过余额校验与扣费
 - 下载体验、升级提示与真实付费边界见 [BILLING_FLOW.md](/Users/nicolechen/ARTI-CLI/BILLING_FLOW.md)
 
 ## 两种使用模式

@@ -8,7 +8,7 @@
 import chalk from "chalk";
 import { loadConfig, getConfigValue, setConfigValue, resetConfig, getConfigPath } from "../config.js";
 
-const SECRET_KEYS = new Set(["token", "artiDataInternalKey"]);
+const SECRET_KEYS = new Set(["token", "refreshToken", "artiDataInternalKey"]);
 
 export function configSetCommand(key: string, value: string): void {
   try {
@@ -57,7 +57,7 @@ function maskSecret(value: string): string {
 }
 
 function isSecretConfigKey(key: string): boolean {
-  return key.endsWith(".token") || key.endsWith(".artiDataInternalKey");
+  return key.endsWith(".token") || key.endsWith(".refreshToken") || key.endsWith(".artiDataInternalKey");
 }
 
 export function configResetCommand(): void {
