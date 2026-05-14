@@ -6,12 +6,9 @@ import chalk from "chalk";
 import {
   getActiveBillingState,
   PLANS,
-  FEATURE_COSTS,
   FEATURE_LABELS,
-  PLAN_ORDER,
-  isPlanId,
-  setPlan,
   formatPlanLimit,
+  getFeatureCost,
   type FeatureKey,
 } from "../billing.js";
 import { output } from "../output.js";
@@ -21,54 +18,47 @@ interface CreditsOptions {
 }
 
 export async function creditsCommand(options?: CreditsOptions): Promise<void> {
-  let changeApplied: string | null = null;
   if (options?.setPlan) {
-    const target = options.setPlan.toLowerCase();
-    if (!isPlanId(target)) {
-      console.log(chalk.red(`可用套餐: ${PLAN_ORDER.join(", ")}`));
-      return;
-    }
-    setPlan(target);
-    changeApplied = target;
+    console.log(chalk.yellow("  `credits --set-plan` 已废弃，CLI 现使用服务端真实套餐与余额。"));
   }
 
-  const state = getActiveBillingState();
+  const state = await getActiveBillingState();
   const plan = PLANS[state.plan];
 
-  // ── JSON 模式 ──
   output(
     {
       plan: state.plan,
+      tier: state.tier,
+      tierLabel: state.tierLabel,
       planName: plan.name,
       balance: state.balance,
-      rollover: state.rollover,
+      weeklyQuota: state.weeklyQuota,
+      usedWeekly: state.usedWeekly,
+      weeklyRemaining: state.weeklyRemaining,
+      permanentBalance: state.permanentBalance,
+      used5h: state.used5h,
+      limit5h: state.limit5h,
       totalUsed: state.totalUsed,
-      monthly: plan.monthly,
-      rolloverCap: plan.rolloverCap,
-      lastResetYM: state.lastResetYM,
+      snapshotAt: state.snapshotAt,
       watchlistLimit: plan.watchlistLimit,
       reportHistoryDays: plan.reportHistoryDays,
       alerts: plan.alerts,
       exportLevel: plan.exportLevel,
       apiAccess: plan.apiAccess,
       priority: plan.priority,
-      changeApplied,
+      pricing: state.pricing,
     },
-    () => renderCredits(state, changeApplied),
+    () => renderCredits(state),
   );
 }
 
-function renderCredits(state: ReturnType<typeof getActiveBillingState>, changeApplied: string | null): void {
+function renderCredits(state: Awaited<ReturnType<typeof getActiveBillingState>>): void {
   const plan2 = PLANS[state.plan];
 
-  // ── 标题栏 ──
   console.log();
-  console.log(
-    `  ${chalk.bold.white("ARTI Credits")}  ${planBadge(state.plan)}`,
-  );
+  console.log(`  ${chalk.bold.white("ARTI Credits")}  ${planBadge(state.plan)}`);
   console.log(chalk.gray("  ─────────────────────────────────────"));
 
-  // ── 余额 ──
   const balanceColor = state.balance > 50
     ? chalk.cyan.bold
     : state.balance > 0
@@ -76,17 +66,13 @@ function renderCredits(state: ReturnType<typeof getActiveBillingState>, changeAp
       : chalk.red.bold;
 
   console.log(`  余额      ${balanceColor(state.balance.toString())} Credits`);
-  if (state.rollover > 0) {
-    console.log(`  其中结转  ${chalk.gray(state.rollover.toString())} Credits`);
-  }
-  console.log(`  月度配额  ${chalk.white(plan2.monthly.toLocaleString())} Credits/月`);
-  if (plan2.rolloverCap > 0) {
-    console.log(`  Rollover  上限 ${chalk.white(plan2.rolloverCap.toLocaleString())} Credits`);
-  }
+  console.log(`  当前套餐  ${chalk.white(state.tierLabel)} (${chalk.gray(state.tier)})`);
+  console.log(`  周包剩余  ${chalk.white(`${state.weeklyRemaining}/${state.weeklyQuota}`)} Credits`);
+  console.log(`  永久余额  ${chalk.white(state.permanentBalance.toLocaleString())} Credits`);
+  console.log(`  5h 窗口   ${chalk.white(`${state.used5h}/${state.limit5h}`)} Credits`);
   console.log(`  累计消耗  ${chalk.gray(state.totalUsed.toLocaleString())} Credits`);
-  console.log(`  重置周期  每月初（上次：${state.lastResetYM}）`);
-  if (changeApplied) {
-    console.log(chalk.green(`  已切换到  ${plan2.name}（本地模拟套餐）`));
+  if (state.snapshotAt) {
+    console.log(`  快照时间  ${chalk.gray(state.snapshotAt)}`);
   }
 
   console.log();
@@ -98,13 +84,12 @@ function renderCredits(state: ReturnType<typeof getActiveBillingState>, changeAp
   console.log(`  API 接入  ${plan2.apiAccess ? chalk.green("已开启") : chalk.gray("未开启")}`);
   console.log(`  响应优先级 ${chalk.white(priorityLabel(plan2.priority))}`);
 
-  // ── 功能消耗速查 ──
   console.log();
   console.log(chalk.gray("  ─── 功能消耗速查 ─────────────────────"));
 
   const featureOrder: FeatureKey[] = ["chat", "quickScan", "panorama", "deepReport", "preBrief", "postRecap"];
   for (const key of featureOrder) {
-    const cost = FEATURE_COSTS[key];
+    const cost = getFeatureCost(key, state.pricing);
     const label = FEATURE_LABELS[key];
     const affordable = state.balance >= cost;
     const costStr = affordable
@@ -114,10 +99,9 @@ function renderCredits(state: ReturnType<typeof getActiveBillingState>, changeAp
     console.log(`  ${canStr} ${label.padEnd(10)}  ${costStr}  ≈ $${(cost * 0.04).toFixed(2)}`);
   }
 
-  // ── 升级提示（余额偏低时） ──
   if (state.balance < 10 && state.plan === "free") {
     console.log();
-    console.log(chalk.yellow("  余额不足 10 Credits。升级基础版（$20/月）可获得 500 Credits/月。"));
+    console.log(chalk.yellow("  剩余额度较低。升级入门版（$20/月）可获得 50 Credits/周。"));
   }
 
   console.log();

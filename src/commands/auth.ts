@@ -1,32 +1,81 @@
 import chalk from "chalk";
-import { clearAuthState, getAuthState, isLoggedIn, maskToken, saveAuthState } from "../auth.js";
+import {
+  clearAuthState,
+  decodeJwtPayload,
+  getAuthenticatedUserProfile,
+  getAuthState,
+  isLoggedIn,
+  loginWithPassword,
+  maskToken,
+  refreshAuthSession,
+  saveAuthState,
+} from "../auth.js";
 import { output } from "../output.js";
 
 interface LoginOptions {
   token?: string;
+  refreshToken?: string;
   email?: string;
+  password?: string;
   userId?: string;
+  supabaseUrl?: string;
+  publishableKey?: string;
 }
 
-export function loginCommand(options?: LoginOptions): void {
+export async function loginCommand(options?: LoginOptions): Promise<void> {
   const token = options?.token?.trim() || process.env.ARTI_AUTH_TOKEN?.trim() || "";
+  const refreshToken = options?.refreshToken?.trim() || process.env.ARTI_AUTH_REFRESH_TOKEN?.trim() || "";
   const email = options?.email?.trim() || process.env.ARTI_USER_EMAIL?.trim() || "";
+  const password = options?.password?.trim() || process.env.ARTI_USER_PASSWORD?.trim() || "";
   const userId = options?.userId?.trim() || process.env.ARTI_USER_ID?.trim() || "";
+  const supabaseUrl = options?.supabaseUrl?.trim() || process.env.ARTI_SUPABASE_URL?.trim() || "";
+  const publishableKey = options?.publishableKey?.trim()
+    || process.env.ARTI_SUPABASE_PUBLISHABLE_KEY?.trim()
+    || process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
+    || process.env.SUPABASE_ANON_KEY?.trim()
+    || "";
 
-  if (!token) {
-    console.log(chalk.red("请提供 access token，例如：arti login --token <token>"));
-    console.log(chalk.gray("也可通过环境变量 ARTI_AUTH_TOKEN 注入。"));
-    return;
+  if (supabaseUrl || publishableKey) {
+    saveAuthState({ supabaseUrl, publishableKey });
   }
 
-  saveAuthState({ token, email, userId });
+  try {
+    if (email && password) {
+      const auth = await loginWithPassword(email, password);
+      printLoginSuccess(auth.email, auth.userId, auth.token, Boolean(auth.refreshToken));
+      return;
+    }
 
-  console.log();
-  console.log(chalk.green("  已登录 ARTI CLI"));
-  if (email) console.log(`  邮箱      ${chalk.white(email)}`);
-  if (userId) console.log(`  用户 ID   ${chalk.white(userId)}`);
-  console.log(`  Token     ${chalk.gray(maskToken(token))}`);
-  console.log();
+    if (!token) {
+      console.log(chalk.red("请提供 access token，或使用邮箱密码登录"));
+      console.log(chalk.gray("例如：arti login --token <token> --refresh-token <token>"));
+      console.log(chalk.gray("或：arti login --email you@example.com --password '***'"));
+      return;
+    }
+
+    const payload = decodeJwtPayload(token);
+    saveAuthState({
+      token,
+      refreshToken,
+      email: email || payload?.email || "",
+      userId: userId || payload?.sub || "",
+      expiresAt: payload?.exp ?? null,
+    });
+
+    if (refreshToken) {
+      try {
+        await refreshAuthSession();
+      } catch {
+        // 保留显式传入的 access token，允许仅 access token 的兼容登录。
+      }
+    }
+
+    const auth = getAuthState();
+    printLoginSuccess(auth.email, auth.userId, auth.token, Boolean(auth.refreshToken));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(chalk.red(`登录失败: ${message}`));
+  }
 }
 
 export function logoutCommand(): void {
@@ -40,15 +89,33 @@ export function logoutCommand(): void {
   console.log(chalk.green("  已退出登录"));
 }
 
-export function whoamiCommand(): void {
+export async function whoamiCommand(): Promise<void> {
   const auth = getAuthState();
+  let profile = {
+    email: auth.email || null,
+    userId: auth.userId || null,
+  };
+
+  if (isLoggedIn(auth)) {
+    try {
+      const fresh = await getAuthenticatedUserProfile();
+      profile = {
+        email: fresh.email,
+        userId: fresh.id,
+      };
+    } catch {
+      // 退回本地已缓存信息，不阻塞 whoami。
+    }
+  }
 
   output(
     {
       loggedIn: isLoggedIn(auth),
-      email: auth.email || null,
-      userId: auth.userId || null,
+      email: profile.email,
+      userId: profile.userId,
       tokenMasked: auth.token ? maskToken(auth.token) : null,
+      refreshTokenMasked: auth.refreshToken ? maskToken(auth.refreshToken) : null,
+      expiresAt: auth.expiresAt,
     },
     () => {
       console.log();
@@ -56,15 +123,38 @@ export function whoamiCommand(): void {
       console.log(chalk.gray("  ─────────────────────────────────────"));
       if (!isLoggedIn(auth)) {
         console.log(chalk.yellow("  未登录"));
-        console.log(chalk.gray("  使用 arti login --token <token> 登录"));
+        console.log(chalk.gray("  使用 arti login --token <token> 或 arti login --email <email> --password <password> 登录"));
         console.log();
         return;
       }
       console.log(chalk.green("  已登录"));
-      if (auth.email) console.log(`  邮箱      ${chalk.white(auth.email)}`);
-      if (auth.userId) console.log(`  用户 ID   ${chalk.white(auth.userId)}`);
+      if (profile.email) console.log(`  邮箱      ${chalk.white(profile.email)}`);
+      if (profile.userId) console.log(`  用户 ID   ${chalk.white(profile.userId)}`);
       console.log(`  Token     ${chalk.gray(maskToken(auth.token))}`);
+      if (auth.refreshToken) {
+        console.log(`  Refresh   ${chalk.gray(maskToken(auth.refreshToken))}`);
+      }
+      if (auth.expiresAt) {
+        console.log(`  过期时间  ${chalk.white(new Date(auth.expiresAt * 1000).toISOString())}`);
+      }
       console.log();
     },
   );
+}
+
+function printLoginSuccess(
+  email: string,
+  userId: string,
+  token: string,
+  hasRefreshToken: boolean,
+): void {
+  console.log();
+  console.log(chalk.green("  已登录 ARTI CLI"));
+  if (email) console.log(`  邮箱      ${chalk.white(email)}`);
+  if (userId) console.log(`  用户 ID   ${chalk.white(userId)}`);
+  console.log(`  Token     ${chalk.gray(maskToken(token))}`);
+  if (hasRefreshToken) {
+    console.log(chalk.gray("  会话      已启用自动续期"));
+  }
+  console.log();
 }

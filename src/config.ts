@@ -7,8 +7,9 @@ import { join } from "node:path";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+const DEFAULT_SUPABASE_URL = "https://wklskhbrjnyppqfmxhxa.supabase.co";
 const LEGACY_API_BASE_URL = "https://laoclhqedllwjuboyqib.supabase.co/functions/v1";
-const DEFAULT_API_BASE_URL = "https://wklskhbrjnyppqfmxhxa.supabase.co/functions/v1";
+const DEFAULT_API_BASE_URL = `${DEFAULT_SUPABASE_URL}/functions/v1`;
 
 export interface ArtiConfig {
   api: {
@@ -22,8 +23,12 @@ export interface ArtiConfig {
   };
   auth: {
     token: string;
+    refreshToken: string;
+    expiresAt: number | null;
     userId: string;
     email: string;
+    supabaseUrl: string;
+    publishableKey: string;
   };
   data: {
     provider: "openbb" | "arti-data" | "hybrid";
@@ -50,8 +55,12 @@ const DEFAULT_CONFIG: ArtiConfig = {
   },
   auth: {
     token: "",
+    refreshToken: "",
+    expiresAt: null,
     userId: "",
     email: "",
+    supabaseUrl: DEFAULT_SUPABASE_URL,
+    publishableKey: "",
   },
   data: {
     provider: "hybrid",
@@ -95,6 +104,10 @@ export function loadConfig(): ArtiConfig {
         config.api.baseUrl = DEFAULT_API_BASE_URL;
         shouldPersistMigration = true;
       }
+      if (!config.auth.supabaseUrl) {
+        config.auth.supabaseUrl = deriveSupabaseUrlFromApiBase(config.api.baseUrl);
+        shouldPersistMigration = true;
+      }
     } catch {
       config = { ...DEFAULT_CONFIG };
     }
@@ -115,8 +128,23 @@ export function loadConfig(): ArtiConfig {
     if (!isNaN(t) && t > 0) config.backend.timeout = t;
   }
   if (process.env.ARTI_AUTH_TOKEN) config.auth.token = process.env.ARTI_AUTH_TOKEN;
+  if (process.env.ARTI_AUTH_REFRESH_TOKEN) config.auth.refreshToken = process.env.ARTI_AUTH_REFRESH_TOKEN;
+  if (process.env.ARTI_AUTH_EXPIRES_AT) {
+    const expiresAt = Number(process.env.ARTI_AUTH_EXPIRES_AT);
+    if (!isNaN(expiresAt) && expiresAt > 0) {
+      config.auth.expiresAt = expiresAt;
+    }
+  }
   if (process.env.ARTI_USER_ID) config.auth.userId = process.env.ARTI_USER_ID;
   if (process.env.ARTI_USER_EMAIL) config.auth.email = process.env.ARTI_USER_EMAIL;
+  if (process.env.ARTI_SUPABASE_URL) config.auth.supabaseUrl = process.env.ARTI_SUPABASE_URL;
+  if (process.env.ARTI_SUPABASE_PUBLISHABLE_KEY) config.auth.publishableKey = process.env.ARTI_SUPABASE_PUBLISHABLE_KEY;
+  if (process.env.VITE_SUPABASE_PUBLISHABLE_KEY && !config.auth.publishableKey) {
+    config.auth.publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  }
+  if (process.env.SUPABASE_ANON_KEY && !config.auth.publishableKey) {
+    config.auth.publishableKey = process.env.SUPABASE_ANON_KEY;
+  }
   if (process.env.ARTI_DATA_PROVIDER) {
     const provider = process.env.ARTI_DATA_PROVIDER;
     if (provider === "openbb" || provider === "arti-data" || provider === "hybrid") {
@@ -157,7 +185,7 @@ export function getConfigValue(key: string): unknown {
 const ALLOWED_CONFIG_KEYS = new Set([
   "api.baseUrl", "api.timeout",
   "backend.enabled", "backend.url", "backend.timeout",
-  "auth.token", "auth.userId", "auth.email",
+  "auth.token", "auth.refreshToken", "auth.expiresAt", "auth.userId", "auth.email", "auth.supabaseUrl", "auth.publishableKey",
   "data.provider", "data.artiDataBaseUrl", "data.artiDataTimeout", "data.artiDataInternalKey",
   "display.market", "display.lang",
   "watchlist",
@@ -210,4 +238,20 @@ export function resetConfig(): void {
 
 export function getConfigPath(): string {
   return CONFIG_FILE;
+}
+
+export function getDefaultSupabaseUrl(): string {
+  return DEFAULT_SUPABASE_URL;
+}
+
+export function deriveSupabaseUrlFromApiBase(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl);
+    if (url.pathname.startsWith("/functions/")) {
+      return url.origin;
+    }
+    return baseUrl;
+  } catch {
+    return DEFAULT_SUPABASE_URL;
+  }
 }

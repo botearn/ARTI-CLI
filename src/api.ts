@@ -4,6 +4,7 @@
  * 支持超时控制和自动重试
  */
 import { loadConfig } from "./config.js";
+import { ensureValidAccessToken } from "./auth.js";
 
 export class ApiError extends Error {
   constructor(
@@ -69,12 +70,12 @@ export async function callEdge<T>(
   const config = loadConfig();
   const baseUrl = config.api.baseUrl;
   const timeout = config.api.timeout;
-  const authToken = config.auth.token;
 
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
+      const authToken = await ensureValidAccessToken();
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
 
@@ -89,6 +90,13 @@ export async function callEdge<T>(
       });
 
       clearTimeout(timer);
+
+      if (res.status === 401 && config.auth.refreshToken) {
+        if (attempt < MAX_RETRIES) {
+          await ensureValidAccessToken({ forceRefresh: true });
+          continue;
+        }
+      }
 
       if (!res.ok) {
         const text = await res.text().catch(() => "unknown error");
@@ -240,14 +248,14 @@ export async function* streamOrchestrator(
 ): AsyncGenerator<OrchestratorSSEEvent> {
   const config = loadConfig();
   const baseUrl = config.api.baseUrl;
-  const authToken = config.auth.token;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 600_000); // 10 分钟超时
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
   try {
-    const res = await fetch(`${baseUrl}/orchestrator`, {
+    let authToken = await ensureValidAccessToken();
+    let res = await fetch(`${baseUrl}/orchestrator`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -260,6 +268,23 @@ export async function* streamOrchestrator(
       }),
       signal: controller.signal,
     });
+
+    if (res.status === 401 && config.auth.refreshToken) {
+      authToken = await ensureValidAccessToken({ forceRefresh: true });
+      res = await fetch(`${baseUrl}/orchestrator`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          symbol,
+          stockData: opts?.stockData || "",
+          mode: opts?.mode || "full",
+        }),
+        signal: controller.signal,
+      });
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "unknown");
@@ -326,7 +351,6 @@ export async function callBackend<T>(
   const config = loadConfig();
   const baseUrl = config.backend.url;
   const timeout = options.timeout ?? config.backend.timeout;
-  const authToken = config.auth.token;
   const maxRetries = options.maxRetries ?? MAX_RETRIES;
 
   if (!baseUrl) {
@@ -339,6 +363,7 @@ export async function callBackend<T>(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
+      const authToken = await ensureValidAccessToken();
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
 
@@ -353,6 +378,13 @@ export async function callBackend<T>(
       });
 
       clearTimeout(timer);
+
+      if (res.status === 401 && config.auth.refreshToken) {
+        if (attempt < maxRetries) {
+          await ensureValidAccessToken({ forceRefresh: true });
+          continue;
+        }
+      }
 
       if (!res.ok) {
         const text = await res.text().catch(() => "unknown error");

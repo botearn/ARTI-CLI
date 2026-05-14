@@ -22,7 +22,7 @@ export async function watchlistCommand(sub?: string, symbols?: string[]): Promis
       const uniqueAdds = symbols
         .map((symbol) => symbol.toUpperCase().trim())
         .filter((symbol, index, arr) => symbol && arr.indexOf(symbol) === index && !existing.has(symbol));
-      assertWatchlistCapacity(existing.size + uniqueAdds.length);
+      await assertWatchlistCapacity(existing.size + uniqueAdds.length);
     } catch (err) {
       if (err instanceof PlanAccessError) {
         console.log(chalk.red(`\n  ✗ ${err.message}\n`));

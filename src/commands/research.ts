@@ -799,7 +799,7 @@ export async function researchCommand(
 
   let billingState: BillingState;
   try {
-    billingState = assertSufficientCredits(featureKey);
+    billingState = await assertSufficientCredits(featureKey);
   } catch (err) {
     if (err instanceof InsufficientCreditsError) {
       console.log(chalk.red(`\n  ✗ ${err.message}\n`));
@@ -848,7 +848,7 @@ async function runSingleAgent(
     const context = await buildResearchStockContext(symbol);
 
     const report = await fetchResearch(symbol, agent, context.stockData);
-    const deduct = applyDeduction(featureKey, billingState);
+    const deduct = await applyDeduction(featureKey, billingState);
     spinner.stop();
 
     output({ symbol, agent, label: AGENT_LABELS[agent], technicalSource: context.technicalSource, ...report }, () => {
@@ -1194,7 +1194,7 @@ async function runOrchestrator(
 
     // JSON 模式下直接输出
     const deduct = (reports.length || masterOpinions.length || synthesis)
-      ? applyDeduction(featureKey, billingState)
+      ? await applyDeduction(featureKey, billingState)
       : undefined;
     output(jsonData, () => {
       // 终端模式已在 SSE 事件中实时渲染完毕

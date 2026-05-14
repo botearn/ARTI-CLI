@@ -35,8 +35,12 @@ describe("config legacy API migration", () => {
       },
       auth: {
         token: "",
+        refreshToken: "",
+        expiresAt: null,
         userId: "",
         email: "",
+        supabaseUrl: "",
+        publishableKey: "",
       },
       data: {
         provider: "hybrid",
@@ -55,6 +59,10 @@ describe("config legacy API migration", () => {
     const config = loadConfig();
 
     expect(config.api.baseUrl).toBe("https://wklskhbrjnyppqfmxhxa.supabase.co/functions/v1");
+    expect(config.auth.refreshToken).toBe("");
+    expect(config.auth.expiresAt).toBeNull();
+    expect(config.auth.supabaseUrl).toBe("https://wklskhbrjnyppqfmxhxa.supabase.co");
+    expect(config.auth.publishableKey).toBe("");
 
     const persisted = JSON.parse(readFileSync(configFile, "utf-8"));
     expect(persisted.api.baseUrl).toBe("https://wklskhbrjnyppqfmxhxa.supabase.co/functions/v1");
