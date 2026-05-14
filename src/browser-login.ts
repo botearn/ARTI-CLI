@@ -11,6 +11,8 @@ interface BrowserLoginOptions {
   timeoutMs?: number;
   onOpenUrl?: (url: string) => Promise<void> | void;
   onLoginUrl?: (url: string) => void;
+  onCode?: (code: string) => void;
+  onApproved?: () => void;
 }
 
 interface CliAuthStartResponse {
@@ -36,6 +38,7 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
   const started = await startLoginSession();
 
   options?.onLoginUrl?.(started.login_url);
+  options?.onCode?.(started.code);
   if (options?.onOpenUrl) {
     await options.onOpenUrl(started.login_url);
   } else {
@@ -48,6 +51,7 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
   while (Date.now() < deadline) {
     const polled = await pollLoginSession(started.session_id, started.poll_token);
     if (polled.status === "approved" && polled.session?.access_token) {
+      options?.onApproved?.();
       return saveSupabaseSession(polled.session, {
         supabaseUrl: auth.supabaseUrl || getDefaultSupabaseUrl(),
         publishableKey: auth.publishableKey || getDefaultSupabasePublishableKey(),
@@ -93,7 +97,7 @@ export function buildBrowserLoginUrl(webAuthUrl: string, sessionId: string, code
   const url = new URL(webAuthUrl || DEFAULT_WEB_AUTH_URL);
   url.searchParams.set("cli", "1");
   url.searchParams.set("session_id", sessionId);
-  url.searchParams.set("code", code);
+  url.searchParams.set("device_code", code);
   return url.toString();
 }
 
@@ -114,7 +118,7 @@ async function startLoginSession(): Promise<CliAuthStartResponse> {
   const webAuthUrl = process.env.ARTI_WEB_AUTH_URL?.trim() || DEFAULT_WEB_AUTH_URL;
   return {
     ...data,
-    login_url: data.login_url || buildBrowserLoginUrl(webAuthUrl, data.session_id, data.code),
+    login_url: buildBrowserLoginUrl(webAuthUrl, data.session_id, data.code),
   };
 }
 

@@ -335,7 +335,7 @@ export async function assertSufficientCredits(feature: FeatureKey, state?: Billi
   const cost = getFeatureCost(feature, billingState.pricing);
   const affordable = billingState.weeklyRemaining + billingState.permanentBalance;
 
-  if (billingState.used5h + cost > billingState.limit5h) {
+  if (billingState.limit5h > 0 && billingState.used5h + cost > billingState.limit5h) {
     throw new InsufficientCreditsError(cost, affordable, feature, "rate_limited_5h");
   }
   if (affordable < cost) {

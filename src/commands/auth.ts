@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import ora from "ora";
 import { loginWithBrowser } from "../browser-login.js";
 import {
   clearAuthState,
@@ -50,14 +51,23 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
     }
 
     if (!token) {
-      console.log(chalk.gray("  正在打开 ARTI 官网登录页…"));
-      console.log();
+      const spinner = ora({ text: "等待浏览器确认…", indent: 2 });
       const auth = await loginWithBrowser({
         webAuthUrl,
         onLoginUrl: (loginUrl) => {
-          console.log(chalk.gray("  如未自动弹出浏览器，请手动打开："));
-          console.log(chalk.white(`  ${loginUrl}`));
           console.log();
+          console.log(chalk.gray("  打开浏览器确认登录，请核对验证码一致后点击确认。"));
+          console.log(chalk.gray("  如未自动弹出，请手动打开："));
+          console.log(chalk.dim(`  ${loginUrl}`));
+          console.log();
+        },
+        onCode: (code) => {
+          console.log(`  验证码  ${chalk.bold.white(code)}`);
+          console.log();
+          spinner.start();
+        },
+        onApproved: () => {
+          spinner.succeed("已确认");
         },
       });
       printLoginSuccess(auth.email, auth.userId, auth.token, Boolean(auth.refreshToken));
