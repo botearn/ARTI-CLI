@@ -14,6 +14,7 @@ interface BrowserLoginOptions {
   webAuthUrl?: string;
   timeoutMs?: number;
   onOpenUrl?: (url: string) => Promise<void> | void;
+  onLoginUrl?: (url: string) => void;
 }
 
 interface CallbackPayload {
@@ -119,6 +120,7 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
       const loginUrl = buildBrowserLoginUrl(webAuthUrl, callbackUrl, state);
 
       try {
+        options?.onLoginUrl?.(loginUrl);
         if (options?.onOpenUrl) {
           await options.onOpenUrl(loginUrl);
         } else {

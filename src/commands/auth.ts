@@ -52,7 +52,14 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
     if (!token) {
       console.log(chalk.gray("  正在打开 ARTI 官网登录页…"));
       console.log();
-      const auth = await loginWithBrowser({ webAuthUrl });
+      const auth = await loginWithBrowser({
+        webAuthUrl,
+        onLoginUrl: (loginUrl) => {
+          console.log(chalk.gray("  如未自动弹出浏览器，请手动打开："));
+          console.log(chalk.white(`  ${loginUrl}`));
+          console.log();
+        },
+      });
       printLoginSuccess(auth.email, auth.userId, auth.token, Boolean(auth.refreshToken));
       return;
     }
