@@ -11,7 +11,7 @@ import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
-import { getHybridQuotes, type HybridQuoteResult } from "../data/quote.js";
+import { getHybridQuotes, type HybridQuoteResult, usingMcp } from "../data/index.js";
 
 export async function quoteCommand(symbols: string[]): Promise<void> {
   if (!symbols.length) {

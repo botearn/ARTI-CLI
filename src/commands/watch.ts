@@ -10,7 +10,7 @@ import { colorChange, sparkline } from "../format.js";
 import { track } from "../tracker.js";
 import { withBilling, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
-import { getHybridQuote } from "../data/quote.js";
+import { getHybridQuote } from "../data/index.js";
 
 interface WatchOptions {
   interval?: number;

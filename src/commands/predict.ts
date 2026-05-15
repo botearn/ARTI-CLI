@@ -11,7 +11,7 @@ import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
-import { getHybridTechnical } from "../data/hybrid.js";
+import { getHybridTechnical } from "../data/index.js";
 
 /** 根据技术指标生成综合预测 */
 function generatePrediction(quote: QuoteData | null, tech: TechnicalData) {
