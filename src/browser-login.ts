@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { getDefaultSupabasePublishableKey, getDefaultSupabaseUrl } from "./config.js";
+import { getDefaultSupabasePublishableKey, getDefaultSupabaseUrl, saveConfig, loadConfig } from "./config.js";
 import { getAuthState, saveSupabaseSession, type AuthState, type SupabaseAuthResponse } from "./auth.js";
 
 const DEFAULT_WEB_AUTH_URL = "https://www.artifin.ai/auth";
@@ -34,6 +34,8 @@ interface CliAuthPollResponse {
 
 export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<AuthState> {
   const auth = getAuthState();
+  // 确保首次使用时配置文件被创建
+  ensureConfigInitialized();
   const timeoutMs = options?.timeoutMs ?? LOGIN_TIMEOUT_MS;
   const started = await startLoginSession();
 
@@ -60,12 +62,17 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
       });
     }
     if (polled.status === "expired") {
-      throw new Error("网页登录已过期，请重新执行 arti login");
+      throw new Error("网页登录已过期（5 分钟未操作）。请重新执行 arti login");
     }
     await delay(polled.poll_after_ms || pollIntervalMs);
   }
 
-  throw new Error("浏览器登录超时，请重新执行 arti login");
+  throw new Error(
+    "浏览器登录超时（5 分钟未收到确认）。\n" +
+    "  • 请确认浏览器已打开并显示验证码页面\n" +
+    "  • 检查您的网络连接\n" +
+    "  • 重新执行 arti login 重试"
+  );
 }
 
 export async function openExternalUrl(url: string): Promise<void> {
@@ -144,4 +151,10 @@ async function safeText(res: Response): Promise<string> {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function ensureConfigInitialized(): void {
+  // 触发配置文件创建（通过 saveConfig 保存当前配置）
+  const config = loadConfig();
+  saveConfig(config);
 }

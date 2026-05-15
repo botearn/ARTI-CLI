@@ -56,18 +56,20 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
         webAuthUrl,
         onLoginUrl: (loginUrl) => {
           console.log();
-          console.log(chalk.gray("  打开浏览器确认登录，请核对验证码一致后点击确认。"));
+          console.log(chalk.bold.cyan("📱 步骤 1：打开浏览器"));
           console.log(chalk.gray("  如未自动弹出，请手动打开："));
-          console.log(chalk.dim(`  ${loginUrl}`));
+          console.log(chalk.blue.underline(`  ${loginUrl}`));
           console.log();
         },
         onCode: (code) => {
-          console.log(`  验证码  ${chalk.bold.white(code)}`);
+          console.log(chalk.bold.cyan("✓ 步骤 2：核对验证码"));
+          console.log(chalk.bgWhite.bold.black(`    ${code}    `));
+          console.log(chalk.gray("  请在浏览器页面中核对上述验证码一致后点击确认"));
           console.log();
           spinner.start();
         },
         onApproved: () => {
-          spinner.succeed("已确认");
+          spinner.succeed(chalk.green("✓ 已确认"));
         },
       });
       printLoginSuccess(auth.email, auth.userId, auth.token, Boolean(auth.refreshToken));
@@ -95,7 +97,19 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
     printLoginSuccess(auth.email, auth.userId, auth.token, Boolean(auth.refreshToken));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.log(chalk.red(`登录失败: ${message}`));
+    console.log();
+    console.log(chalk.red("✗ 登录失败"));
+    console.log(chalk.gray(`  原因: ${message}`));
+    console.log();
+    if (message.includes("超时")) {
+      console.log(chalk.yellow("  💡 提示:"));
+      console.log(chalk.gray("  • 确认浏览器已打开正确的登录页面"));
+      console.log(chalk.gray("  • 检查网络连接是否正常"));
+      console.log(chalk.gray("  • 重新执行 arti login"));
+    } else if (message.includes("过期")) {
+      console.log(chalk.yellow("  💡 提示: 请重新执行 arti login"));
+    }
+    console.log();
   }
 }
 
