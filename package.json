@@ -1,6 +1,6 @@
 {
   "name": "arti-cli",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "ARTI 智能投研 CLI 工具 — OpenBB 驱动的股票分析命令行",
   "type": "module",
   "bin": {
