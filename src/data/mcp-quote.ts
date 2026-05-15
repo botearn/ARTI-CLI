@@ -1,6 +1,7 @@
 /**
  * Quote 数据层 — MCP 集成版
- * 优先级：Backend MCP → Backend API → OpenBB
+ * 优先级：Backend MCP（最高）→ Backend API → OpenBB
+ * MCP 对所有市场（美股/港股/A 股）都是最高优先级
  */
 import { loadConfig } from "../config.js";
 import { fetchQuotesBackend, type StockQuote, type MarketIndex } from "../api.js";
