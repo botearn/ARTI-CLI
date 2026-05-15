@@ -75,7 +75,19 @@ export async function callEdge<T>(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const authToken = await ensureValidAccessToken();
+      // 尝试获取 token，失败时继续（某些端点可能不需要认证）
+      let authToken = "";
+      try {
+        authToken = await ensureValidAccessToken();
+      } catch (err) {
+        // 开发模式或 BILLING_BYPASS 时忽略认证错误
+        if (process.env.ARTI_BILLING_BYPASS || process.env.NODE_ENV === "development") {
+          console.warn("[API] 认证失败，继续无认证请求:", (err as Error).message);
+        } else {
+          throw err;
+        }
+      }
+
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
 

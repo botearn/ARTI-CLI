@@ -1,6 +1,9 @@
 # ARTI CLI — 智能投研工具
 
-ARTI 是一个基于 OpenBB 的金融数据命令行工具，同时提供 MCP Server 供 AI 助手调用。
+ARTI 是一个金融数据命令行工具，支持美股、港股、A 股三个市场。
+
+**数据源：** Backend HTTP API（主）→ OpenBB (fallback)  
+**MCP Server：** 独立服务，供 Claude Desktop/Code 使用（不是给 CLI 用）
 
 ## 项目结构
 
@@ -19,8 +22,21 @@ ARTI 是一个基于 OpenBB 的金融数据命令行工具，同时提供 MCP Se
 ## 依赖环境
 
 - Node.js >= 18
-- Python 虚拟环境在 `.venv/`，内含 openbb 包
-- OpenBB 数据源主要使用 yfinance（免费，无需 API Key）
+- Python 虚拟环境在 `.venv/`，内含 openbb 包（OpenBB 作为 fallback）
+- Backend API 服务（生产环境）或 Backend MCP Server（开发环境）
+
+## 快速开始（开发）
+
+```bash
+# 启动开发环境（自动启动 Backend MCP + 配置）
+./scripts/start-dev.sh
+
+# 测试三个市场
+arti quote AAPL 0700.HK 600519.SS
+
+# 查看文档
+cat docs/BACKEND_API_USAGE.md
+```
 
 ## MCP Server 可用工具
 
