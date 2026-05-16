@@ -70,8 +70,11 @@ def test_ac2_mcpEnabled开关控制():
     # 检查 mcpEnabled 默认值
     assert "mcpEnabled:" in backend_config, "DEFAULT_CONFIG.backend 缺少 mcpEnabled"
     assert "mcpUrl:" in backend_config, "DEFAULT_CONFIG.backend 缺少 mcpUrl"
+    assert "DEFAULT_BACKEND_MCP_URL" in backend_config or "mcp-market-production.up.railway.app" in content, \
+        "mcpUrl 未使用生产环境地址"
 
     print("✓ config.ts 包含 backend.mcpEnabled 和 backend.mcpUrl 配置")
+    print("✓ mcpUrl 默认指向生产环境 (mcp-market-production.up.railway.app)")
 
 
 def test_ac3_mcp主链优先级():

@@ -12,6 +12,7 @@ const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_5SIVwCD2q2QjtijkX8zn5Q_
 const LEGACY_API_BASE_URL = "https://laoclhqedllwjuboyqib.supabase.co/functions/v1";
 const DEFAULT_API_BASE_URL = `${DEFAULT_SUPABASE_URL}/functions/v1`;
 const DEFAULT_BACKEND_URL = "https://api-gateway-production-b656.up.railway.app";
+const DEFAULT_BACKEND_MCP_URL = "https://mcp-market-production.up.railway.app/mcp";
 
 export interface ArtiConfig {
   api: {
@@ -56,7 +57,7 @@ const DEFAULT_CONFIG: ArtiConfig = {
     enabled: true,
     url: DEFAULT_BACKEND_URL,
     timeout: 60000,
-    mcpUrl: "http://localhost:8001/mcp",
+    mcpUrl: DEFAULT_BACKEND_MCP_URL,
     mcpEnabled: true,
   },
   auth: {
