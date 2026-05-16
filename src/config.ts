@@ -57,7 +57,7 @@ const DEFAULT_CONFIG: ArtiConfig = {
     url: DEFAULT_BACKEND_URL,
     timeout: 60000,
     mcpUrl: "http://localhost:8001/mcp",
-    mcpEnabled: false,
+    mcpEnabled: true,
   },
   auth: {
     token: "",

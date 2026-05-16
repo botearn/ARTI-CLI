@@ -1,6 +1,11 @@
 import { loadConfig } from "../config.js";
 import { fetchQuotesBackend, type StockQuote, type MarketIndex } from "../api.js";
 import { getQuote, getHistorical, type QuoteData } from "../openbb.js";
+import {
+  canUseBackendMcp,
+  fetchDailyBarsFromBackendMcp,
+  fetchQuoteFromBackendMcp,
+} from "./mcp-client.js";
 
 export interface HybridQuoteResult {
   quote: QuoteData;
@@ -42,6 +47,22 @@ function parseVolume(vol: string): number {
 export async function getHybridQuote(symbol: string): Promise<HybridQuoteResult> {
   const config = loadConfig();
 
+  if (canUseBackendMcp(symbol)) {
+    try {
+      const [quote, bars] = await Promise.all([
+        fetchQuoteFromBackendMcp(symbol),
+        fetchDailyBarsFromBackendMcp(symbol, 20),
+      ]);
+      return {
+        quote,
+        prices: bars.map((bar) => bar.close),
+        source: "backend",
+      };
+    } catch {
+      // fallback below
+    }
+  }
+
   if (config.backend.enabled && config.backend.url) {
     try {
       const res = await fetchQuotesBackend(symbol);
@@ -70,6 +91,27 @@ export async function getHybridQuote(symbol: string): Promise<HybridQuoteResult>
 
 export async function getHybridQuotes(symbols: string[]): Promise<HybridQuoteResult[]> {
   const config = loadConfig();
+
+  if (symbols.every((symbol) => canUseBackendMcp(symbol))) {
+    const results = await Promise.all(symbols.map(async (symbol): Promise<HybridQuoteResult | null> => {
+      try {
+        const [quote, bars] = await Promise.all([
+          fetchQuoteFromBackendMcp(symbol),
+          fetchDailyBarsFromBackendMcp(symbol, 20),
+        ]);
+        return {
+          quote,
+          prices: bars.map((bar) => bar.close),
+          source: "backend",
+        };
+      } catch {
+        return null;
+      }
+    }));
+
+    const ok = results.filter((result): result is HybridQuoteResult => result !== null);
+    if (ok.length) return ok;
+  }
 
   if (config.backend.enabled && config.backend.url) {
     try {

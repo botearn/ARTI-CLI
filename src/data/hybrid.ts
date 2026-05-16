@@ -3,6 +3,7 @@ import { canUseArtiDataHistory, fetchHistoryFromArtiData } from "./client.js";
 import { buildTechnicalFromHistory } from "./technical.js";
 import { scanStockBackend, type BackendStockData } from "../api.js";
 import { loadConfig } from "../config.js";
+import { canUseBackendMcp, fetchTechnicalFromBackendMcp } from "./mcp-client.js";
 
 export interface HybridTechnicalResult {
   technical: TechnicalData;
@@ -72,7 +73,20 @@ function convertBackendToTechnical(backendData: BackendStockData): TechnicalData
 export async function getHybridTechnical(symbol: string, days = 220): Promise<HybridTechnicalResult> {
   const config = loadConfig();
 
-  // 优先级 1: Backend (如果启用)
+  // 优先级 1: Backend MCP (A 股主链)
+  if (canUseBackendMcp(symbol)) {
+    try {
+      return {
+        technical: await fetchTechnicalFromBackendMcp(symbol),
+        source: "backend",
+      };
+    } catch (err) {
+      console.warn("Backend MCP technical 失败，fallback 到 Backend API/arti-data/openbb:", (err as Error).message);
+      // fallback below
+    }
+  }
+
+  // 优先级 2: Backend HTTP API (如果启用)
   if (config.backend.enabled && config.backend.url) {
     try {
       const backendResult = await scanStockBackend(symbol);
@@ -86,7 +100,7 @@ export async function getHybridTechnical(symbol: string, days = 220): Promise<Hy
     }
   }
 
-  // 优先级 2: arti-data (仅 A 股)
+  // 优先级 3: arti-data / Backend MCP daily bars（仅 A 股）
   if (canUseArtiDataHistory(symbol)) {
     try {
       const bars = await fetchHistoryFromArtiData(symbol, days);
@@ -99,7 +113,7 @@ export async function getHybridTechnical(symbol: string, days = 220): Promise<Hy
     }
   }
 
-  // 优先级 3: OpenBB (兜底)
+  // 优先级 4: OpenBB (兜底)
   return {
     technical: await getTechnical(symbol),
     source: "openbb",

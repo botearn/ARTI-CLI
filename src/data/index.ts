@@ -1,9 +1,10 @@
 /**
  * 数据层统一入口
- * 统一使用 Backend HTTP API
+ * 优先使用 Backend MCP，失败再回退到 HTTP API / arti-data / OpenBB
  */
 import type { HybridTechnicalResult } from "./hybrid.js";
 import type { HybridQuoteResult } from "./quote.js";
+import { canUseBackendMcp } from "./mcp-client.js";
 
 export async function getHybridQuote(symbol: string): Promise<HybridQuoteResult> {
   const { getHybridQuote: getApiQuote } = await import("./quote.js");
@@ -21,7 +22,7 @@ export async function getHybridTechnical(symbol: string, days?: number): Promise
 }
 
 export function usingMcp(): boolean {
-  return false;
+  return canUseBackendMcp();
 }
 
 export type { HybridTechnicalResult, HybridQuoteResult };
