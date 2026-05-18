@@ -27,7 +27,9 @@ import { economyCommand } from "./commands/economy.js";
 import { searchCommand } from "./commands/search.js";
 import { creditsCommand } from "./commands/credits.js";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { shutdownDaemon } from "./openbb.js";
+import { shutdownBackendMcp } from "./data/mcp-client.js";
 import chalk from "chalk";
 import { setJsonMode } from "./output.js";
 import { checkForUpdate } from "./update-check.js";
@@ -52,6 +54,7 @@ program
 // ── 共用选项模板 ──
 const OPT_LIMIT: OptionDef = { short: "-l", long: "--limit", key: "limit", type: "string", desc: "返回条数", hint: "<n>" };
 const OPT_DAYS: OptionDef  = { short: "-d", long: "--days",  key: "days",  type: "string", desc: "历史天数", hint: "<n>" };
+const OPT_REFRESH: OptionDef = { short: "", long: "--refresh", key: "refresh", type: "boolean", desc: "跳过 MCP 缓存，强制刷新" };
 
 /** 选项值 → 整数（有 defaultValue 保证不为 undefined） */
 const int = (v: string | boolean | undefined, fallback = 0): number =>
@@ -166,7 +169,7 @@ const defs: CommandDef[] = [
     description: "查询实时行情（支持股票代码和中文名称搜索）",
     usage: "quote <symbol...>",
     args: [{ spec: "<symbols...>", desc: "股票代码或名称，如 AAPL NVDA 0700.HK" }],
-    options: [],
+    options: [OPT_REFRESH],
     examples: [
       "$ arti quote AAPL              # 单只股票",
       "$ arti quote AAPL NVDA TSLA    # 多只股票",
@@ -174,7 +177,7 @@ const defs: CommandDef[] = [
       "$ arti quote 腾讯              # 中文名搜索",
       "$ arti quote AAPL --json       # JSON 输出",
     ],
-    invoke: ({ positional }) => quoteCommand(positional),
+    invoke: ({ positional, options }) => quoteCommand(positional, { refresh: options.refresh as boolean | undefined }),
   },
   {
     name: "market", aliases: ["m"],
@@ -199,26 +202,27 @@ const defs: CommandDef[] = [
     description: "技术指标扫描（MA/RSI/MACD/布林带/ATR/ADX + 综合研判）",
     usage: "scan <symbol>",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
-    options: [],
+    options: [OPT_REFRESH],
     examples: [
       "$ arti scan AAPL               # 扫描苹果技术面",
       "$ arti scan NVDA --json        # JSON 输出，适合脚本",
     ],
-    invoke: ({ positional }) => scanCommand(positional[0]),
+    invoke: ({ positional, options }) => scanCommand(positional[0], { refresh: options.refresh as boolean | undefined }),
   },
   {
     name: "history", aliases: ["hist"],
     description: "查看股票历史价格（OHLCV 表格）",
     usage: "history <symbol> [-d N]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
-    options: [{ ...OPT_DAYS, defaultValue: "60" }],
+    options: [{ ...OPT_DAYS, defaultValue: "60" }, OPT_REFRESH],
     examples: [
       "$ arti history AAPL              # 默认 60 天",
       "$ arti history NVDA -d 30        # 最近 30 天",
+      "$ arti history 600519.SS --refresh # 跳过 MCP 缓存",
       "$ arti history TSLA --json       # JSON 输出",
     ],
     invoke: ({ positional, options }) =>
-      historyCommand(positional[0], { days: int(options.days) }),
+      historyCommand(positional[0], { days: int(options.days), refresh: options.refresh as boolean | undefined }),
   },
   {
     name: "crypto", aliases: ["cr"],
@@ -409,6 +413,26 @@ const defs: CommandDef[] = [
     invoke: () => insightsCommand(),
   },
   {
+    name: "doctor", aliases: ["diag"],
+    description: "诊断 ARTI 本地/后端连接状态",
+    usage: "doctor mcp [--symbol AAPL] [--refresh]",
+    args: [{ spec: "[target]", desc: "诊断对象，目前支持 mcp" }],
+    options: [
+      { short: "", long: "--symbol", key: "symbol", type: "string", desc: "MCP 探测股票代码", hint: "<symbol>", defaultValue: "AAPL" },
+      OPT_REFRESH,
+    ],
+    examples: [
+      "$ arti doctor mcp",
+      "$ arti doctor mcp --symbol 600519.SS --refresh",
+      "$ arti doctor mcp --json",
+    ],
+    invoke: ({ positional, options }) =>
+      doctorCommand(positional[0], {
+        symbol: options.symbol as string | undefined,
+        refresh: options.refresh as boolean | undefined,
+      }),
+  },
+  {
     name: "credits", aliases: ["cred"],
     description: "查看 Credit 余额与套餐详情",
     usage: "credits",
@@ -476,6 +500,7 @@ async function main(): Promise<void> {
   try {
     await program.parseAsync(process.argv);
   } finally {
+    await shutdownBackendMcp().catch(() => undefined);
     shutdownDaemon();
   }
 }

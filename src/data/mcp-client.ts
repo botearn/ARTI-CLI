@@ -17,10 +17,15 @@ class BackendMcpError extends Error {
 type McpClient = {
   connect: (transport: unknown) => Promise<void>;
   request: (request: Record<string, unknown>, schema: unknown) => Promise<McpCallResult>;
+  close?: () => Promise<void>;
 };
 
 let clientPromise: Promise<McpClient> | null = null;
+let activeClient: McpClient | null = null;
 let cachedUrl: string | null = null;
+let cachedToken: string | null = null;
+let failureCount = 0;
+let circuitOpenUntil = 0;
 
 async function loadSdk() {
   const [{ Client }, { StreamableHTTPClientTransport }, { CallToolResultSchema }] = await Promise.all([
@@ -35,12 +40,13 @@ async function loadSdk() {
 async function getClient(): Promise<McpClient> {
   const config = loadConfig();
   const url = config.backend.mcpUrl.trim();
+  const token = config.auth.token.trim();
 
   if (!url) {
     throw new BackendMcpError("Backend MCP URL 未配置");
   }
 
-  if (clientPromise && cachedUrl === url) {
+  if (clientPromise && cachedUrl === url && cachedToken === token) {
     return clientPromise;
   }
 
@@ -52,18 +58,29 @@ async function getClient(): Promise<McpClient> {
     );
     const transport = new StreamableHTTPClientTransport(
       new URL(url),
-      { requestInit: { headers: { Accept: "application/json, text/event-stream" } } },
+      {
+        requestInit: {
+          headers: {
+            Accept: "application/json, text/event-stream",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      },
     );
     await client.connect(transport);
+    activeClient = client;
     return client;
   })();
   cachedUrl = url;
+  cachedToken = token;
 
   try {
     return await clientPromise;
   } catch (err) {
     clientPromise = null;
+    activeClient = null;
     cachedUrl = null;
+    cachedToken = null;
     throw err;
   }
 }
@@ -99,12 +116,36 @@ async function callTool(
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const { CallToolResultSchema } = await loadSdk();
+  const timeout = loadConfig().backend.mcpTimeout;
   const client = await getClient();
   const result = await client.request(
     { method: "tools/call", params: { name, arguments: args } },
     CallToolResultSchema,
+    { timeout },
   ) as McpCallResult;
   return parseToolPayload(result);
+}
+
+async function callToolWithCircuit(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if (!canUseBackendMcp()) {
+    throw new BackendMcpError("Backend MCP 当前不可用");
+  }
+
+  try {
+    const payload = await callTool(name, args);
+    failureCount = 0;
+    circuitOpenUntil = 0;
+    return payload;
+  } catch (err) {
+    failureCount += 1;
+    if (failureCount >= 3) {
+      circuitOpenUntil = Date.now() + loadConfig().backend.mcpFailureCooldown;
+    }
+    throw err;
+  }
 }
 
 function asNumber(value: unknown): number | null {
@@ -208,20 +249,64 @@ export function canUseBackendMcp(symbol?: string): boolean {
   const config = loadConfig();
   if (!config.backend.mcpEnabled) return false;
   if (!config.backend.mcpUrl.trim()) return false;
+  if (circuitOpenUntil > Date.now()) return false;
   return true;
 }
 
-export async function fetchQuoteFromBackendMcp(symbol: string): Promise<QuoteData> {
-  const payload = await callTool("get_realtime_quote", { symbol });
+export function getBackendMcpStatus(): {
+  enabled: boolean;
+  url: string;
+  timeout: number;
+  failureCount: number;
+  circuitOpenUntil: number | null;
+  usable: boolean;
+} {
+  const config = loadConfig();
+  return {
+    enabled: config.backend.mcpEnabled,
+    url: config.backend.mcpUrl,
+    timeout: config.backend.mcpTimeout,
+    failureCount,
+    circuitOpenUntil: circuitOpenUntil > Date.now() ? circuitOpenUntil : null,
+    usable: canUseBackendMcp(),
+  };
+}
+
+export async function fetchQuoteFromBackendMcp(symbol: string, forceRefresh = false): Promise<QuoteData> {
+  const payload = await callToolWithCircuit("get_realtime_quote", { symbol, force_refresh: forceRefresh });
   return mapMcpQuoteToQuoteData(symbol, payload);
 }
 
-export async function fetchTechnicalFromBackendMcp(symbol: string): Promise<TechnicalData> {
-  const payload = await callTool("get_technical_indicators", { symbol });
+export async function fetchTechnicalFromBackendMcp(symbol: string, forceRefresh = false): Promise<TechnicalData> {
+  const payload = await callToolWithCircuit("get_technical_indicators", { symbol, force_refresh: forceRefresh });
   return mapMcpTechnicalToTechnicalData(symbol, payload);
 }
 
-export async function fetchDailyBarsFromBackendMcp(symbol: string, days = 60): Promise<HistoricalBar[]> {
-  const payload = await callTool("get_daily_bars", { symbol, days, adjust: "qfq" });
+export async function fetchDailyBarsFromBackendMcp(symbol: string, days = 60, forceRefresh = false): Promise<HistoricalBar[]> {
+  const payload = await callToolWithCircuit("get_daily_bars", { symbol, days, adjust: "qfq", force_refresh: forceRefresh });
   return mapMcpBars(payload);
+}
+
+export async function probeBackendMcp(symbol = "AAPL", forceRefresh = false): Promise<{
+  quote: QuoteData;
+  bars: HistoricalBar[];
+  latencyMs: number;
+}> {
+  const started = Date.now();
+  const quote = await fetchQuoteFromBackendMcp(symbol, forceRefresh);
+  const bars = await fetchDailyBarsFromBackendMcp(symbol, 5, forceRefresh);
+  return { quote, bars, latencyMs: Date.now() - started };
+}
+
+export async function shutdownBackendMcp(): Promise<void> {
+  const client = activeClient;
+  activeClient = null;
+  clientPromise = null;
+  cachedUrl = null;
+  cachedToken = null;
+  failureCount = 0;
+  circuitOpenUntil = 0;
+  if (client?.close) {
+    await client.close();
+  }
 }

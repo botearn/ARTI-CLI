@@ -10,7 +10,7 @@ import {
 export interface HybridQuoteResult {
   quote: QuoteData;
   prices: number[];
-  source: "backend" | "openbb";
+  source: "backend_mcp" | "backend_http" | "openbb";
 }
 
 function backendToQuoteData(sq: StockQuote): QuoteData {
@@ -44,19 +44,20 @@ function parseVolume(vol: string): number {
   return parseFloat(vol) || 0;
 }
 
-export async function getHybridQuote(symbol: string): Promise<HybridQuoteResult> {
+export async function getHybridQuote(symbol: string, options?: { forceRefresh?: boolean }): Promise<HybridQuoteResult> {
   const config = loadConfig();
+  const forceRefresh = options?.forceRefresh ?? false;
 
   if (canUseBackendMcp(symbol)) {
     try {
       const [quote, bars] = await Promise.all([
-        fetchQuoteFromBackendMcp(symbol),
-        fetchDailyBarsFromBackendMcp(symbol, 20),
+        fetchQuoteFromBackendMcp(symbol, forceRefresh),
+        fetchDailyBarsFromBackendMcp(symbol, 20, forceRefresh),
       ]);
       return {
         quote,
         prices: bars.map((bar) => bar.close),
-        source: "backend",
+        source: "backend_mcp",
       };
     } catch {
       // fallback below
@@ -71,7 +72,7 @@ export async function getHybridQuote(symbol: string): Promise<HybridQuoteResult>
         return {
           quote: backendToQuoteData(sq),
           prices: sq.sparkline || [],
-          source: "backend",
+          source: "backend_http",
         };
       }
     } catch {
@@ -89,20 +90,21 @@ export async function getHybridQuote(symbol: string): Promise<HybridQuoteResult>
   return { quote, prices, source: "openbb" };
 }
 
-export async function getHybridQuotes(symbols: string[]): Promise<HybridQuoteResult[]> {
+export async function getHybridQuotes(symbols: string[], options?: { forceRefresh?: boolean }): Promise<HybridQuoteResult[]> {
   const config = loadConfig();
+  const forceRefresh = options?.forceRefresh ?? false;
 
   if (symbols.every((symbol) => canUseBackendMcp(symbol))) {
     const results = await Promise.all(symbols.map(async (symbol): Promise<HybridQuoteResult | null> => {
       try {
         const [quote, bars] = await Promise.all([
-          fetchQuoteFromBackendMcp(symbol),
-          fetchDailyBarsFromBackendMcp(symbol, 20),
+          fetchQuoteFromBackendMcp(symbol, forceRefresh),
+          fetchDailyBarsFromBackendMcp(symbol, 20, forceRefresh),
         ]);
         return {
           quote,
           prices: bars.map((bar) => bar.close),
-          source: "backend",
+          source: "backend_mcp",
         };
       } catch {
         return null;
@@ -120,7 +122,7 @@ export async function getHybridQuotes(symbols: string[]): Promise<HybridQuoteRes
         return res.quotes.map(sq => ({
           quote: backendToQuoteData(sq),
           prices: sq.sparkline || [],
-          source: "backend" as const,
+          source: "backend_http" as const,
         }));
       }
     } catch {

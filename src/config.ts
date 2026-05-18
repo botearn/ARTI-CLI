@@ -25,6 +25,8 @@ export interface ArtiConfig {
     timeout: number;
     mcpUrl: string;
     mcpEnabled: boolean;
+    mcpTimeout: number;
+    mcpFailureCooldown: number;
   };
   auth: {
     token: string;
@@ -59,6 +61,8 @@ const DEFAULT_CONFIG: ArtiConfig = {
     timeout: 60000,
     mcpUrl: DEFAULT_BACKEND_MCP_URL,
     mcpEnabled: true,
+    mcpTimeout: 10000,
+    mcpFailureCooldown: 60000,
   },
   auth: {
     token: "",
@@ -142,6 +146,14 @@ export function loadConfig(): ArtiConfig {
   if (process.env.ARTI_BACKEND_MCP_ENABLED !== undefined) {
     config.backend.mcpEnabled = process.env.ARTI_BACKEND_MCP_ENABLED !== "false";
   }
+  if (process.env.ARTI_BACKEND_MCP_TIMEOUT) {
+    const t = Number(process.env.ARTI_BACKEND_MCP_TIMEOUT);
+    if (!isNaN(t) && t > 0) config.backend.mcpTimeout = t;
+  }
+  if (process.env.ARTI_BACKEND_MCP_FAILURE_COOLDOWN) {
+    const t = Number(process.env.ARTI_BACKEND_MCP_FAILURE_COOLDOWN);
+    if (!isNaN(t) && t > 0) config.backend.mcpFailureCooldown = t;
+  }
   if (process.env.ARTI_AUTH_TOKEN) config.auth.token = process.env.ARTI_AUTH_TOKEN;
   if (process.env.ARTI_AUTH_REFRESH_TOKEN) config.auth.refreshToken = process.env.ARTI_AUTH_REFRESH_TOKEN;
   if (process.env.ARTI_AUTH_EXPIRES_AT) {
@@ -199,7 +211,7 @@ export function getConfigValue(key: string): unknown {
 
 const ALLOWED_CONFIG_KEYS = new Set([
   "api.baseUrl", "api.timeout",
-  "backend.enabled", "backend.url", "backend.timeout", "backend.mcpUrl", "backend.mcpEnabled",
+  "backend.enabled", "backend.url", "backend.timeout", "backend.mcpUrl", "backend.mcpEnabled", "backend.mcpTimeout", "backend.mcpFailureCooldown",
   "auth.token", "auth.refreshToken", "auth.expiresAt", "auth.userId", "auth.email", "auth.supabaseUrl", "auth.publishableKey",
   "data.provider", "data.artiDataBaseUrl", "data.artiDataTimeout", "data.artiDataInternalKey",
   "display.market", "display.lang",

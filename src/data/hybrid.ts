@@ -7,7 +7,7 @@ import { canUseBackendMcp, fetchTechnicalFromBackendMcp } from "./mcp-client.js"
 
 export interface HybridTechnicalResult {
   technical: TechnicalData;
-  source: "backend" | "arti-data" | "openbb";
+  source: "backend_mcp" | "backend_http" | "arti-data" | "openbb";
 }
 
 /**
@@ -70,15 +70,16 @@ function convertBackendToTechnical(backendData: BackendStockData): TechnicalData
   };
 }
 
-export async function getHybridTechnical(symbol: string, days = 220): Promise<HybridTechnicalResult> {
+export async function getHybridTechnical(symbol: string, days = 220, options?: { forceRefresh?: boolean }): Promise<HybridTechnicalResult> {
   const config = loadConfig();
+  const forceRefresh = options?.forceRefresh ?? false;
 
   // 优先级 1: Backend MCP (A 股主链)
   if (canUseBackendMcp(symbol)) {
     try {
       return {
-        technical: await fetchTechnicalFromBackendMcp(symbol),
-        source: "backend",
+        technical: await fetchTechnicalFromBackendMcp(symbol, forceRefresh),
+        source: "backend_mcp",
       };
     } catch (err) {
       console.warn("Backend MCP technical 失败，fallback 到 Backend API/arti-data/openbb:", (err as Error).message);
@@ -92,7 +93,7 @@ export async function getHybridTechnical(symbol: string, days = 220): Promise<Hy
       const backendResult = await scanStockBackend(symbol);
       return {
         technical: convertBackendToTechnical(backendResult.scan),
-        source: "backend",
+        source: "backend_http",
       };
     } catch (err) {
       console.warn("Backend scan 失败，fallback 到 arti-data/openbb:", (err as Error).message);

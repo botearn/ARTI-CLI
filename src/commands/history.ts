@@ -11,8 +11,9 @@ import { handleCommand } from "../core/handler.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
 import { canUseArtiDataHistory, fetchHistoryFromArtiData } from "../data/client.js";
+import { canUseBackendMcp, fetchDailyBarsFromBackendMcp } from "../data/mcp-client.js";
 
-export async function historyCommand(symbol: string, options?: { days?: number }): Promise<void> {
+export async function historyCommand(symbol: string, options?: { days?: number; refresh?: boolean }): Promise<void> {
   if (!symbol) {
     console.log(chalk.red("请提供股票代码，例如：arti history AAPL"));
     return;
@@ -25,15 +26,23 @@ export async function historyCommand(symbol: string, options?: { days?: number }
   try {
     billed = await withBilling("chat", () => handleCommand(`获取 ${sym} 历史价格...`, async () => {
       let bars;
-      let source: "arti-data" | "openbb" = "openbb";
-      if (canUseArtiDataHistory(sym)) {
+      let source: "backend_mcp" | "arti-data" | "openbb" = "openbb";
+      if (canUseBackendMcp(sym)) {
+        try {
+          bars = await fetchDailyBarsFromBackendMcp(sym, days, options?.refresh);
+          source = "backend_mcp";
+        } catch {
+          // fallback below
+        }
+      }
+      if (!bars && canUseArtiDataHistory(sym)) {
         try {
           bars = await fetchHistoryFromArtiData(sym, days);
           source = "arti-data";
         } catch {
           bars = await getHistorical(sym, days);
         }
-      } else {
+      } else if (!bars) {
         bars = await getHistorical(sym, days);
       }
       track("history", [sym]);

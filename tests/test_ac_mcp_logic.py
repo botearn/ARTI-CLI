@@ -70,10 +70,13 @@ def test_ac2_mcpEnabled开关控制():
     # 检查 mcpEnabled 默认值
     assert "mcpEnabled:" in backend_config, "DEFAULT_CONFIG.backend 缺少 mcpEnabled"
     assert "mcpUrl:" in backend_config, "DEFAULT_CONFIG.backend 缺少 mcpUrl"
+    assert "mcpTimeout:" in backend_config, "DEFAULT_CONFIG.backend 缺少 mcpTimeout"
+    assert "mcpFailureCooldown:" in backend_config, "DEFAULT_CONFIG.backend 缺少 mcpFailureCooldown"
     assert "DEFAULT_BACKEND_MCP_URL" in backend_config or "mcp-market-production.up.railway.app" in content, \
         "mcpUrl 未使用生产环境地址"
 
     print("✓ config.ts 包含 backend.mcpEnabled 和 backend.mcpUrl 配置")
+    print("✓ config.ts 包含 MCP timeout 和 failure cooldown 配置")
     print("✓ mcpUrl 默认指向生产环境 (mcp-market-production.up.railway.app)")
 
 
@@ -88,6 +91,7 @@ def test_ac3_mcp主链优先级():
     # 确保优先调用 canUseBackendMcp
     assert "canUseBackendMcp" in content, "quote.ts 未使用 canUseBackendMcp"
     assert "fetchQuoteFromBackendMcp" in content, "quote.ts 未使用 fetchQuoteFromBackendMcp"
+    assert "backend_mcp" in content, "quote.ts 未标识 backend_mcp source"
     print("✓ quote.ts 使用 Backend MCP 主链")
 
     # 检查 hybrid.ts（技术指标）
@@ -96,6 +100,7 @@ def test_ac3_mcp主链优先级():
 
     assert "canUseBackendMcp" in content, "hybrid.ts 未使用 canUseBackendMcp"
     assert "fetchTechnicalFromBackendMcp" in content, "hybrid.ts 未使用 fetchTechnicalFromBackendMcp"
+    assert "backend_mcp" in content, "hybrid.ts 未标识 backend_mcp source"
     print("✓ hybrid.ts 使用 Backend MCP 主链")
 
 

@@ -12,7 +12,7 @@ import { withBilling, printDeductResult, InsufficientCreditsError } from "../bil
 import { printError } from "../errors.js";
 import { getHybridTechnical } from "../data/index.js";
 
-export async function scanCommand(symbol: string): Promise<void> {
+export async function scanCommand(symbol: string, options?: { refresh?: boolean }): Promise<void> {
   if (!symbol) {
     console.log(chalk.red("请提供股票代码，例如：arti scan AAPL"));
     return;
@@ -23,7 +23,7 @@ export async function scanCommand(symbol: string): Promise<void> {
   let billed;
   try {
     billed = await withBilling("quickScan", () => handleCommand(`扫描 ${symbol} 技术指标...`, async () => {
-      const result = await getHybridTechnical(symbol, 220);
+      const result = await getHybridTechnical(symbol, 220, { forceRefresh: options?.refresh });
       track("scan", [symbol]);
       return result;
     }));

@@ -11,9 +11,9 @@ import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
-import { getHybridQuotes, type HybridQuoteResult, usingMcp } from "../data/index.js";
+import { getHybridQuotes, type HybridQuoteResult } from "../data/index.js";
 
-export async function quoteCommand(symbols: string[]): Promise<void> {
+export async function quoteCommand(symbols: string[], options?: { refresh?: boolean }): Promise<void> {
   if (!symbols.length) {
     console.log(chalk.red("请提供股票代码，例如：arti quote AAPL NVDA"));
     return;
@@ -51,7 +51,7 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
 
       spinner.text = `获取 ${resolved.join(", ")} 实时行情...`;
 
-      const quotes = await getHybridQuotes(resolved);
+      const quotes = await getHybridQuotes(resolved, { forceRefresh: options?.refresh });
       if (!quotes.length) {
         spinner.fail("未获取到行情数据");
         return undefined;
@@ -59,7 +59,10 @@ export async function quoteCommand(symbols: string[]): Promise<void> {
 
       track("quote", resolved);
 
-      return { quotes: quotes.map(q => ({ ...q.quote, sparkline: q.prices })), _quotes: quotes };
+      return {
+        quotes: quotes.map(q => ({ ...q.quote, sparkline: q.prices, source: q.source })),
+        _quotes: quotes,
+      };
     }));
   } catch (err) {
     if (err instanceof InsufficientCreditsError) {

@@ -6,19 +6,19 @@ import type { HybridTechnicalResult } from "./hybrid.js";
 import type { HybridQuoteResult } from "./quote.js";
 import { canUseBackendMcp } from "./mcp-client.js";
 
-export async function getHybridQuote(symbol: string): Promise<HybridQuoteResult> {
+export async function getHybridQuote(symbol: string, options?: { forceRefresh?: boolean }): Promise<HybridQuoteResult> {
   const { getHybridQuote: getApiQuote } = await import("./quote.js");
-  return getApiQuote(symbol);
+  return getApiQuote(symbol, options);
 }
 
-export async function getHybridQuotes(symbols: string[]): Promise<HybridQuoteResult[]> {
+export async function getHybridQuotes(symbols: string[], options?: { forceRefresh?: boolean }): Promise<HybridQuoteResult[]> {
   const { getHybridQuotes: getApiQuotes } = await import("./quote.js");
-  return getApiQuotes(symbols);
+  return getApiQuotes(symbols, options);
 }
 
-export async function getHybridTechnical(symbol: string, days?: number): Promise<HybridTechnicalResult> {
+export async function getHybridTechnical(symbol: string, days?: number, options?: { forceRefresh?: boolean }): Promise<HybridTechnicalResult> {
   const { getHybridTechnical: getApiTechnical } = await import("./hybrid.js");
-  return getApiTechnical(symbol, days);
+  return getApiTechnical(symbol, days, options);
 }
 
 export function usingMcp(): boolean {
