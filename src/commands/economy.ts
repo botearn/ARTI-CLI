@@ -9,6 +9,7 @@ import { getFredSeries, getFredSearch, getTreasuryRates, type EconomyData } from
 import { title, divider } from "../format.js";
 import { track } from "../tracker.js";
 import { handleCommandWithOutput } from "../core/handler.js";
+import { canUseBackendMcp, fetchMacroIndicatorsFromBackendMcp } from "../data/mcp-client.js";
 
 const USAGE = `用法:
   arti economy treasury              国债利率
@@ -30,9 +31,16 @@ export async function economyCommand(
 
   if (cmd === "treasury") {
     await handleCommandWithOutput("获取国债利率...", async () => {
-      const result = await getTreasuryRates(limit);
+      const result = await getHybridMacro("us", { days: 90, limit });
       track("economy", ["treasury"]);
       return { data: { indicator: "treasury_rates", ...result }, render: () => renderTable("美国国债利率", result) };
+    });
+  } else if (cmd === "macro") {
+    const country = (args?.[0]?.toLowerCase() === "cn" ? "cn" : "us") as "us" | "cn";
+    await handleCommandWithOutput(`获取 ${country.toUpperCase()} 宏观指标...`, async () => {
+      const result = await getHybridMacro(country, { days: limit });
+      track("economy", ["macro", country]);
+      return { data: { indicator: "macro_indicators", country, ...result }, render: () => renderTable(`${country.toUpperCase()} 宏观指标`, result) };
     });
   } else if (cmd === "fred") {
     const seriesId = args?.[0];
@@ -60,6 +68,41 @@ export async function economyCommand(
     console.log(chalk.red(`未知子命令: ${sub}`));
     console.log(chalk.yellow(USAGE));
   }
+}
+
+async function getHybridMacro(
+  country: "us" | "cn",
+  options: { days?: number; limit?: number },
+): Promise<EconomyData> {
+  if (canUseBackendMcp()) {
+    try {
+      const payload = await fetchMacroIndicatorsFromBackendMcp(country, { days: options.days ?? options.limit ?? 90 });
+      const data = normalizeMacroRows(payload);
+      if (data.length) return { data };
+    } catch {
+      // fallback below
+    }
+  }
+  return country === "us" ? getTreasuryRates(options.limit ?? 20) : { data: [] };
+}
+
+function normalizeMacroRows(payload: Record<string, unknown>): Record<string, unknown>[] {
+  const direct = payload.data;
+  if (Array.isArray(direct)) {
+    return direct.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
+  }
+
+  const indicators = payload.indicators;
+  if (indicators && typeof indicators === "object") {
+    return Object.entries(indicators as Record<string, unknown>).map(([key, value]) => ({
+      indicator: key,
+      value,
+    }));
+  }
+
+  return Object.entries(payload)
+    .filter(([key]) => !key.startsWith("_"))
+    .map(([key, value]) => ({ indicator: key, value }));
 }
 
 function renderTable(label: string, result: EconomyData): void {

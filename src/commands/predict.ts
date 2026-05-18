@@ -79,7 +79,7 @@ export async function predictCommand(symbol: string): Promise<void> {
       let quote = null;
       try { quote = await getQuote(symbol); } catch { /* ignore */ }
       let tech = null;
-      let technicalSource: "arti-data" | "openbb" = "openbb";
+      let technicalSource: "backend_mcp" | "backend_http" | "arti-data" | "openbb" = "openbb";
       try {
         const hybrid = await getHybridTechnical(symbol, 220);
         tech = hybrid.technical;

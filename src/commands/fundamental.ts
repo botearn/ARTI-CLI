@@ -8,8 +8,16 @@ import { getFundamental, type FundamentalData } from "../openbb.js";
 import { title, kvLine, divider } from "../format.js";
 import { track } from "../tracker.js";
 import { handleCommandWithOutput } from "../core/handler.js";
+import {
+  canUseBackendMcp,
+  fetchCompanyProfileFromBackendMcp,
+  fetchDividendHistoryFromBackendMcp,
+  fetchFinancialReportFromBackendMcp,
+  fetchStockInfoFromBackendMcp,
+} from "../data/mcp-client.js";
 
 const VALID_FIELDS = ["income", "balance", "metrics", "dividends"] as const;
+type FundamentalField = typeof VALID_FIELDS[number];
 
 export async function fundamentalCommand(
   symbol: string,
@@ -21,8 +29,8 @@ export async function fundamentalCommand(
   }
 
   const sym = symbol.toUpperCase();
-  const fields = options?.fields
-    ? options.fields.split(",").filter((f): f is typeof VALID_FIELDS[number] => VALID_FIELDS.includes(f as typeof VALID_FIELDS[number]))
+  const fields: FundamentalField[] = options?.fields
+    ? options.fields.split(",").filter((f): f is FundamentalField => VALID_FIELDS.includes(f as FundamentalField))
     : ["income", "balance", "metrics"];
 
   if (!fields.length) {
@@ -31,10 +39,10 @@ export async function fundamentalCommand(
   }
 
   await handleCommandWithOutput(`获取 ${sym} 基本面数据...`, async () => {
-    const result = await getFundamental(sym, fields);
+    const { result, source } = await getHybridFundamental(sym, fields);
     track("fundamental", [sym]);
 
-    const data = { symbol: sym, fields, ...result };
+    const data = { symbol: sym, fields, source, ...result };
     return {
       data,
       render: () => {
@@ -96,4 +104,74 @@ export async function fundamentalCommand(
       },
     };
   });
+}
+
+async function getHybridFundamental(
+  symbol: string,
+  fields: FundamentalField[],
+): Promise<{ result: FundamentalData; source: "backend_mcp" | "openbb" }> {
+  if (canUseBackendMcp(symbol)) {
+    try {
+      const result: FundamentalData = {};
+      const calls: Promise<void>[] = [];
+
+      if (fields.includes("metrics")) {
+        calls.push((async () => {
+          const [info, profile] = await Promise.all([
+            fetchStockInfoFromBackendMcp(symbol),
+            fetchCompanyProfileFromBackendMcp(symbol),
+          ]);
+          result.metrics = { ...info, profile };
+        })());
+      }
+
+      if (fields.includes("income")) {
+        calls.push((async () => {
+          const payload = await fetchFinancialReportFromBackendMcp(symbol, "income");
+          result.income = normalizeReports(payload);
+        })());
+      }
+
+      if (fields.includes("balance")) {
+        calls.push((async () => {
+          const payload = await fetchFinancialReportFromBackendMcp(symbol, "balance");
+          result.balance = normalizeReports(payload);
+        })());
+      }
+
+      if (fields.includes("dividends")) {
+        calls.push((async () => {
+          const payload = await fetchDividendHistoryFromBackendMcp(symbol);
+          result.dividends = normalizeRows(payload, ["dividends", "items", "data"]);
+        })());
+      }
+
+      await Promise.all(calls);
+      return { result, source: "backend_mcp" };
+    } catch {
+      // fallback below
+    }
+  }
+
+  return { result: await getFundamental(symbol, fields), source: "openbb" };
+}
+
+function normalizeReports(payload: Record<string, unknown>): Record<string, unknown>[] {
+  const rows = normalizeRows(payload, ["reports", "items", "data"]);
+  return rows.map((row) => {
+    const data = row.data;
+    return data && typeof data === "object"
+      ? { ...row, ...(data as Record<string, unknown>) }
+      : row;
+  });
+}
+
+function normalizeRows(payload: Record<string, unknown>, keys: string[]): Record<string, unknown>[] {
+  for (const key of keys) {
+    const value = payload[key];
+    if (Array.isArray(value)) {
+      return value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
+    }
+  }
+  return [];
 }

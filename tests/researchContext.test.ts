@@ -91,11 +91,11 @@ describe("formatResearchStockData", () => {
       overall_signal: "偏多",
     };
 
-    const json = formatBackendResearchStockData("AAPL", quote, technical, "backend");
+    const json = formatBackendResearchStockData("AAPL", quote, technical, "backend_mcp");
     const parsed = JSON.parse(json);
     expect(parsed.symbol).toBe("AAPL");
     expect(parsed.quote.price).toBe(100);
     expect(parsed.technical.ma.MA20).toBe(97);
-    expect(parsed.technicalSource).toBe("backend");
+    expect(parsed.technicalSource).toBe("backend_mcp");
   });
 });

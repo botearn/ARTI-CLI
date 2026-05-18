@@ -1,17 +1,23 @@
-import { getQuote, type QuoteData, type TechnicalData } from "../openbb.js";
+import type { QuoteData, TechnicalData } from "../openbb.js";
 import { getHybridTechnical } from "./hybrid.js";
+import { getHybridQuote } from "./quote.js";
+import { canUseBackendMcp, fetchStockContextFromBackendMcp, fetchStockFundFlowFromBackendMcp } from "./mcp-client.js";
 
 export interface ResearchStockContext {
   stockData: string;
   backendStockData: string;
-  technicalSource: "backend" | "arti-data" | "openbb" | null;
+  technicalSource: "backend_mcp" | "backend_http" | "arti-data" | "openbb" | null;
 }
+
+type ResearchSource = ResearchStockContext["technicalSource"];
 
 export function formatResearchStockData(
   symbol: string,
   quote: QuoteData | null,
   technical: TechnicalData | null,
-  technicalSource: "backend" | "arti-data" | "openbb" | null,
+  technicalSource: ResearchSource,
+  mcpContext?: Record<string, unknown> | null,
+  fundFlow?: Record<string, unknown> | null,
 ): string {
   const parts: string[] = [];
 
@@ -37,6 +43,26 @@ export function formatResearchStockData(
     parts.push(technicalBits.join(" "));
   }
 
+  if (mcpContext) {
+    const profile = mcpContext.profile ?? mcpContext.company_profile ?? mcpContext.companyProfile;
+    if (profile && typeof profile === "object") {
+      const p = profile as Record<string, unknown>;
+      const bits = [
+        p.name ? `名称:${p.name}` : "",
+        p.industry ? `行业:${p.industry}` : "",
+        p.market ? `市场:${p.market}` : "",
+      ].filter(Boolean);
+      if (bits.length) parts.push(bits.join(" "));
+    }
+  }
+
+  if (fundFlow) {
+    const items = Array.isArray(fundFlow.items) ? fundFlow.items : Array.isArray(fundFlow.data) ? fundFlow.data : null;
+    if (items?.length) {
+      parts.push(`资金流: ${JSON.stringify(items[0]).slice(0, 180)}`);
+    }
+  }
+
   return parts.join(" | ");
 }
 
@@ -44,7 +70,9 @@ export function formatBackendResearchStockData(
   symbol: string,
   quote: QuoteData | null,
   technical: TechnicalData | null,
-  technicalSource: "backend" | "arti-data" | "openbb" | null,
+  technicalSource: ResearchSource,
+  mcpContext?: Record<string, unknown> | null,
+  fundFlow?: Record<string, unknown> | null,
 ): string {
   const payload: Record<string, unknown> = { symbol };
 
@@ -79,23 +107,37 @@ export function formatBackendResearchStockData(
   if (technicalSource) {
     payload.technicalSource = technicalSource;
   }
+  if (mcpContext) {
+    payload.mcpContext = mcpContext;
+  }
+  if (fundFlow) {
+    payload.fundFlow = fundFlow;
+  }
 
   return Object.keys(payload).length > 1 ? JSON.stringify(payload) : "";
 }
 
 export async function buildResearchStockContext(symbol: string): Promise<ResearchStockContext> {
-  const [quoteSettled, technicalSettled] = await Promise.allSettled([
-    getQuote(symbol),
+  const [quoteSettled, technicalSettled, mcpContextSettled, fundFlowSettled] = await Promise.allSettled([
+    getHybridQuote(symbol),
     getHybridTechnical(symbol, 220),
+    canUseBackendMcp(symbol)
+      ? fetchStockContextFromBackendMcp(symbol, ["quote", "technicals", "profile", "fundamentals"])
+      : Promise.resolve(null),
+    canUseBackendMcp(symbol)
+      ? fetchStockFundFlowFromBackendMcp(symbol)
+      : Promise.resolve(null),
   ]);
 
-  const quote = quoteSettled.status === "fulfilled" ? quoteSettled.value : null;
+  const quote = quoteSettled.status === "fulfilled" ? quoteSettled.value.quote : null;
   const technical = technicalSettled.status === "fulfilled" ? technicalSettled.value.technical : null;
   const technicalSource = technicalSettled.status === "fulfilled" ? technicalSettled.value.source : null;
+  const mcpContext = mcpContextSettled.status === "fulfilled" ? mcpContextSettled.value : null;
+  const fundFlow = fundFlowSettled.status === "fulfilled" ? fundFlowSettled.value : null;
 
   return {
-    stockData: formatResearchStockData(symbol, quote, technical, technicalSource),
-    backendStockData: formatBackendResearchStockData(symbol, quote, technical, technicalSource),
+    stockData: formatResearchStockData(symbol, quote, technical, technicalSource, mcpContext, fundFlow),
+    backendStockData: formatBackendResearchStockData(symbol, quote, technical, technicalSource, mcpContext, fundFlow),
     technicalSource,
   };
 }

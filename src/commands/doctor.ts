@@ -3,11 +3,22 @@ import { output } from "../output.js";
 import { getBackendMcpStatus, probeBackendMcp } from "../data/mcp-client.js";
 import { loadConfig } from "../config.js";
 
-export async function doctorCommand(target?: string, options?: { symbol?: string; refresh?: boolean }): Promise<void> {
+const LOCAL_MCP_URL = "http://localhost:8001/mcp";
+const PROD_MCP_URL = "https://mcp-market-production.up.railway.app/mcp";
+
+export async function doctorCommand(
+  target?: string,
+  options?: { symbol?: string; refresh?: boolean; url?: string; local?: boolean; prod?: boolean },
+): Promise<void> {
   const subject = target || "mcp";
   if (subject !== "mcp") {
     console.log(chalk.red(`暂不支持 doctor ${subject}，目前可用: doctor mcp`));
     return;
+  }
+
+  const overrideUrl = resolveMcpUrlOverride(options);
+  if (overrideUrl) {
+    process.env.ARTI_BACKEND_MCP_URL = overrideUrl;
   }
 
   const config = loadConfig();
@@ -68,6 +79,13 @@ export async function doctorCommand(target?: string, options?: { symbol?: string
     }
     console.log("");
   });
+}
+
+function resolveMcpUrlOverride(options?: { url?: string; local?: boolean; prod?: boolean }): string | null {
+  if (options?.url?.trim()) return options.url.trim();
+  if (options?.local) return LOCAL_MCP_URL;
+  if (options?.prod) return PROD_MCP_URL;
+  return null;
 }
 
 function formatError(err: unknown): string {

@@ -7,6 +7,49 @@ type McpCallResult = {
   isError?: boolean;
 };
 
+export const BACKEND_MCP_TOOL_CONTRACTS = {
+  get_realtime_quote: {
+    args: ["symbol", "force_refresh"],
+    requiredFields: ["symbol", "price"],
+  },
+  get_daily_bars: {
+    args: ["symbol", "days", "adjust", "force_refresh"],
+    requiredFields: ["bars"],
+  },
+  get_technical_indicators: {
+    args: ["symbol", "force_refresh"],
+    requiredFields: ["latest_close", "ma5", "ma10", "ma20", "ma60"],
+  },
+  get_stock_info: {
+    args: ["symbol", "force_refresh"],
+    requiredFields: ["symbol"],
+  },
+  get_company_profile: {
+    args: ["symbol", "force_refresh"],
+    requiredFields: ["symbol"],
+  },
+  get_financial_report: {
+    args: ["symbol", "report_type", "force_refresh"],
+    requiredFields: ["reports"],
+  },
+  get_dividend_history: {
+    args: ["symbol", "force_refresh"],
+    requiredFields: ["symbol"],
+  },
+  get_macro_indicators: {
+    args: ["country", "frequency", "days", "force_refresh"],
+    requiredFields: ["data"],
+  },
+  get_stock_fund_flow: {
+    args: ["symbol", "force_refresh"],
+    requiredFields: ["symbol"],
+  },
+  load_stock_context: {
+    args: ["symbol", "include", "force_refresh"],
+    requiredFields: ["symbol"],
+  },
+} as const;
+
 class BackendMcpError extends Error {
   constructor(message: string) {
     super(message);
@@ -15,8 +58,8 @@ class BackendMcpError extends Error {
 }
 
 type McpClient = {
-  connect: (transport: unknown) => Promise<void>;
-  request: (request: Record<string, unknown>, schema: unknown) => Promise<McpCallResult>;
+  connect: (transport: any, options?: unknown) => Promise<void>;
+  request: (request: Record<string, unknown>, schema: unknown, options?: unknown) => Promise<McpCallResult>;
   close?: () => Promise<void>;
 };
 
@@ -146,6 +189,13 @@ async function callToolWithCircuit(
     }
     throw err;
   }
+}
+
+export async function callBackendMcpTool(
+  name: keyof typeof BACKEND_MCP_TOOL_CONTRACTS,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return callToolWithCircuit(name, args);
 }
 
 function asNumber(value: unknown): number | null {
@@ -285,6 +335,54 @@ export async function fetchTechnicalFromBackendMcp(symbol: string, forceRefresh 
 export async function fetchDailyBarsFromBackendMcp(symbol: string, days = 60, forceRefresh = false): Promise<HistoricalBar[]> {
   const payload = await callToolWithCircuit("get_daily_bars", { symbol, days, adjust: "qfq", force_refresh: forceRefresh });
   return mapMcpBars(payload);
+}
+
+export async function fetchStockInfoFromBackendMcp(symbol: string, forceRefresh = false): Promise<Record<string, unknown>> {
+  return callBackendMcpTool("get_stock_info", { symbol, force_refresh: forceRefresh });
+}
+
+export async function fetchCompanyProfileFromBackendMcp(symbol: string, forceRefresh = false): Promise<Record<string, unknown>> {
+  return callBackendMcpTool("get_company_profile", { symbol, force_refresh: forceRefresh });
+}
+
+export async function fetchFinancialReportFromBackendMcp(
+  symbol: string,
+  reportType: "income" | "balance" | "cashflow",
+  forceRefresh = false,
+): Promise<Record<string, unknown>> {
+  return callBackendMcpTool("get_financial_report", {
+    symbol,
+    report_type: reportType,
+    force_refresh: forceRefresh,
+  });
+}
+
+export async function fetchDividendHistoryFromBackendMcp(symbol: string, forceRefresh = false): Promise<Record<string, unknown>> {
+  return callBackendMcpTool("get_dividend_history", { symbol, force_refresh: forceRefresh });
+}
+
+export async function fetchMacroIndicatorsFromBackendMcp(
+  country: "us" | "cn" = "us",
+  options?: { frequency?: string; days?: number; forceRefresh?: boolean },
+): Promise<Record<string, unknown>> {
+  return callBackendMcpTool("get_macro_indicators", {
+    country,
+    frequency: options?.frequency,
+    days: options?.days ?? 90,
+    force_refresh: options?.forceRefresh ?? false,
+  });
+}
+
+export async function fetchStockFundFlowFromBackendMcp(symbol: string, forceRefresh = false): Promise<Record<string, unknown>> {
+  return callBackendMcpTool("get_stock_fund_flow", { symbol, force_refresh: forceRefresh });
+}
+
+export async function fetchStockContextFromBackendMcp(
+  symbol: string,
+  include?: string[],
+  forceRefresh = false,
+): Promise<Record<string, unknown>> {
+  return callBackendMcpTool("load_stock_context", { symbol, include, force_refresh: forceRefresh });
 }
 
 export async function probeBackendMcp(symbol = "AAPL", forceRefresh = false): Promise<{

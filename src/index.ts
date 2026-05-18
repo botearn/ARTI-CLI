@@ -269,7 +269,7 @@ const defs: CommandDef[] = [
   {
     name: "economy", aliases: ["eco"],
     description: "宏观经济数据（国债利率 / FRED 数据系列）",
-    usage: "economy treasury | fred <id> | search <keyword> [-l N]",
+    usage: "economy treasury | macro [us|cn] | fred <id> | search <keyword> [-l N]",
     args: [
       { spec: "[sub]", desc: "子命令: treasury | fred <id> | search <keyword>" },
       { spec: "[args...]", desc: "子命令参数" },
@@ -277,6 +277,7 @@ const defs: CommandDef[] = [
     options: [{ ...OPT_LIMIT, defaultValue: "20" }],
     examples: [
       "$ arti economy treasury          # 国债利率",
+      "$ arti economy macro cn          # 中国宏观指标（MCP 优先）",
       "$ arti economy fred GDP          # GDP 数据",
       "$ arti economy fred UNRATE       # 失业率",
       "$ arti economy search CPI        # 搜索 CPI 相关系列",
@@ -415,14 +416,19 @@ const defs: CommandDef[] = [
   {
     name: "doctor", aliases: ["diag"],
     description: "诊断 ARTI 本地/后端连接状态",
-    usage: "doctor mcp [--symbol AAPL] [--refresh]",
+    usage: "doctor mcp [--symbol AAPL] [--local|--prod|--url <url>] [--refresh]",
     args: [{ spec: "[target]", desc: "诊断对象，目前支持 mcp" }],
     options: [
       { short: "", long: "--symbol", key: "symbol", type: "string", desc: "MCP 探测股票代码", hint: "<symbol>", defaultValue: "AAPL" },
+      { short: "", long: "--url", key: "url", type: "string", desc: "临时使用指定 MCP URL", hint: "<url>" },
+      { short: "", long: "--local", key: "local", type: "boolean", desc: "临时使用本地 MCP: http://localhost:8001/mcp" },
+      { short: "", long: "--prod", key: "prod", type: "boolean", desc: "临时使用线上 MCP" },
       OPT_REFRESH,
     ],
     examples: [
       "$ arti doctor mcp",
+      "$ arti doctor mcp --prod --symbol 600519.SS",
+      "$ arti doctor mcp --local --symbol 600519.SS",
       "$ arti doctor mcp --symbol 600519.SS --refresh",
       "$ arti doctor mcp --json",
     ],
@@ -430,6 +436,9 @@ const defs: CommandDef[] = [
       doctorCommand(positional[0], {
         symbol: options.symbol as string | undefined,
         refresh: options.refresh as boolean | undefined,
+        url: options.url as string | undefined,
+        local: options.local as boolean | undefined,
+        prod: options.prod as boolean | undefined,
       }),
   },
   {
