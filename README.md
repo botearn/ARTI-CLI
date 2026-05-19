@@ -692,6 +692,24 @@ npm test                       # 运行测试
 npm run test:watch             # 监听模式
 ```
 
+### RFC 流程
+
+所有重要功能变更都需要先写 RFC。查看 [rfcs/README.md](rfcs/README.md) 了解详情。
+
+```bash
+# 创建新 RFC
+./scripts/create-rfc.sh
+
+# 查看所有 RFC
+cat rfcs/INDEX.md
+```
+
+**必须写 RFC 的场景**:
+- 新增 CLI 命令
+- 破坏性变更
+- 架构调整
+- 数据源切换
+
 ## 技术栈
 
 - **运行时** — Node.js >= 18 (ESM)
@@ -705,13 +723,20 @@ npm run test:watch             # 监听模式
 
 ## 文档
 
-项目文档位于 `docs/` 目录：
+### 用户文档 (`docs/`)
 
 - [agents.md](docs/agents.md) — AI 分析师系统架构与角色说明
 - [ARTI_DATA_INTEGRATION_PLAN.md](docs/ARTI_DATA_INTEGRATION_PLAN.md) — arti-data 高级数据源接入计划
 - [BILLING_FLOW.md](docs/BILLING_FLOW.md) — Credit 计费流程、套餐对比与升级引导
 - [CLI_FEATURES.md](docs/CLI_FEATURES.md) — CLI 功能清单与开发进度
 - [codex.md](docs/codex.md) — Codex 集成说明
+
+### RFC 设计文档 (`rfcs/`)
+
+- [rfcs/README.md](rfcs/README.md) — RFC 流程说明
+- [rfcs/QUICK_START.md](rfcs/QUICK_START.md) — 5 分钟上手指南
+- [rfcs/INDEX.md](rfcs/INDEX.md) — 所有 RFC 索引
+- [rfcs/template.md](rfcs/template.md) — RFC 模板
 
 ## License
 
