@@ -9,6 +9,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
 import { trackCommand } from "./session.js";
+import { getAuthState, isLoggedIn } from "../auth.js";
+import { VERSION } from "../version.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const HISTORY_FILE = join(CONFIG_DIR, "repl_history");
@@ -69,7 +71,26 @@ function printBanner(): void {
   ██╔══██║██╔══██╗   ██║   ██║
   ██║  ██║██║  ██║   ██║   ██║
   ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝`));
-  console.log(chalk.gray("  智能投研终端 v0.2.0 — 输入 help 查看命令\n"));
+  console.log(chalk.gray(`  智能投研终端 v${VERSION} — 输入 help 查看命令`));
+  printAuthHint();
+  console.log();
+}
+
+/** 登录态提示 — 仅本地读取 token，无网络请求；失败时静默退回 */
+function printAuthHint(): void {
+  try {
+    const auth = getAuthState();
+    if (isLoggedIn(auth)) {
+      const who = auth.email || auth.userId || "已登录账户";
+      console.log(chalk.gray("  已登录 ") + chalk.green(who));
+    } else {
+      console.log(
+        chalk.gray("  未登录 — 输入 ") + chalk.cyan("login") + chalk.gray(" 开始（浏览器登录）"),
+      );
+    }
+  } catch {
+    // 读取登录态失败不应阻塞 REPL 启动
+  }
 }
 
 /** 打印帮助 */

@@ -48,7 +48,21 @@ $ arti market
 
 ### 1. 安装
 
-需要 Node.js >= 18 和 Python >= 3.9。
+只需要 Node.js >= 18。生产数据源为 Backend MCP，无需本地 Python。
+
+#### 一行安装（推荐）
+
+```bash
+curl -fsSL https://artifin.ai/cli/install.sh | bash
+```
+
+脚本会检测 Node 环境并通过 npm 全局安装 `arti-cli`，几秒完成。
+
+#### npm
+
+```bash
+npm install -g arti-cli
+```
 
 #### Homebrew (macOS / Linux)
 
@@ -57,23 +71,21 @@ brew tap botearn/arti https://github.com/botearn/homebrew-arti
 brew install arti
 ```
 
-#### Shell script
-
-```bash
-curl -sSL https://raw.githubusercontent.com/botearn/ARTI-CLI/master/install.sh | sh
-```
-
-#### Build from source
+#### Build from source（贡献者 / 需要 OpenBB 本地 fallback）
 
 ```bash
 git clone https://github.com/botearn/ARTI-CLI.git
 cd ARTI-CLI
 npm install && npm run build
-python3 -m venv .venv && .venv/bin/pip install openbb
+python3 -m venv .venv && .venv/bin/pip install openbb   # 可选：OpenBB 本地 fallback
 npm link
 ```
 
-安装完成后即可使用 `arti` 命令。无参数运行 `arti` 会进入交互式 REPL 终端。
+安装完成后即可使用 `arti` 命令。无参数运行 `arti` 会进入交互式 REPL 终端 —— 未登录时终端顶部会提示先 `login`。
+
+```bash
+arti login        # 浏览器登录（推荐）
+```
 
 ### 2. 首次体验
 

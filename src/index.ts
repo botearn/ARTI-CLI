@@ -33,6 +33,7 @@ import { shutdownBackendMcp } from "./data/mcp-client.js";
 import chalk from "chalk";
 import { setJsonMode } from "./output.js";
 import { checkForUpdate } from "./update-check.js";
+import { VERSION } from "./version.js";
 import { startRepl } from "./core/repl.js";
 import { buildCli, buildRepl, type CommandDef, type OptionDef } from "./core/registry.js";
 
@@ -41,7 +42,7 @@ const program = new Command();
 program
   .name("arti")
   .description("ARTI 智能投研 CLI — OpenBB 驱动的股票分析工具")
-  .version("0.2.0")
+  .version(VERSION)
   .option("--json", "以 JSON 格式输出（适合脚本和管道）")
   .option("--install-completion", "一键安装 Shell 自动补全脚本")
   .configureOutput({
@@ -492,7 +493,7 @@ configCmd.command("reset").description("重置为默认配置")
   .action(configResetCommand);
 
 // ── 版本更新检查（静默、不阻塞） ──
-checkForUpdate("0.2.0");
+checkForUpdate(VERSION);
 
 // ── 入口 ──
 async function main(): Promise<void> {
