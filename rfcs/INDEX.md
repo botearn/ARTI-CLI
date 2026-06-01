@@ -4,7 +4,9 @@
 
 ## 📝 Draft（草稿）
 
-*当前无草稿 RFC*
+| RFC | 标题 | 创建日期 |
+|---|---|---|
+| [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) | 新用户上手 — 一行安装 + REPL 登录态 Onboarding | 2026-06-01 |
 
 ---
 
@@ -74,7 +76,7 @@
 
 ### 📱 用户体验
 
-- *待添加*
+- [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) - 新用户上手（一行安装 + REPL onboarding）
 
 ### 🔐 安全 & 认证
 
@@ -86,6 +88,7 @@
 
 ### 2026
 
+- **2026-06-01** - [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) - 新用户上手 / 一行安装 + Onboarding (Draft)
 - **2026-05-19** - [RFC-2026-0001](2026/RFC-2026-0001-backend-mcp-integration.md) - Backend MCP 集成 (Implemented)
 
 ### 2025
@@ -98,13 +101,13 @@
 
 | 状态 | 数量 |
 |---|---|
-| Draft | 0 |
+| Draft | 1 |
 | Proposed | 0 |
 | Accepted | 0 |
 | Implementing | 0 |
 | Implemented | 1 |
 | Rejected | 0 |
 | Deprecated | 0 |
-| **总计** | **1** |
+| **总计** | **2** |
 
-**最后更新**: 2026-05-19
+**最后更新**: 2026-06-01
