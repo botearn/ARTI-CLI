@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { getDefaultSupabasePublishableKey, getDefaultSupabaseUrl, saveConfig, loadConfig } from "./config.js";
 import { getAuthState, saveSupabaseSession, type AuthState, type SupabaseAuthResponse } from "./auth.js";
 
-const DEFAULT_WEB_AUTH_URL = "https://www.artifin.ai/auth";
+const DEFAULT_WEB_AUTH_URL = "https://artifin.ai/cli/auth";
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 

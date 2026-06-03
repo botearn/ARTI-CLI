@@ -8,6 +8,7 @@ import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
+import * as clack from "@clack/prompts";
 import { trackCommand } from "./session.js";
 import { getAuthState, isLoggedIn } from "../auth.js";
 import { VERSION } from "../version.js";
@@ -22,6 +23,7 @@ interface ReplCommand {
   aliases: string[];
   description: string;
   usage: string;
+  category?: string;
   handler: (args: string[]) => Promise<void>;
 }
 
@@ -93,18 +95,90 @@ function printAuthHint(): void {
   }
 }
 
-/** 打印帮助 */
-function printHelp(): void {
-  console.log(chalk.cyan("\n  可用命令:\n"));
-  const maxName = Math.max(...commands.map(c => c.usage.length));
-  for (const cmd of commands) {
-    const aliases = cmd.aliases.length ? chalk.cyan(` [${cmd.aliases.join(", ")}]`) : "";
-    console.log(`    ${chalk.white(cmd.usage.padEnd(maxName + 2))} ${chalk.gray(cmd.description)}${aliases}`);
-  }
-  console.log(`    ${chalk.white("help".padEnd(maxName + 2))} ${chalk.gray("显示此帮助")} ${chalk.cyan("[?]")}`);
-  console.log(`    ${chalk.white("clear".padEnd(maxName + 2))} ${chalk.gray("清屏")} ${chalk.cyan("[cls]")}`);
-  console.log(`    ${chalk.white("exit".padEnd(maxName + 2))} ${chalk.gray("退出")} ${chalk.cyan("[quit]")}`);
+/** 命令分组定义 */
+const CATEGORIES: { key: string; label: string; icon: string }[] = [
+  { key: "research", label: "研报", icon: "📊" },
+  { key: "market", label: "行情", icon: "📈" },
+  { key: "data", label: "数据", icon: "🗂️" },
+  { key: "tools", label: "工具", icon: "🔧" },
+  { key: "account", label: "账户", icon: "👤" },
+];
+
+function getCategoryForCommand(name: string): string {
+  const map: Record<string, string> = {
+    "quick-scan": "research", full: "research", deep: "research",
+    research: "research", predict: "research", scan: "research",
+    quote: "market", market: "market", watch: "market", watchlist: "market",
+    history: "data", crypto: "data", fundamental: "data",
+    options: "data", economy: "data", news: "data", search: "data",
+    export: "tools", doctor: "tools", credits: "tools",
+    insights: "tools", completion: "tools",
+    login: "account", logout: "account", whoami: "account",
+  };
+  return map[name] || "tools";
+}
+
+/** 交互式帮助菜单 */
+async function printHelp(): Promise<void> {
+  const category = await clack.select({
+    message: "选择命令分类（↑↓ 移动，回车确认，Ctrl+C 取消）",
+    options: CATEGORIES.map(c => {
+      const group = commands.filter(cmd => getCategoryForCommand(cmd.name) === c.key);
+      const names = group.map(cmd => cmd.name).join(", ");
+      return { value: c.key, label: `${c.icon}  ${c.label}`, hint: names };
+    }),
+  });
+
+  if (clack.isCancel(category)) return;
+
+  const group = commands.filter(cmd => getCategoryForCommand(cmd.name) === category);
+
+  const selected = await clack.select({
+    message: "选择命令查看详情（回车执行，Ctrl+C 返回）",
+    options: group.map(cmd => {
+      const aliases = cmd.aliases.length ? ` (${cmd.aliases.join(", ")})` : "";
+      return { value: cmd.name, label: cmd.name + aliases, hint: cmd.description };
+    }),
+  });
+
+  if (clack.isCancel(selected)) return;
+
+  const cmd = group.find(c => c.name === selected)!;
   console.log();
+  console.log(chalk.bold(`  ${cmd.name}`) + (cmd.aliases.length ? chalk.gray(` — 别名: ${cmd.aliases.join(", ")}`) : ""));
+  console.log(chalk.gray(`  ${cmd.description}`));
+  console.log();
+  console.log(`  ${chalk.cyan("用法:")} ${cmd.usage}`);
+  console.log();
+
+  const action = await clack.select({
+    message: "下一步",
+    options: [
+      { value: "run", label: "立即运行", hint: "输入参数后执行" },
+      { value: "back", label: "返回帮助菜单" },
+      { value: "done", label: "关闭帮助" },
+    ],
+  });
+
+  if (clack.isCancel(action) || action === "done") return;
+  if (action === "back") {
+    await printHelp();
+    return;
+  }
+
+  const input = await clack.text({
+    message: `输入参数（如: ${cmd.usage.replace(cmd.name + " ", "").replace(/[<\[\]>]/g, "")}）`,
+    placeholder: "例如: AAPL",
+  });
+
+  if (clack.isCancel(input) || !input) return;
+
+  const args = String(input).trim().split(/\s+/);
+  try {
+    await cmd.handler(args);
+  } catch (err) {
+    console.error(chalk.red(`  执行失败: ${err instanceof Error ? err.message : String(err)}`));
+  }
 }
 
 /** 解析输入行为命令和参数 */
@@ -157,7 +231,7 @@ export async function startRepl(): Promise<void> {
       process.exit(0);
     }
     if (cmdName === "help" || cmdName === "?") {
-      printHelp();
+      await printHelp();
       rl.prompt();
       return;
     }
