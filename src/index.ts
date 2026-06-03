@@ -65,7 +65,7 @@ const int = (v: string | boolean | undefined, fallback = 0): number =>
 const defs: CommandDef[] = [
   {
     name: "quick-scan", aliases: ["quick", "qs"],
-    description: "主产品 Quick Scan（行情 + 技术面 + 新闻的快速研判）",
+    description: "快速研判",
     usage: "quick-scan <symbol>",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [],
@@ -78,7 +78,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "full", aliases: ["panorama", "fr"],
-    description: "主产品 Full 全景研报（多分析师 Layer 1）",
+    description: "全景研报",
     usage: "full <symbol> [--full]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [
@@ -96,7 +96,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "deep", aliases: ["dr"],
-    description: "主产品 Deep 深度研报（三层级辩论 + 圆桌裁定）",
+    description: "深度研报",
     usage: "deep <symbol> [--full]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [
@@ -113,7 +113,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "login", aliases: [],
-    description: "登录 ARTI 账户（默认打开官网登录，也兼容邮箱密码或 token）",
+    description: "登录",
     usage: "login | login --email <email> --password <password> | login --token <token> [--refresh-token <token>]",
     args: [],
     options: [
@@ -144,7 +144,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "logout", aliases: [],
-    description: "退出当前 ARTI 账户",
+    description: "登出",
     usage: "logout",
     args: [],
     options: [],
@@ -155,7 +155,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "whoami", aliases: [],
-    description: "查看当前登录状态",
+    description: "当前账户",
     usage: "whoami",
     args: [],
     options: [],
@@ -167,7 +167,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "quote", aliases: ["q"],
-    description: "查询实时行情（支持股票代码和中文名称搜索）",
+    description: "实时行情",
     usage: "quote <symbol...>",
     args: [{ spec: "<symbols...>", desc: "股票代码或名称，如 AAPL NVDA 0700.HK" }],
     options: [OPT_REFRESH],
@@ -182,7 +182,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "market", aliases: ["m"],
-    description: "全球市场概览（指数 / 涨跌榜 / 活跃榜）",
+    description: "市场概览",
     usage: "market [gainers|losers|active] [-l N]",
     args: [{ spec: "[sub]", desc: "子命令: gainers | losers | active" }],
     options: [{ ...OPT_LIMIT, defaultValue: "15" }],
@@ -200,7 +200,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "scan", aliases: ["s"],
-    description: "技术指标扫描（MA/RSI/MACD/布林带/ATR/ADX + 综合研判）",
+    description: "技术面扫描",
     usage: "scan <symbol>",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [OPT_REFRESH],
@@ -212,7 +212,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "history", aliases: ["hist"],
-    description: "查看股票历史价格（OHLCV 表格）",
+    description: "历史价格",
     usage: "history <symbol> [-d N]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [{ ...OPT_DAYS, defaultValue: "60" }, OPT_REFRESH],
@@ -227,7 +227,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "crypto", aliases: ["cr"],
-    description: "查看加密货币历史价格",
+    description: "加密货币",
     usage: "crypto <symbol> [-d N]",
     args: [{ spec: "<symbol>", desc: "加密货币代码，如 BTCUSD、ETHUSD" }],
     options: [{ ...OPT_DAYS, defaultValue: "30" }],
@@ -241,7 +241,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "fundamental", aliases: ["fund"],
-    description: "公司基本面数据（财报 / 估值 / 分红）",
+    description: "基本面",
     usage: "fundamental <symbol> [--fields income,metrics]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [{ short: "", long: "--fields", key: "fields", type: "string", desc: "数据类别: income,balance,metrics,dividends", hint: "<list>", defaultValue: "income,balance,metrics" }],
@@ -255,7 +255,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "options", aliases: ["opt"],
-    description: "查看股票期权链（行权价 / IV / 持仓量）",
+    description: "期权链",
     usage: "options <symbol> [-l N]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [{ ...OPT_LIMIT, defaultValue: "20" }],
@@ -269,7 +269,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "economy", aliases: ["eco"],
-    description: "宏观经济数据（国债利率 / FRED 数据系列）",
+    description: "宏观经济",
     usage: "economy treasury | macro [us|cn] | fred <id> | search <keyword> [-l N]",
     args: [
       { spec: "[sub]", desc: "子命令: treasury | fred <id> | search <keyword>" },
@@ -289,7 +289,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "search", aliases: ["find"],
-    description: "搜索股票代码（支持公司名称、代码模糊搜索）",
+    description: "搜索股票",
     usage: "search <keyword> [-l N]",
     args: [{ spec: "<query>", desc: "搜索关键词，如 Apple、腾讯、MSFT" }],
     options: [{ ...OPT_LIMIT, defaultValue: "10" }],
@@ -304,7 +304,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "predict", aliases: ["p"],
-    description: "综合预测分析（行情 + 技术面 + 新闻 → 多空研判）",
+    description: "综合预测",
     usage: "predict <symbol>",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [],
@@ -316,7 +316,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "news", aliases: ["n"],
-    description: "财经新闻（指定股票代码查公司新闻，不指定查全球新闻）",
+    description: "财经新闻",
     usage: "news [symbol] [-l N]",
     args: [{ spec: "[symbol]", desc: "股票代码（可选）" }],
     options: [{ ...OPT_LIMIT, defaultValue: "15" }],
@@ -331,7 +331,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "research", aliases: ["r"],
-    description: "底层研报命令（兼容入口，建议优先使用 full / deep）",
+    description: "研报（兼容入口）",
     usage: "research <symbol> [--agent <type>] [--mode panorama|deep]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [
@@ -354,7 +354,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "watchlist", aliases: ["wl"],
-    description: "自选股管理（查看行情 / 添加 / 移除）",
+    description: "自选股",
     usage: "watchlist [add|remove|list] [symbols...]",
     args: [
       { spec: "[sub]", desc: "子命令: add | remove | list" },
@@ -371,7 +371,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "watch", aliases: ["w"],
-    description: "实时行情 Dashboard（轮询刷新）",
+    description: "实时监控",
     usage: "watch <symbol...> [-i N]",
     args: [{ spec: "<symbols...>", desc: "股票代码，如 AAPL NVDA TSLA" }],
     options: [{ short: "-i", long: "--interval", key: "interval", type: "string", desc: "刷新间隔（秒）", hint: "<seconds>", defaultValue: "15" }],
@@ -385,7 +385,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "export", aliases: ["exp"],
-    description: "导出股票历史数据到文件（CSV / JSON）",
+    description: "导出数据",
     usage: "export <symbol> [-f csv|json] [-d N]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [
@@ -407,7 +407,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "insights", aliases: ["i"],
-    description: "生成个人投研洞察报告（HTML 可分享）",
+    description: "投研洞察",
     usage: "insights",
     args: [],
     options: [],
@@ -416,7 +416,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "doctor", aliases: ["diag"],
-    description: "诊断 ARTI 本地/后端连接状态",
+    description: "连接诊断",
     usage: "doctor mcp [--symbol AAPL] [--local|--prod|--url <url>] [--refresh]",
     args: [{ spec: "[target]", desc: "诊断对象，目前支持 mcp" }],
     options: [
@@ -444,7 +444,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "credits", aliases: ["cred"],
-    description: "查看 Credit 余额与套餐详情",
+    description: "余额套餐",
     usage: "credits",
     args: [],
     options: [{ short: "", long: "--set-plan", key: "setPlan", type: "string", desc: "兼容旧参数，现已废弃", hint: "<plan>" }],
@@ -456,7 +456,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "completion", aliases: [],
-    description: "生成 Shell 自动补全脚本",
+    description: "Shell 补全",
     usage: "completion [bash|zsh]",
     args: [{ spec: "[shell]", desc: "Shell 类型: bash | zsh" }],
     options: [],

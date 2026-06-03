@@ -8,7 +8,6 @@ import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
-import * as clack from "@clack/prompts";
 import { trackCommand } from "./session.js";
 import { getAuthState, isLoggedIn } from "../auth.js";
 import { VERSION } from "../version.js";
@@ -95,14 +94,11 @@ function printAuthHint(): void {
   }
 }
 
-/** 命令分组定义 */
-const CATEGORIES: { key: string; label: string; icon: string }[] = [
-  { key: "research", label: "研报", icon: "📊" },
-  { key: "market", label: "行情", icon: "📈" },
-  { key: "data", label: "数据", icon: "🗂️" },
-  { key: "tools", label: "工具", icon: "🔧" },
-  { key: "account", label: "账户", icon: "👤" },
-];
+/** 命令分组 */
+const CATEGORY_ORDER = ["research", "market", "data", "tools", "account"] as const;
+const CATEGORY_LABELS: Record<string, string> = {
+  research: "研报", market: "行情", data: "数据", tools: "工具", account: "账户",
+};
 
 function getCategoryForCommand(name: string): string {
   const map: Record<string, string> = {
@@ -118,67 +114,136 @@ function getCategoryForCommand(name: string): string {
   return map[name] || "tools";
 }
 
-/** 交互式帮助菜单 */
+/** 内置选择器 — 不依赖外部库，不抢占 stdin */
+interface SelectItem { name: string; label: string; hint: string; isSep?: boolean }
+
+function buildHelpItems(): SelectItem[] {
+  const items: SelectItem[] = [];
+  for (const cat of CATEGORY_ORDER) {
+    const group = commands.filter(cmd => getCategoryForCommand(cmd.name) === cat);
+    if (!group.length) continue;
+    items.push({ name: "", label: `── ${CATEGORY_LABELS[cat]} ──`, hint: "", isSep: true });
+    for (const cmd of group) {
+      const aliases = cmd.aliases.length ? `  ${cmd.aliases.join(", ")}` : "";
+      items.push({ name: cmd.name, label: cmd.name + aliases, hint: cmd.description });
+    }
+  }
+  return items;
+}
+
+function renderSelect(items: SelectItem[], cursor: number, maxVisible: number): string {
+  const selectableIndices = items.map((it, i) => it.isSep ? -1 : i).filter(i => i >= 0);
+  const cursorSelectIdx = selectableIndices.indexOf(cursor);
+  const total = selectableIndices.length;
+
+  let startIdx = 0;
+  if (total > maxVisible) {
+    startIdx = Math.max(0, Math.min(cursorSelectIdx - Math.floor(maxVisible / 2), total - maxVisible));
+  }
+  const visibleSelectables = selectableIndices.slice(startIdx, startIdx + maxVisible);
+
+  const lines: string[] = [];
+  lines.push(chalk.dim("  ↑↓ 浏览  回车选中  Esc 取消\n"));
+
+  let lastCat = "";
+  for (const idx of visibleSelectables) {
+    const item = items[idx];
+    const catIdx = items.slice(0, idx).findLastIndex(i => i.isSep);
+    const catLabel = catIdx >= 0 ? items[catIdx].label : "";
+    if (catLabel && catLabel !== lastCat) {
+      lines.push(chalk.dim(`  ${catLabel}`));
+      lastCat = catLabel;
+    }
+
+    if (idx === cursor) {
+      lines.push(`  ${chalk.cyan(">")} ${chalk.bold(item.label)}  ${chalk.dim(item.hint)}`);
+    } else {
+      lines.push(`    ${chalk.dim(item.label)}  ${chalk.dim(item.hint)}`);
+    }
+  }
+
+  if (total > maxVisible) {
+    const pos = cursorSelectIdx + 1;
+    lines.push(chalk.dim(`\n  ${pos}/${total}`));
+  }
+
+  return lines.join("\n");
+}
+
+function interactiveSelect(items: SelectItem[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    const selectableIndices = items.map((it, i) => it.isSep ? -1 : i).filter(i => i >= 0);
+    if (!selectableIndices.length) { resolve(null); return; }
+
+    let cursor = selectableIndices[0];
+    const maxVisible = Math.min(selectableIndices.length, (process.stdout.rows || 24) - 6);
+    let rendered = "";
+
+    const clear = () => {
+      if (rendered) {
+        const lineCount = rendered.split("\n").length;
+        process.stdout.write(`\x1b[${lineCount}A\x1b[J`);
+      }
+    };
+
+    const draw = () => {
+      clear();
+      rendered = renderSelect(items, cursor, maxVisible);
+      process.stdout.write(rendered + "\n");
+    };
+
+    const cleanup = () => {
+      clear();
+      process.stdin.removeListener("keypress", onKey);
+      if (wasRaw !== undefined) process.stdin.setRawMode(wasRaw);
+    };
+
+    const wasRaw = process.stdin.isRaw;
+    process.stdin.setRawMode(true);
+    readline.emitKeypressEvents(process.stdin);
+
+    const onKey = (_: string, key: readline.Key) => {
+      if (!key) return;
+      if (key.name === "escape" || (key.ctrl && key.name === "c")) {
+        cleanup();
+        resolve(null);
+        return;
+      }
+      if (key.name === "return") {
+        cleanup();
+        resolve(items[cursor].name);
+        return;
+      }
+      if (key.name === "up" || (key.ctrl && key.name === "p")) {
+        const idx = selectableIndices.indexOf(cursor);
+        if (idx > 0) cursor = selectableIndices[idx - 1];
+        draw();
+      }
+      if (key.name === "down" || (key.ctrl && key.name === "n")) {
+        const idx = selectableIndices.indexOf(cursor);
+        if (idx < selectableIndices.length - 1) cursor = selectableIndices[idx + 1];
+        draw();
+      }
+    };
+
+    process.stdin.on("keypress", onKey);
+    draw();
+  });
+}
+
+/** 交互式帮助 — ↑↓ 浏览所有命令，回车查看用法 */
 async function printHelp(): Promise<void> {
-  const category = await clack.select({
-    message: "选择命令分类（↑↓ 移动，回车确认，Ctrl+C 取消）",
-    options: CATEGORIES.map(c => {
-      const group = commands.filter(cmd => getCategoryForCommand(cmd.name) === c.key);
-      const names = group.map(cmd => cmd.name).join(", ");
-      return { value: c.key, label: `${c.icon}  ${c.label}`, hint: names };
-    }),
-  });
+  const items = buildHelpItems();
+  const selected = await interactiveSelect(items);
+  if (!selected) return;
 
-  if (clack.isCancel(category)) return;
+  const cmd = commands.find(c => c.name === selected);
+  if (!cmd) return;
 
-  const group = commands.filter(cmd => getCategoryForCommand(cmd.name) === category);
-
-  const selected = await clack.select({
-    message: "选择命令查看详情（回车执行，Ctrl+C 返回）",
-    options: group.map(cmd => {
-      const aliases = cmd.aliases.length ? ` (${cmd.aliases.join(", ")})` : "";
-      return { value: cmd.name, label: cmd.name + aliases, hint: cmd.description };
-    }),
-  });
-
-  if (clack.isCancel(selected)) return;
-
-  const cmd = group.find(c => c.name === selected)!;
+  console.log(`  ${chalk.bold(cmd.name)}${cmd.aliases.length ? chalk.dim(`  (${cmd.aliases.join(", ")})`) : ""}`);
+  console.log(chalk.dim(`  ${cmd.description}`));
+  console.log(`  ${chalk.dim("用法")}  ${cmd.usage}`);
   console.log();
-  console.log(chalk.bold(`  ${cmd.name}`) + (cmd.aliases.length ? chalk.gray(` — 别名: ${cmd.aliases.join(", ")}`) : ""));
-  console.log(chalk.gray(`  ${cmd.description}`));
-  console.log();
-  console.log(`  ${chalk.cyan("用法:")} ${cmd.usage}`);
-  console.log();
-
-  const action = await clack.select({
-    message: "下一步",
-    options: [
-      { value: "run", label: "立即运行", hint: "输入参数后执行" },
-      { value: "back", label: "返回帮助菜单" },
-      { value: "done", label: "关闭帮助" },
-    ],
-  });
-
-  if (clack.isCancel(action) || action === "done") return;
-  if (action === "back") {
-    await printHelp();
-    return;
-  }
-
-  const input = await clack.text({
-    message: `输入参数（如: ${cmd.usage.replace(cmd.name + " ", "").replace(/[<\[\]>]/g, "")}）`,
-    placeholder: "例如: AAPL",
-  });
-
-  if (clack.isCancel(input) || !input) return;
-
-  const args = String(input).trim().split(/\s+/);
-  try {
-    await cmd.handler(args);
-  } catch (err) {
-    console.error(chalk.red(`  执行失败: ${err instanceof Error ? err.message : String(err)}`));
-  }
 }
 
 /** 解析输入行为命令和参数 */
@@ -230,7 +295,7 @@ export async function startRepl(): Promise<void> {
       rl.close();
       process.exit(0);
     }
-    if (cmdName === "help" || cmdName === "?") {
+    if (cmdName === "help" || cmdName === "?" || cmdName === "/") {
       await printHelp();
       rl.prompt();
       return;
