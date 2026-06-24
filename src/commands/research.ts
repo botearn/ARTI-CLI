@@ -486,11 +486,15 @@ function renderMasterOpinion(master: string, opinion: MasterOpinion): void {
         : chalk.bgGray.white(` ${opinion.stance} `);
 
   console.log(`  ${chalk.bold.blue(`【${label}】`)} ${stanceBadge}`);
-  // 截取核心段落（避免终端刷屏）
-  const lines = opinion.content.split("\n").filter(l => l.trim());
-  const preview = lines.slice(0, 8).join("\n  ");
-  console.log(`  ${preview}`);
-  if (lines.length > 8) console.log(chalk.gray(`  ... (共 ${lines.length} 行)`));
+  // 截取核心段落（避免终端刷屏）；个别大师可能无 content，做空值保护
+  const lines = (opinion.content ?? "").split("\n").filter(l => l.trim());
+  if (lines.length) {
+    const preview = lines.slice(0, 8).join("\n  ");
+    console.log(`  ${preview}`);
+    if (lines.length > 8) console.log(chalk.gray(`  ... (共 ${lines.length} 行)`));
+  } else {
+    console.log(chalk.gray("  （该大师本轮无观点内容）"));
+  }
   console.log();
 }
 
