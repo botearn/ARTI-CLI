@@ -7,6 +7,7 @@
 | RFC | 标题 | 创建日期 |
 |---|---|---|
 | [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) | 新用户上手 — 一行安装 + REPL 登录态 Onboarding | 2026-06-01 |
+| [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) | CLI 数据链收敛到生产产品函数，下线 OpenBB 第二套处理 | 2026-06-24 |
 
 ---
 
