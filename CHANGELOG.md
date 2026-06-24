@@ -5,6 +5,31 @@ All notable changes to ARTI CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-24
+
+### 🔄 重大重构（RFC-2026-0003）
+
+**CLI 收敛为生产瘦客户端，下线 OpenBB 与 MCP Server**
+
+CLI 不再维护本地数据处理逻辑，所有能力直接调用与 web 产品同一套生产函数，数据口径与计费完全一致，新用户零 Python 依赖。
+
+### ✅ Added
+
+- **chat**：AI 投研对话（调产品 `chat` 函数，SSE 流式）
+- **REPL 意图识别**：交互终端自由文本经产品 `classify-intent` 自动派发到快速扫描 / 全景 / 深度 / 聊天
+
+### 🔧 Changed
+
+- **quick-scan** 改接产品 `scan-stock` 函数，渲染产品口径数据（综合研判 / 均线 / 技术指标 / 基本面），三市场与 web 一致
+- **full / deep** 的研报上下文（`research-context`）改用 `scan-stock` 取数，脱离 OpenBB
+- v1 命令面收敛为 **chat / quick-scan / full / deep** + 辅助命令
+
+### 🗑️ Removed
+
+- **OpenBB 本地链**：`openbb.ts`、Python 桥接脚本（`scripts/openbb_*.py`）、孤儿 `data/` 模块
+- **MCP Server**：`mcp-server.ts`、`.mcp.json`、`arti-mcp` bin、相关 build 入口
+- **裸数据命令**（暂时移除，后续版本评估）：`quote`、`scan`、`predict`、`search`、`history`、`fundamental`、`economy`、`market`、`news`、`crypto`、`options`、`watch`、`watchlist`、`export`、`insights`
+
 ## [0.3.0] - 2026-05-15
 
 ### 🔄 重大重构

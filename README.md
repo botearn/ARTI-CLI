@@ -1,754 +1,156 @@
-# ARTI CLI 
+# ARTI CLI
 
 <div align="center">
 
-**🚀 智能投研命令行工具 — OpenBB 驱动的股票分析终端 + MCP Server**
+**🚀 智能投研命令行工具 — 聊天 / 快速扫描 / 全景研报 / 深度研报**
 
-[![Version](https://img.shields.io/badge/version-0.2.0--beta-orange)](https://github.com/botearn/ARTI-CLI)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
-[![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](https://www.python.org/)
 
 </div>
 
 ---
 
-> ⚠️ **当前版本为 Public Beta，正在积极开发中。**  
-> 基础功能（行情、技术面、预测）已稳定可用。  
-> 高级研报功能（`full`/`deep`）需额外配置后端服务。
+ARTI CLI 是 ARTI 投研产品的命令行客户端。它是生产后端的**瘦客户端**——所有能力直接调用与 web 产品**同一套生产函数**，数据口径、计费完全一致，无需本地 Python 或额外数据源。
 
 ```
-$ arti market
+$ arti
+  智能投研终端 > 茅台现在怎么样？
 
-  全球市场概览
-──────────────────────────────────────────────────
-
-  美股
-    标普500            6,816.89        -7.77 -0.11%
-    道琼斯             47,916.57      -269.23 -0.56%
-    纳斯达克            22,902.89       +80.47 +0.35%
-
-  亚太
-    恒生指数            25,660.85      -232.69 -0.90%
-    上证指数             3,988.56        +2.33 +0.06%
-    日经225           56,502.77      -421.34 -0.74%
+  贵州茅台 快速扫描 · 600519.SS …
 ```
 
-## Public Beta
+## 能力（v1）
 
-当前仓库适合以公开 beta / preview 的方式发布。
+| 能力 | 命令 | 说明 |
+|---|---|---|
+| 聊天 | `arti chat <问题>` | AI 投研对话（流式） |
+| 快速扫描 | `arti quick-scan <代码>` | 行情 + 技术面 + 基本面快速研判 |
+| 全景研报 | `arti full <代码>` | 多分析师 Layer 1 全景报告 |
+| 深度研报 | `arti deep <代码>` | 三层级深度研报（分析师 + 大师辩论 + 综合裁定） |
 
-- 开箱即可用：`quote`、`market`、`history`、`scan`、`predict`、`news`、`search`、`watchlist`、`watch`、`fundamental`、`options`、`economy`、`crypto`
-- 主产品主路径已对齐到三档：`quick-scan`、`full`、`deep`
-- 公开安装默认不需要 `arti-data`、Supabase、数据库或额外 API key（`economy fred/search` 除外）
-- `research` 不是纯本地能力，默认公开安装不保证可用，需要单独接入后端 orchestrator
-- `arti-data hybrid` 是高级 / 内部增强链路，主要用于 A 股技术面数据增强，不是首次体验必需项
+支持美股、港股、A 股。无参运行 `arti` 进入交互终端，**直接打字即可**——内置意图识别会自动判断该聊天还是出报告。
 
 ## Quick Start
 
 ### 1. 安装
 
-只需要 Node.js >= 18。生产数据源为 Backend MCP，无需本地 Python。
-
-#### 一行安装（推荐）
+只需 Node.js >= 18，无需 Python。
 
 ```bash
+# 一行安装（推荐）
 curl -fsSL https://artifin.ai/cli/install.sh | bash
-```
 
-脚本会检测 Node 环境并通过 npm 全局安装 `arti-cli`，几秒完成。
-
-#### npm
-
-```bash
+# 或 npm
 npm install -g arti-cli
-```
 
-#### Homebrew (macOS / Linux)
-
-```bash
+# 或 Homebrew
 brew tap botearn/arti https://github.com/botearn/homebrew-arti
 brew install arti
 ```
 
-#### Build from source（贡献者 / 需要 OpenBB 本地 fallback）
+从源码构建（贡献者）：
 
 ```bash
 git clone https://github.com/botearn/ARTI-CLI.git
 cd ARTI-CLI
 npm install && npm run build
-python3 -m venv .venv && .venv/bin/pip install openbb   # 可选：OpenBB 本地 fallback
 npm link
 ```
 
-安装完成后即可使用 `arti` 命令。无参数运行 `arti` 会进入交互式 REPL 终端 —— 未登录时终端顶部会提示先 `login`。
+### 2. 登录
 
 ```bash
 arti login        # 浏览器登录（推荐）
-```
-
-### 2. 首次体验
-
-#### 🎯 推荐体验路径（3 步快速上手）
-
-```bash
-# 步骤 1：查看实时行情
-$ arti quote AAPL
-  苹果公司 (AAPL)                               2025-01-15 16:00:00
-  ────────────────────────────────────────────────────────────────
-  当前价格     $234.56     ▲ $2.34 (1.01%)
-  开盘         $232.22     52周最高    $250.00
-  最高         $235.00     52周最低    $180.00
-  最低         $231.80     50日均线    $230.45
-  成交量       45.2M       近期走势    ▁▂▃▅▆█▇▆
-
-# 步骤 2：技术面扫描
-$ arti scan AAPL
-  [显示 MA/RSI/MACD/布林带等 8 项技术指标]
-
-# 步骤 3：综合研判
-$ arti quick-scan AAPL
-  [整合行情 + 技术面 + 新闻，生成多空判断]
-```
-
-#### 🚀 高级能力体验（需配置后端）
-
-```bash
-arti full NVDA      # 多分析师全景报告
-arti deep TSLA      # 三层级深度研报
-```
-
-#### 💡 更多基础功能
-
-```bash
-arti market                 # 全球市场概览
-arti market gainers         # 今日涨幅榜
-arti history AAPL -d 30     # 30 天历史数据
-arti predict NVDA           # AI 综合预测
-arti news AAPL              # 公司新闻
-arti watchlist add AAPL     # 加入自选股
-```
-
-## 主产品三档
-
-| 命令 | 对应主产品能力 | 说明 |
-|---|---|---|
-| `arti quick-scan AAPL` | Quick Scan | 快速研判，整合行情、技术面、新闻 |
-| `arti full AAPL` | Full 全景研报 | 多分析师 Layer 1 全景报告 |
-| `arti deep AAPL` | Deep 深度研报 | 三层级研报，含大师辩论和综合裁定 |
-
-### 3. 可选环境变量
-
-复制 [.env.example](/Users/nicolechen/ARTI-CLI/.env.example) 按需配置。对公开用户来说，通常只需要关心：
-
-```bash
-export ARTI_API_URL=https://your-research-backend
-export ARTI_TIMEOUT=30000
-```
-
-如果你不打算启用 `arti research` 或内部 hybrid 数据源，这一步可以跳过。
-
-### 4. 登录
-
-CLI 现已支持可续期登录态。默认方式是直接打开官网登录，登录完成后自动回到终端：
-
-```bash
-arti login
-arti whoami
+arti whoami       # 查看登录状态
 arti logout
 ```
 
-如果你在脚本环境里不方便弹浏览器，也兼容邮箱密码登录：
+脚本环境也支持邮箱密码或直接传 token：
 
 ```bash
 arti login --email you@example.com --password '***'
-```
-
-如你已有现成会话，也可直接传入 access token + refresh token：
-
-```bash
 arti login --token <access-token> --refresh-token <refresh-token>
 ```
 
-登录后，CLI 会在调用后端 Edge Functions / orchestrator / Credits 接口前自动检查 token，并在需要时自动续期。
+登录态会自动续期。
 
-> 迁移说明：旧版本只保存 access token。升级到当前版本后，老用户通常需要重新登录一次，才能启用自动续期和服务端 Credits。
+### 3. 上手
 
-## 功能一览
+```bash
+# 交互终端（推荐）：直接打字，意图自动识别
+$ arti
+  智能投研终端 > 帮我深度分析英伟达
+  智能投研终端 > 今天大盘怎么样
 
-| 命令 | 说明 | 公开可用性 | 计费 / 限制 |
-|---|---|---|---|
-| `arti quote AAPL NVDA` | 实时行情（支持多股、港股、中文名搜索） | 公开可用 | 服务端实时定价 |
-| `arti market` | 全球指数概览（美股 / 亚太 / 欧洲） | 公开可用 | 服务端实时定价 |
-| `arti market gainers` | 今日涨幅榜 | 公开可用 | 服务端实时定价 |
-| `arti market losers` | 今日跌幅榜 | 公开可用 | 服务端实时定价 |
-| `arti market active` | 今日活跃榜 | 公开可用 | 服务端实时定价 |
-| `arti quick-scan AAPL` | 主产品 Quick Scan（行情 + 技术面 + 新闻） | 公开可用 | 服务端实时定价 |
-| `arti full AAPL` | 主产品 Full 全景研报（Layer 1） | 高级功能，需单独后端 | 服务端实时定价 |
-| `arti deep AAPL` | 主产品 Deep 深度研报（三层级） | 高级功能，需单独后端 | 服务端实时定价 |
-| `arti scan AAPL` | 技术指标扫描（MA / RSI / MACD / 布林带 / ATR / ADX / KDJ / OBV） | 公开可用 | 服务端实时定价 |
-| `arti predict AAPL` | 综合预测（行情 + 技术面 + 新闻 → 多空研判） | 公开可用 | 服务端实时定价 |
-| `arti history AAPL -d 30` | 历史价格（OHLCV 表格） | 公开可用 | 服务端实时定价 |
-| `arti crypto BTCUSD` | 加密货币历史价格 | 公开可用 | 当前未接入 Credit 扣费 |
-| `arti fundamental AAPL` | 基本面数据（财报 / 估值 / 分红） | 公开可用 | 当前未接入 Credit 扣费 |
-| `arti options AAPL` | 期权链（行权价 / IV / 持仓量） | 公开可用 | 当前未接入 Credit 扣费 |
-| `arti economy treasury` | 宏观经济（国债利率 / FRED 数据） | 公开可用 | 当前未接入 Credit 扣费 |
-| `arti search 苹果` | 搜索股票代码（模糊匹配） | 公开可用 | 服务端实时定价 |
-| `arti news AAPL` | 公司新闻 | 公开可用 | 服务端实时定价 |
-| `arti news` | 全球财经新闻 | 公开可用 | 服务端实时定价 |
-| `arti research AAPL` | AI 三层级研报（8 位分析师 → 大师辩论 → 综合裁定） | 高级功能，需单独后端 | 服务端实时定价 |
-| `arti watchlist` | 查看自选股行情 | 公开可用 | 查看行情时按服务端定价 |
-| `arti watchlist add AAPL` | 添加 / 移除自选股 | 公开可用 | 受套餐自选上限限制 |
-| `arti watch AAPL NVDA` | 实时行情 Dashboard（自动轮询，Ctrl+C 退出） | 公开可用 | 启动时按服务端定价 |
-| `arti export AAPL -f csv` | 导出历史数据到 CSV / JSON 文件 | 公开可用 | 当前未接入 Credit 扣费 |
-| `arti insights` | 个人投研洞察报告（HTML 可分享） | 公开可用 | 当前未接入 Credit 扣费 |
-| `arti credits` | 查看余额、套餐与权益 | 公开可用 | 不扣费 |
-| `arti completion zsh` | 生成 Shell 自动补全脚本 | 公开可用 | 不扣费 |
-| `arti config list` | 查看 / 修改配置 | 公开可用 | 不扣费 |
-
-所有命令支持 `--json` 输出结构化 JSON，适合脚本和管道。
-
-## Credit 计费
-
-- Credits 现已以服务端为准，不再使用本地 `billing.json` 作为真源
-- `arti credits` 会展示真实套餐、周包剩余、永久余额、5h 窗口与动作定价
-- 定价、套餐和限额以生产环境 `credit_pricing / usage_tiers / subscribers / user_credits` 为准
-- 自选股上限仍按套餐限制：`1 / 5 / 20 / 无限`
-- `arti credits --set-plan ...` 已废弃，仅保留兼容提示
-- 临时联调可用 `ARTI_BILLING_BYPASS=true arti full AAPL --full` 跳过余额校验与扣费
-- 下载体验、升级提示与真实付费边界见 [BILLING_FLOW.md](/Users/nicolechen/ARTI-CLI/BILLING_FLOW.md)
+# 或用显式命令
+arti quick-scan AAPL
+arti full NVDA
+arti deep TSLA
+arti chat 美股今天怎么样
+```
 
 ## 两种使用模式
 
+### REPL 交互模式（chat-first）
+
+无参运行 `arti` 进入终端。输入分两类：
+
+- **命令**：`quick-scan AAPL`、`full NVDA`、`help`、`exit` 等
+- **自由文本**：任意问题 → 复用产品意图识别（`classify-intent`）→ 自动派发到快速扫描 / 全景 / 深度 / 聊天；缺股票代码时会回问
+
 ### CLI 模式
 
-直接传入命令参数，适合脚本和管道：
-
-```bash
-arti quote AAPL
-arti --json market gainers | jq '.[0:3]'
-```
-
-### REPL 交互模式
-
-无参数运行 `arti` 进入金融终端，支持命令补全、历史记录、连续查询：
-
-```
-$ arti
-
-   █████╗ ██████╗ ████████╗██╗
-  ██╔══██╗██╔══██╗╚══██╔══╝██║
-  ███████║██████╔╝   ██║   ██║
-  ██╔══██║██╔══██╗   ██║   ██║
-  ██║  ██║██║  ██║   ██║   ██║
-  ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝
-  智能投研终端 v0.2.0 — 输入 help 查看命令
-
-arti> q AAPL          # 快捷别名
-arti> m gainers -l 5  # 涨幅榜前 5
-arti> s NVDA          # 技术扫描
-arti> help            # 查看所有命令
-```
-
-REPL 命令别名：
-
-| 别名 | 命令 | 别名 | 命令 |
-|---|---|---|---|
-| `q` | quote | `n` | news |
-| `m` | market | `r` | research |
-| `s` | scan | `wl` | watchlist |
-| `p` | predict | `w` | watch |
-| `i` | insights | `exp` | export |
-| `hist` | history | `fund` | fundamental |
-| `cr` | crypto | `opt` | options |
-| `eco` | economy | `find` | search |
-
-## MCP Server
-
-ARTI 同时提供 MCP Server，供 Claude Code、Claude Desktop 等 AI 助手直接调用金融数据。
-
-### 启动
-
-```bash
-# 开发模式
-npm run dev:mcp
-
-# 生产模式
-node dist/mcp-server.js
-```
-
-### 配置 Claude Code
-
-在 `~/.claude/settings.json` 或项目 `.mcp.json` 中添加：
-
-```json
-{
-  "mcpServers": {
-    "arti": {
-      "command": "node",
-      "args": ["/path/to/ARTI-CLI/dist/mcp-server.js"]
-    }
-  }
-}
-```
-
-### 可用工具
-
-| 工具 | 功能 | 参数 |
-|---|---|---|
-| `arti_quote` | 股票实时报价 | `symbol` |
-| `arti_historical` | 股票历史价格 | `symbol`, `days?` |
-| `arti_crypto` | 加密货币历史价格 | `symbol`, `days?` |
-| `arti_market` | 全球市场概览（主要指数） | 无 |
-| `arti_gainers` | 今日涨幅榜 | `limit?` |
-| `arti_losers` | 今日跌幅榜 | `limit?` |
-| `arti_active` | 今日活跃榜 | `limit?` |
-| `arti_technical` | 技术指标全面扫描 | `symbol` |
-| `arti_search` | 搜索股票代码 | `query`, `limit?` |
-| `arti_news` | 财经新闻 | `symbol?`, `limit?` |
-| `arti_fundamental` | 基本面数据 | `symbol`, `fields?` |
-| `arti_options` | 期权链 | `symbol`, `limit?` |
-| `arti_economy` | 宏观经济数据 | `indicator`, `series_id?`, `query?`, `limit?` |
-
-## 命令详解
-
-### quote — 实时行情
-
-```bash
-arti quote AAPL              # 单只股票
-arti quote AAPL NVDA TSLA    # 多只股票
-arti quote 0700.HK           # 港股
-arti quote 腾讯              # 中文名搜索（自动解析为股票代码）
-```
-
-输出包含：当前价格、涨跌额/涨跌幅、成交量、52 周范围、50 日均线、近期走势 sparkline。
-
-计费：每次调用扣 `1 Credit`。
-
-### scan — 技术扫描
-
-```bash
-arti scan AAPL
-arti scan NVDA --json        # JSON 输出，适合脚本
-```
-
-计算并展示：
-- **均线系统** — MA5 / 10 / 20 / 60 / 120 / 200，多空排列判断
-- **RSI(14)** — 超买（>70）/ 超卖（<30）信号
-- **MACD(12,26,9)** — DIF / DEA / 柱状，金叉死叉判断
-- **布林带(20,2)** — 上轨 / 中轨 / 下轨，突破信号
-- **ATR(14)** — 波动率水平
-- **ADX(14)** — 趋势强度（>25 为强趋势）
-- **Stochastic(14,3,3)** — KDJ 超买超卖
-- **OBV** — 能量潮，量价配合判断
-- **综合信号** — 偏多 / 偏空 / 中性研判
-
-计费：每次调用扣 `5 Credits`。
-
-### predict — 综合预测
-
-```bash
-arti predict AAPL
-arti predict TSLA --json
-```
-
-整合行情报价 + 全部技术指标 + 公司新闻，生成：
-- 方向判断（看多 / 看空 / 中性）+ 置信度
-- 支撑位 / 压力位
-- 多空信号分解
-- 分析依据
-
-计费：每次调用扣 `5 Credits`。
-
-### market — 市场概览
-
-```bash
-arti market               # 全球 10 大指数
-arti market gainers       # 涨幅榜 Top 15
-arti market losers        # 跌幅榜 Top 15
-arti market active        # 活跃榜 Top 15
-arti market gainers -l 5  # 只看前 5 名
-```
-
-计费：每次调用扣 `1 Credit`，包含 `gainers / losers / active` 子命令。
-
-### history — 历史价格
-
-```bash
-arti history AAPL            # 默认 60 天 OHLCV 表格
-arti history NVDA -d 30      # 最近 30 天
-```
-
-计费：每次调用扣 `1 Credit`。
-
-### crypto — 加密货币
-
-```bash
-arti crypto BTCUSD           # 比特币 30 天
-arti crypto ETHUSD -d 7      # 以太坊 7 天
-```
-
-### fundamental — 基本面
-
-```bash
-arti fundamental AAPL                          # 利润表 + 资产负债 + 估值
-arti fundamental NVDA --fields metrics         # 仅估值指标
-arti fundamental TSLA --fields income,dividends
-```
-
-支持的 fields：`income`（利润表）、`balance`（资产负债表）、`metrics`（估值指标）、`dividends`（分红历史）。
-
-### options — 期权链
-
-```bash
-arti options AAPL              # 默认 20 条
-arti options NVDA -l 10        # 前 10 条
-```
-
-### economy — 宏观经济
-
-```bash
-arti economy treasury          # 美国国债收益率曲线
-arti economy fred GDP          # FRED 数据系列（需 API Key）
-arti economy fred UNRATE       # 失业率
-arti economy search CPI        # 搜索 FRED 数据系列
-```
-
-### search — 搜索股票
-
-```bash
-arti search apple              # 搜索 Apple 相关股票
-arti search 腾讯               # 中文搜索
-arti search bank -l 20         # 返回 20 条
-```
-
-计费：每次调用扣 `1 Credit`。
-
-### news — 财经新闻
-
-```bash
-arti news                # 全球财经新闻
-arti news AAPL           # 公司新闻
-arti news AAPL -l 5      # 只看 5 条
-```
-
-计费：每次调用扣 `1 Credit`。
-
-### research — AI 三层级研报
-
-如果你只是按主产品能力使用，优先使用：
-
-```bash
-arti full AAPL
-arti deep AAPL
-```
-
-`research` 更适合作为底层兼容入口或调试入口。
-
-```bash
-arti research AAPL                     # 完整三层级研报
-arti research NVDA -a tony             # 仅 Tony（技术面）快速分析
-arti research TSLA -m panorama         # 仅 Layer 1，跳过大师辩论
-arti research AAPL -m deep -f          # 深度研报 + 完整输出
-```
-
-三层结构：
-- **Layer 1** — 8 位分析师并行分析：Natasha（情报宏观）、Steve（板块轮动）、Tony（技术面）、Thor（风控）、Clint（基本面）、Sam（收益分析）、Vision（量化验证）、Wanda（组合策略）
-- **Layer 2** — 投资大师圆桌辩论（动态路由）：巴菲特、林奇、马克斯、索罗斯、达里奥、德鲁肯米勒、段永平
-- **Layer 3** — 综合裁定（多空联盟 + 分歧点 + 失败信号）
-
-公开 beta 说明：
-
-- `research` 默认不是纯本地能力，公开安装不保证直接可用
-- 需要可访问的后端 `api.baseUrl`，当前默认协议是 Supabase Edge Function / orchestrator SSE
-- 如果没有单独部署 research 后端，建议先使用 `quote`、`scan`、`predict`、`history` 作为公开体验主路径
-
-计费：
-- `arti deep AAPL`、`arti research AAPL` 或 `arti research -m deep` 默认扣 `100 Credits`
-- `arti full AAPL`、`arti research NVDA -a tony` 或 `arti research -m panorama` 扣 `30 Credits`
-
-### watchlist — 自选股管理
-
-```bash
-arti watchlist               # 查看自选股行情
-arti watchlist add AAPL NVDA # 添加到自选
-arti watchlist remove TSLA   # 从自选移除
-arti watchlist list          # 列出自选股代码
-```
-
-套餐限制：
-- `free` 最多 `1` 支
-- `basic` 最多 `5` 支
-- `pro` 最多 `20` 支
-- `flagship` 不限
-
-`arti watchlist` 查看自选股行情时会复用 `quote`，因此会扣 `1 Credit`；`add/remove/list` 本身不扣费。
-
-### watch — 实时行情 Dashboard
-
-```bash
-arti watch AAPL NVDA TSLA    # 监控三只股票（默认 15 秒刷新）
-arti watch AAPL -i 10        # 10 秒刷新
-# 按 Ctrl+C 退出
-```
-
-计费：启动 Dashboard 时扣 `1 Credit`；后续轮询刷新当前不重复扣费。
-
-### export — 导出数据
-
-```bash
-arti export AAPL                        # 导出 60 天 CSV
-arti export NVDA -f json -d 90          # 导出 90 天 JSON
-arti export TSLA -o ~/data/tsla.csv     # 指定输出路径
-```
-
-当前未接入 Credit 扣费。
-
-### credits — Credits 与套餐
-
-```bash
-arti credits
-arti credits --set-plan pro
-arti credits --json
-```
-
-用途：
-- 查看当前余额、月度配额、rollover、自选上限和套餐权益
-- 本地联调时切换模拟套餐：`free | basic | pro | flagship`
-
-### config — 配置管理
-
-```bash
-arti config list               # 查看所有配置
-arti config get api.timeout    # 查看单项
-arti config set api.timeout 60000
-arti config reset              # 重置为默认
-```
-
-配置文件位于 `~/.config/arti/config.json`。
-
-常见配置：
-
-- `api.baseUrl`：`arti research` 使用的后端地址
-- `api.timeout`：后端请求超时
-- `data.provider`：`openbb | arti-data | hybrid`
-- `data.artiDataBaseUrl` / `data.artiDataInternalKey`：仅高级 / 内部 hybrid 链路需要
-
-也可通过环境变量覆盖配置文件，示例见 [.env.example](/Users/nicolechen/ARTI-CLI/.env.example)。
-
-### completion — Shell 补全
-
-```bash
-arti completion bash >> ~/.bashrc
-arti completion zsh >> ~/.zshrc
-```
-
-## JSON 模式
-
-所有命令支持 `--json` 输出，方便与其他工具组合：
-
-```bash
-arti --json quote AAPL | jq '.quotes[0].last_price'
-arti --json scan AAPL | jq '.rsi'
-arti --json market gainers | jq '.[0:3]'
-arti --json news AAPL | jq '.[].title'
-```
+每个能力都有显式命令，适合脚本与一次性调用。所有命令支持 `--json` 输出结构化 JSON。
+
+## 命令一览
+
+| 命令 | 说明 |
+|---|---|
+| `chat <message...>` | AI 投研对话 |
+| `quick-scan <symbol>` | 快速研判 |
+| `full <symbol> [-f]` | 全景研报（`-f` 看完整内容） |
+| `deep <symbol> [-f]` | 深度研报 |
+| `login` / `logout` / `whoami` | 账户 |
+| `credits` | 余额与套餐 |
+| `doctor` | 连接诊断 |
+| `config` | 配置管理 |
+| `completion [bash\|zsh]` | Shell 补全 |
+
+## Credit 计费
+
+各能力按对应产品函数计费，口径与 web 产品一致。`arti credits` 查看余额；积分不足会在调用前提示。
 
 ## 架构
 
 ```
-┌─────────────────────────────────────────────────┐
-│  CLI / REPL (TypeScript)                        │
-│  src/index.ts → commands/ + core/repl.ts        │
-├─────────────────────────────────────────────────┤
-│  MCP Server (TypeScript)                        │
-│  src/mcp-server.ts → 13 个金融数据工具           │
-├─────────────────────────────────────────────────┤
-│  桥接层 (src/openbb.ts)                          │
-│  child_process → stdin JSON → stdout JSON       │
-├─────────────────────────────────────────────────┤
-│  数据层 (scripts/openbb_query.py)                │
-│  OpenBB SDK → yfinance / SEC / FRED / OECD      │
-└─────────────────────────────────────────────────┘
+                   ┌─────────────────────────────────────┐
+   web 产品 / CLI ──┤  生产产品函数（Supabase Edge Functions）│
+                   │  chat · scan-stock · classify-intent  │
+                   │  orchestrator · cli-auth · credits     │
+                   └──────────────┬──────────────────────────┘
+                                  │ 重型研报委派
+                                  ▼
+                       ARTI_backend（orchestrator 运行时）
 ```
 
-**数据流向：** CLI 命令 → TypeScript 桥接层通过 `child_process` 调用 Python 脚本 → Python 脚本调用 OpenBB SDK 获取数据 → JSON 返回 → 终端格式化输出（涨红跌绿）
-
-## 数据源
-
-通过 [OpenBB](https://github.com/OpenBB-finance/OpenBB) 聚合多个金融数据源：
-
-| Provider | 数据范围 | API Key |
-|---|---|---|
-| yfinance | 全球股票、加密货币、外汇、ETF、指数、期权、期货、新闻 | 不需要 |
-| SEC | SEC 文件、公司搜索、13F 持仓、内部人交易 | 不需要 |
-| Federal Reserve | 国债收益率 (`arti economy treasury`) | 不需要 |
-| FRED | 美联储经济数据 (`arti economy fred/search`) | **需要**（免费） |
-| OECD | 国际经济数据（GDP、失业率、通胀等） | 不需要 |
-| ECB | 欧洲央行汇率 | 不需要 |
-
-> **FRED API Key 配置：** `arti economy fred` 和 `arti economy search` 需要 FRED API Key。前往 [https://fred.stlouisfed.org/docs/api/api_key.html](https://fred.stlouisfed.org/docs/api/api_key.html) 免费注册，然后配置：
-> ```bash
-> # 方式一：环境变量
-> export OPENBB_fred_api_key=YOUR_KEY
->
-> # 方式二：写入 OpenBB 配置
-> echo '{"credentials":{"fred_api_key":"YOUR_KEY"}}' > ~/.openbb_platform/user_settings.json
-> ```
-> 其他所有命令（quote、market、scan、history、crypto、options 等）均无需 API Key。
-
-## Internal / Advanced: arti-data Hybrid 数据源
-
-这部分不是公开用户首次安装的必需项。当前主要用于 A 股技术面增强和内部链路对齐。
-
-- 当前第一步已接入：`history`
-- 当前第二步已接入：A 股 `scan`
-- 当前第三步已接入：A 股 `predict` 的技术面部分
-- 当前第四步已接入：A 股 `research` 的技术面上下文增强
-- 仅 A 股 `history` 会优先尝试 `arti-data`
-- A 股 `scan` 会优先使用 `arti-data` 日线，并在 CLI 内计算技术指标
-- A 股 `predict` 会复用同一套 hybrid 技术面链路
-- A 股 `research` 会把 hybrid 技术面摘要拼进传给 agent/orchestrator 的 `stockData`
-- 其他市场或 `arti-data` 不可用时，会自动 fallback 到现有 OpenBB/yfinance 链路
-
-高级环境变量：
-
-```bash
-export ARTI_DATA_PROVIDER=hybrid
-export ARTI_DATA_API_URL=https://your-arti-data-host
-export ARTI_DATA_INTERNAL_KEY=your-internal-key
-export ARTI_DATA_TIMEOUT=15000
-```
-
-高级配置项：
-
-- `data.provider`：`openbb | arti-data | hybrid`
-- `data.artiDataBaseUrl`
-- `data.artiDataInternalKey`
-- `data.artiDataTimeout`
-
-实现细节和接入计划见 [ARTI_DATA_INTEGRATION_PLAN.md](/Users/nicolechen/ARTI-CLI/ARTI_DATA_INTEGRATION_PLAN.md)。
-
-## 项目结构
-
-```
-ARTI-CLI/
-├── src/
-│   ├── index.ts              # CLI 入口，Commander 命令注册 + REPL 声明
-│   ├── mcp-server.ts         # MCP Server 入口（stdio 传输）
-│   ├── openbb.ts             # OpenBB Python 桥接层（child_process，120s 超时）
-│   ├── api.ts                # Supabase Edge Function（research 命令后端）
-│   ├── config.ts             # 配置管理（~/.config/arti/config.json）
-│   ├── format.ts             # 终端格式化（涨跌着色、sparkline、置信度条）
-│   ├── output.ts             # 统一输出层（JSON / 终端切换）
-│   ├── errors.ts             # 错误分类与友好提示
-│   ├── tracker.ts            # 使用追踪
-│   ├── update-check.ts       # 版本更新检查（静默、不阻塞）
-│   ├── core/
-│   │   ├── repl.ts           # REPL 交互模式（补全、历史、命令路由）
-│   │   ├── registry.ts       # 统一命令注册表（parseArgs 声明式参数解析）
-│   │   ├── handler.ts        # 统一命令处理器（spinner + try-catch）
-│   │   └── session.ts        # 会话管理
-│   └── commands/
-│       ├── quote.ts          # 实时行情
-│       ├── market.ts         # 市场概览 + 涨跌榜
-│       ├── scan.ts           # 技术指标扫描
-│       ├── predict.ts        # 综合预测
-│       ├── history.ts        # 历史价格
-│       ├── crypto.ts         # 加密货币
-│       ├── fundamental.ts    # 基本面数据
-│       ├── options.ts        # 期权链
-│       ├── economy.ts        # 宏观经济
-│       ├── search.ts         # 股票搜索
-│       ├── news.ts           # 财经新闻
-│       ├── research.ts       # AI 三层级研报
-│       ├── watchlist.ts      # 自选股管理
-│       ├── watch.ts          # 实时行情 Dashboard
-│       ├── export.ts         # 数据导出
-│       ├── insights.ts       # 投研洞察
-│       ├── completion.ts     # Shell 补全脚本生成
-│       └── config.ts         # 配置管理命令
-├── prompts/                  # AI 研报 prompt 定义（从 ARTI_backend 同步）
-│   ├── layer1/               # 8 位分析师 prompt
-│   ├── layer2/               # 7 位投资大师 prompt
-│   ├── panorama_synthesizer.yaml  # 全景研报综合裁定
-│   ├── synthesizer.yaml      # 深度研报综合裁定
-│   └── _common.yaml          # 公共 prompt 片段
-├── scripts/
-│   └── openbb_query.py       # OpenBB 数据查询脚本
-├── docs/                     # 项目文档
-├── package.json
-├── tsconfig.json
-└── CLAUDE.md                 # AI 助手项目说明
-```
+CLI 不维护本地数据处理逻辑，全部复用生产函数，保证与产品口径一致、计费统一。
 
 ## 开发
 
 ```bash
-# 安装依赖
-npm install
-
-# 开发模式（直接运行 TypeScript，无需编译）
-npm run dev -- quote AAPL
-npm run dev:mcp               # 开发模式启动 MCP Server
-
-# 构建
-npm run build
-
-# 运行构建产物
-node dist/index.js market
-node dist/mcp-server.js       # 启动 MCP Server
-
-# 测试
-npm test                       # 运行测试
-npm run test:watch             # 监听模式
+npm install                   # 安装依赖
+npm run dev -- quick-scan AAPL # 开发模式运行（tsx，免编译）
+npm run build                 # 构建
+npm test                      # 测试
 ```
 
 ### RFC 流程
 
-所有重要功能变更都需要先写 RFC。查看 [rfcs/README.md](rfcs/README.md) 了解详情。
+重要功能变更、架构调整、破坏性更新先写 RFC。
 
-```bash
-# 创建新 RFC
-./scripts/create-rfc.sh
-
-# 查看所有 RFC
-cat rfcs/INDEX.md
-```
-
-**必须写 RFC 的场景**:
-- 新增 CLI 命令
-- 破坏性变更
-- 架构调整
-- 数据源切换
-
-## 技术栈
-
-- **运行时** — Node.js >= 18 (ESM)
-- **语言** — TypeScript 5.6+, Python 3.9+
-- **CLI 框架** — [Commander.js](https://github.com/tj/commander.js)
-- **MCP** — [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk)
-- **数据引擎** — [OpenBB](https://github.com/OpenBB-finance/OpenBB)（yfinance / SEC / FRED / OECD）
-- **构建** — [tsup](https://github.com/egoist/tsup)（ESM, 带 .d.ts）
-- **测试** — [Vitest](https://vitest.dev)
-- **终端** — [chalk](https://github.com/chalk/chalk) + [ora](https://github.com/sindresorhus/ora)
-
-## 文档
-
-### 用户文档 (`docs/`)
-
-- [agents.md](docs/agents.md) — AI 分析师系统架构与角色说明
-- [ARTI_DATA_INTEGRATION_PLAN.md](docs/ARTI_DATA_INTEGRATION_PLAN.md) — arti-data 高级数据源接入计划
-- [BILLING_FLOW.md](docs/BILLING_FLOW.md) — Credit 计费流程、套餐对比与升级引导
-- [CLI_FEATURES.md](docs/CLI_FEATURES.md) — CLI 功能清单与开发进度
-- [codex.md](docs/codex.md) — Codex 集成说明
-
-### RFC 设计文档 (`rfcs/`)
-
-- [rfcs/README.md](rfcs/README.md) — RFC 流程说明
-- [rfcs/QUICK_START.md](rfcs/QUICK_START.md) — 5 分钟上手指南
-- [rfcs/INDEX.md](rfcs/INDEX.md) — 所有 RFC 索引
-- [rfcs/template.md](rfcs/template.md) — RFC 模板
+- RFC 目录：`rfcs/`，索引：`rfcs/INDEX.md`，模板：`rfcs/template.md`
+- 创建：`./scripts/create-rfc.sh`
 
 ## License
 
