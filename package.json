@@ -1,6 +1,6 @@
 {
   "name": "arti-cli",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "ARTI 智能投研 CLI 工具 — 聊天 / 快速扫描 / 全景 / 深度研报",
   "type": "module",
   "bin": {
