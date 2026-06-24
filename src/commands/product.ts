@@ -50,6 +50,16 @@ export async function quickScanCommand(symbol: string): Promise<void> {
   });
 }
 
+/** 市值（绝对金额）换算为「亿」并附币种；流通/总由调用方标注 */
+function formatMarketCap(value: number, symbol: string): string {
+  const currency = /\.HK$/i.test(symbol) ? "亿港元"
+    : /\.(SS|SZ)$/i.test(symbol) ? "亿元"
+      : "亿美元";
+  const yi = value / 1e8;
+  const num = yi >= 100 ? Math.round(yi).toLocaleString() : yi.toFixed(2);
+  return `${num} ${currency}`;
+}
+
 /** 渲染产品 Quick Scan 结果（scan-stock 字段，口径与 web 一致） */
 function renderQuickScan(symbol: string, d: BackendStockData): void {
   const t = d.tech ?? {
@@ -111,12 +121,27 @@ function renderQuickScan(symbol: string, d: BackendStockData): void {
 
   // 基本面快照
   if (d.fundamentals && Object.keys(d.fundamentals).length) {
-    const entries = Object.entries(d.fundamentals).filter(([, v]) => v != null);
-    const width = Math.max(...entries.map(([k]) => k.length)) + 6;
+    const f = d.fundamentals;
     console.log(chalk.bold.cyan("\n  【基本面】"));
-    for (const [k, v] of entries) {
-      const val = typeof v === "number" ? v.toLocaleString() : String(v);
-      console.log(kvLine(`    ${k}`, val, width));
+
+    // 市值：换算成「亿」并标明 流通/总
+    if (typeof f.market_cap === "number") {
+      const capLabel = f.market_cap_basis === "circulating" ? "流通市值" : "市值";
+      console.log(kvLine(`    ${capLabel}`, formatMarketCap(f.market_cap, symbol), 18));
+    }
+
+    // 其余标量字段：跳过市值元字段，以及嵌套对象/数组（如 quarterly_financials，避免 [object Object]）
+    const skip = new Set(["market_cap", "market_cap_basis"]);
+    const entries = Object.entries(f).filter(([k, v]) =>
+      v != null && !skip.has(k) &&
+      (typeof v === "number" || typeof v === "string" || typeof v === "boolean"),
+    );
+    if (entries.length) {
+      const width = Math.max(18, ...entries.map(([k]) => k.length + 6));
+      for (const [k, v] of entries) {
+        const val = typeof v === "number" ? v.toLocaleString() : String(v);
+        console.log(kvLine(`    ${k}`, val, width));
+      }
     }
   }
 
