@@ -11,6 +11,9 @@ import chalk from "chalk";
 import { trackCommand } from "./session.js";
 import { getAuthState, isLoggedIn } from "../auth.js";
 import { VERSION } from "../version.js";
+import { classifyIntent } from "../api.js";
+import { quickScanCommand, fullReportCommand, deepReportCommand } from "../commands/product.js";
+import { chatCommand } from "../commands/chat.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const HISTORY_FILE = join(CONFIG_DIR, "repl_history");
@@ -259,6 +262,42 @@ function findCommand(name: string): ReplCommand | undefined {
   return commands.find(c => c.name === name || c.aliases.includes(name));
 }
 
+/** 自由文本 → 复用产品意图识别 → 派发到对应能力 */
+async function dispatchFreeText(text: string): Promise<void> {
+  if (!text) return;
+  appendHistory(text);
+  trackCommand(text);
+  try {
+    const res = await classifyIntent(text);
+    if (res.needs_symbol) {
+      console.log(chalk.yellow("  请带上股票代码，例如：茅台 / AAPL / 600519.SS"));
+      return;
+    }
+    switch (res.intent) {
+      case "quick-scan":
+        if (res.symbol) await quickScanCommand(res.symbol);
+        return;
+      case "panorama":
+        if (res.symbol) await fullReportCommand(res.symbol);
+        return;
+      case "deep":
+        if (res.symbol) await deepReportCommand(res.symbol);
+        return;
+      case "unsupported-market":
+        console.log(chalk.yellow("  暂不支持该市场"));
+        return;
+      case "roundtable":
+        console.log(chalk.yellow("  圆桌能力暂未开放"));
+        return;
+      default:
+        // general-chat 及其它 → 走对话
+        await chatCommand(text);
+    }
+  } catch (err) {
+    console.error(chalk.red(`  处理失败: ${err instanceof Error ? err.message : String(err)}`));
+  }
+}
+
 /** 启动 REPL */
 export async function startRepl(): Promise<void> {
   printBanner();
@@ -306,10 +345,11 @@ export async function startRepl(): Promise<void> {
       return;
     }
 
-    // 查找注册命令
+    // 查找注册命令；非命令则当作自由文本走意图识别
     const cmd = findCommand(cmdName);
     if (!cmd) {
-      console.log(chalk.yellow(`  未知命令: ${cmdName}，输入 help 查看可用命令`));
+      await dispatchFreeText(line.trim());
+      console.log();
       rl.prompt();
       return;
     }
