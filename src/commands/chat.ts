@@ -1,0 +1,39 @@
+/**
+ * chat 命令 — AI 投研对话（产品 chat 函数，SSE 流式）
+ * 用法：arti chat 美股今天怎么样
+ */
+import chalk from "chalk";
+import { streamChat } from "../api.js";
+import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
+import { printError } from "../errors.js";
+import { track } from "../tracker.js";
+
+export async function chatCommand(message: string): Promise<void> {
+  const text = message?.trim();
+  if (!text) {
+    console.log(chalk.red("请输入问题，例如：arti chat 美股今天怎么样"));
+    return;
+  }
+
+  try {
+    const billed = await withBilling("chat", async () => {
+      track("chat", []);
+      let received = false;
+      process.stdout.write("\n  ");
+      for await (const delta of streamChat([{ role: "user", content: text }])) {
+        process.stdout.write(delta);
+        received = true;
+      }
+      process.stdout.write("\n");
+      return received ? true : undefined;
+    });
+    if (!billed) return;
+    printDeductResult(billed.deduct);
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      return;
+    }
+    printError(err);
+  }
+}

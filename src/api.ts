@@ -585,6 +585,100 @@ export async function* streamOrchestratorBackend(
   }
 }
 
+// ── Backend: chat（SSE 流式）──
+
+/** 从一段 SSE chunk 提取文本增量（chat 流是纯文本 token，也兼容 JSON delta） */
+function parseChatDelta(chunk: string): string {
+  const trimmed = chunk.trim();
+  if (!trimmed || trimmed.startsWith(":")) return "";
+  const dataLines = trimmed
+    .split(/\r?\n/)
+    .filter(line => line.startsWith("data:"))
+    .map(line => line.slice(5).replace(/^ /, ""));
+  if (!dataLines.length) return "";
+  const payload = dataLines.join("\n");
+  if (payload === "[DONE]") return "";
+  try {
+    const obj = JSON.parse(payload);
+    if (typeof obj === "string") return obj;
+    // OpenAI 风格：choices[0].delta.content；兼容其它字段名
+    return (obj.choices?.[0]?.delta?.content ?? obj.text ?? obj.content ?? obj.delta ?? "") as string;
+  } catch {
+    return payload;
+  }
+}
+
+/** 调用产品 chat 函数，流式返回文本增量 */
+export async function* streamChat(
+  messages: Array<{ role: string; content: string }>,
+): AsyncGenerator<string> {
+  const config = loadConfig();
+  const baseUrl = config.backend.url;
+  const authToken = config.auth.token;
+  if (!baseUrl) throw new Error("Backend URL 未配置");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 300_000); // 5 分钟超时
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
+      body: JSON.stringify({ messages }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "unknown");
+      throw new ApiError("/v1/chat", res.status, text);
+    }
+    if (!res.body) throw new Error("SSE 响应无 body");
+
+    reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split(/\r?\n\r?\n/);
+      buffer = chunks.pop() || "";
+      for (const chunk of chunks) {
+        const delta = parseChatDelta(chunk);
+        if (delta) yield delta;
+      }
+    }
+    if (buffer.trim()) {
+      const delta = parseChatDelta(buffer);
+      if (delta) yield delta;
+    }
+  } finally {
+    if (reader) {
+      try { await reader.cancel(); } catch { /* 已结束，忽略 */ }
+    }
+    controller.abort();
+    clearTimeout(timer);
+  }
+}
+
+// ── Edge: classify-intent（意图识别，复用产品分类器）──
+
+export interface IntentResult {
+  intent: string;
+  symbol: string | null;
+  needs_symbol: boolean;
+}
+
+/** 复用产品 classify-intent 边缘函数，把自由文本分类为意图 */
+export async function classifyIntent(text: string, lastSymbol?: string | null): Promise<IntentResult> {
+  return callEdge<IntentResult>("classify-intent", { text, last_symbol: lastSymbol ?? null });
+}
+
 // ── Backend: route ──
 
 export interface RouteDecision {

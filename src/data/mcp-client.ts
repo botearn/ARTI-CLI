@@ -1,5 +1,5 @@
 import { loadConfig } from "../config.js";
-import type { HistoricalBar, QuoteData, TechnicalData } from "../openbb.js";
+import type { HistoricalBar, QuoteData, TechnicalData } from "./types.js";
 
 type McpCallResult = {
   content: Array<{ type: string; text?: string }>;

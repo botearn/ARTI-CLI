@@ -1,22 +1,19 @@
 {
   "name": "arti-cli",
   "version": "0.3.4",
-  "description": "ARTI 智能投研 CLI 工具 — OpenBB 驱动的股票分析命令行",
+  "description": "ARTI 智能投研 CLI 工具 — 聊天 / 快速扫描 / 全景 / 深度研报",
   "type": "module",
   "bin": {
-    "arti": "./dist/index.js",
-    "arti-mcp": "./dist/mcp-server.js"
+    "arti": "./dist/index.js"
   },
   "files": [
     "dist",
     "scripts"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/mcp-server.ts --format esm --dts --clean",
+    "build": "tsup src/index.ts --format esm --dts --clean",
     "dev": "tsx src/index.ts",
-    "dev:mcp": "tsx src/mcp-server.ts",
     "start": "node dist/index.js",
-    "start:mcp": "node dist/mcp-server.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
