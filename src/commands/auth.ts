@@ -1,6 +1,14 @@
 import chalk from "chalk";
 import ora from "ora";
-import { loginWithBrowser } from "../browser-login.js";
+import {
+  loginWithBrowser,
+  startLoginSession,
+  pollLoginSession,
+  saveApprovedSession,
+  savePendingLogin,
+  loadPendingLogin,
+  clearPendingLogin,
+} from "../browser-login.js";
 import {
   clearAuthState,
   decodeJwtPayload,
@@ -23,9 +31,89 @@ interface LoginOptions {
   supabaseUrl?: string;
   publishableKey?: string;
   webAuthUrl?: string;
+  start?: boolean;
+  poll?: boolean;
+  session?: string;
+  pollToken?: string;
+}
+
+/** device flow 第一步：取授权链接，落盘待确认会话，立即返回（不开浏览器、不阻塞）。供 agent 用 */
+async function loginStart(): Promise<void> {
+  const started = await startLoginSession();
+  savePendingLogin({
+    session_id: started.session_id,
+    poll_token: started.poll_token,
+    login_url: started.login_url,
+    code: started.code,
+    expires_at: started.expires_at,
+    poll_interval_ms: started.poll_interval_ms,
+  });
+  output(
+    {
+      status: "authorize_pending",
+      login_url: started.login_url,
+      user_code: started.code,
+      session_id: started.session_id,
+      expires_at: started.expires_at ?? null,
+      poll_interval_ms: started.poll_interval_ms ?? 2000,
+    },
+    () => {
+      console.log();
+      console.log(chalk.bold.cyan("📱 在浏览器打开以授权（或把链接交给用户点击）："));
+      console.log(chalk.blue.underline(`  ${started.login_url}`));
+      console.log(chalk.gray("  验证码: ") + chalk.bgWhite.bold.black(` ${started.code} `));
+      console.log(chalk.gray("  授权后运行: ") + chalk.cyan("arti login --poll"));
+      console.log();
+    },
+  );
+}
+
+/** device flow 第二步：单次轮询，返回当前状态（pending/authorized/expired）。agent 循环调用直到 authorized */
+async function loginPoll(options: LoginOptions): Promise<void> {
+  const pending = options.session && options.pollToken
+    ? { session_id: options.session, poll_token: options.pollToken, poll_interval_ms: 2000 }
+    : loadPendingLogin();
+  if (!pending) {
+    output(
+      { status: "no_pending", message: "无进行中的登录会话，请先运行 arti login --start" },
+      () => console.log(chalk.yellow("  无进行中的登录会话，请先运行 arti login --start")),
+    );
+    return;
+  }
+
+  const polled = await pollLoginSession(pending.session_id, pending.poll_token);
+
+  if (polled.status === "approved" && polled.session?.access_token) {
+    const auth = saveApprovedSession(polled.session);
+    clearPendingLogin();
+    output(
+      { status: "authorized", email: auth.email || null, userId: auth.userId || null },
+      () => printLoginSuccess(auth.email, auth.userId, auth.token, Boolean(auth.refreshToken)),
+    );
+    return;
+  }
+
+  if (polled.status === "expired" || polled.status === "consumed") {
+    clearPendingLogin();
+    output(
+      { status: polled.status, message: "登录会话已失效，请重新运行 arti login --start" },
+      () => console.log(chalk.red(`  登录会话已${polled.status === "expired" ? "过期" : "失效"}，请重新运行 arti login --start`)),
+    );
+    return;
+  }
+
+  // 仍在等待用户确认
+  output(
+    { status: "pending", poll_interval_ms: polled.poll_after_ms || pending.poll_interval_ms || 2000 },
+    () => console.log(chalk.gray("  等待用户在浏览器确认中… 授权后再次运行 arti login --poll")),
+  );
 }
 
 export async function loginCommand(options?: LoginOptions): Promise<void> {
+  // device flow 两步式（agent 用）：先 --start 取链接，再 --poll 等确认
+  if (options?.start) { await loginStart(); return; }
+  if (options?.poll) { await loginPoll(options); return; }
+
   const token = options?.token?.trim() || process.env.ARTI_AUTH_TOKEN?.trim() || "";
   const refreshToken = options?.refreshToken?.trim() || process.env.ARTI_AUTH_REFRESH_TOKEN?.trim() || "";
   const email = options?.email?.trim() || process.env.ARTI_USER_EMAIL?.trim() || "";
@@ -51,9 +139,12 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
     }
 
     if (!token) {
+      // headless（agent / 非 TTY）：不自动开浏览器，只打印链接后阻塞等待确认
+      const headless = !process.stdout.isTTY || process.env.ARTI_HEADLESS === "1";
       const spinner = ora({ text: "等待浏览器确认…", indent: 2 });
       const auth = await loginWithBrowser({
         webAuthUrl,
+        onOpenUrl: headless ? () => { /* headless：不自动打开浏览器 */ } : undefined,
         onLoginUrl: (loginUrl) => {
           console.log();
           console.log(chalk.bold.cyan("📱 步骤 1：打开浏览器"));
