@@ -1,8 +1,12 @@
 import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, dirname } from "node:path";
 import { getDefaultSupabasePublishableKey, getDefaultSupabaseUrl, saveConfig, loadConfig } from "./config.js";
 import { getAuthState, saveSupabaseSession, type AuthState, type SupabaseAuthResponse } from "./auth.js";
 
 const DEFAULT_WEB_AUTH_URL = "https://artifin.ai/cli/auth";
+const PENDING_FILE = join(homedir(), ".config", "arti", "pending-login.json");
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 
@@ -54,12 +58,7 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
     const polled = await pollLoginSession(started.session_id, started.poll_token);
     if (polled.status === "approved" && polled.session?.access_token) {
       options?.onApproved?.();
-      return saveSupabaseSession(polled.session, {
-        supabaseUrl: auth.supabaseUrl || getDefaultSupabaseUrl(),
-        publishableKey: auth.publishableKey || getDefaultSupabasePublishableKey(),
-        userId: polled.session.user?.id || auth.userId,
-        email: polled.session.user?.email || auth.email,
-      });
+      return saveApprovedSession(polled.session);
     }
     if (polled.status === "expired") {
       throw new Error("网页登录已过期（5 分钟未操作）。请重新执行 arti login");
@@ -73,6 +72,50 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
     "  • 检查您的网络连接\n" +
     "  • 重新执行 arti login 重试"
   );
+}
+
+/** 保存已批准的登录会话到本地配置，返回 AuthState */
+export function saveApprovedSession(session: SupabaseAuthResponse): AuthState {
+  const auth = getAuthState();
+  return saveSupabaseSession(session, {
+    supabaseUrl: auth.supabaseUrl || getDefaultSupabaseUrl(),
+    publishableKey: auth.publishableKey || getDefaultSupabasePublishableKey(),
+    userId: session.user?.id || auth.userId,
+    email: session.user?.email || auth.email,
+  });
+}
+
+// ── 待确认登录会话持久化（供 agent 两步式 --start / --poll 使用）──
+
+export interface PendingLogin {
+  session_id: string;
+  poll_token: string;
+  login_url: string;
+  code: string;
+  expires_at?: string;
+  poll_interval_ms?: number;
+}
+
+export function savePendingLogin(p: PendingLogin): void {
+  mkdirSync(dirname(PENDING_FILE), { recursive: true });
+  writeFileSync(PENDING_FILE, JSON.stringify(p, null, 2));
+}
+
+export function loadPendingLogin(): PendingLogin | null {
+  if (!existsSync(PENDING_FILE)) return null;
+  try {
+    return JSON.parse(readFileSync(PENDING_FILE, "utf8")) as PendingLogin;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingLogin(): void {
+  try {
+    rmSync(PENDING_FILE, { force: true });
+  } catch {
+    // 文件不存在或无法删除，忽略
+  }
 }
 
 export async function openExternalUrl(url: string): Promise<void> {
@@ -108,7 +151,7 @@ export function buildBrowserLoginUrl(webAuthUrl: string, sessionId: string, code
   return url.toString();
 }
 
-async function startLoginSession(): Promise<CliAuthStartResponse> {
+export async function startLoginSession(): Promise<CliAuthStartResponse> {
   const auth = getAuthState();
   const res = await fetch(`${auth.supabaseUrl}/functions/v1/cli-auth`, {
     method: "POST",
@@ -129,7 +172,7 @@ async function startLoginSession(): Promise<CliAuthStartResponse> {
   };
 }
 
-async function pollLoginSession(sessionId: string, pollToken: string): Promise<CliAuthPollResponse> {
+export async function pollLoginSession(sessionId: string, pollToken: string): Promise<CliAuthPollResponse> {
   const auth = getAuthState();
   const url = new URL(`${auth.supabaseUrl}/functions/v1/cli-auth`);
   url.searchParams.set("session_id", sessionId);

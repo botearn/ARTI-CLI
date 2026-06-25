@@ -115,11 +115,17 @@ const defs: CommandDef[] = [
       { short: "", long: "--supabase-url", key: "supabaseUrl", type: "string", desc: "Supabase URL（可选）", hint: "<url>" },
       { short: "", long: "--publishable-key", key: "publishableKey", type: "string", desc: "Supabase publishable key（可选）", hint: "<key>" },
       { short: "", long: "--web-auth-url", key: "webAuthUrl", type: "string", desc: "网页登录地址（调试用）", hint: "<url>" },
+      { short: "", long: "--start", key: "start", type: "boolean", desc: "device flow：取授权链接后退出（agent 用）" },
+      { short: "", long: "--poll", key: "poll", type: "boolean", desc: "device flow：轮询等待授权完成（agent 用）" },
+      { short: "", long: "--session", key: "session", type: "string", desc: "配合 --poll：指定会话 ID", hint: "<id>" },
+      { short: "", long: "--poll-token", key: "pollToken", type: "string", desc: "配合 --poll：指定 poll token", hint: "<token>" },
     ],
     examples: [
       "$ arti login",
       "$ arti login --email you@example.com --password '***'",
       "$ arti login --token <token> --refresh-token <token>",
+      "$ arti login --start --json    # agent：取授权链接",
+      "$ arti login --poll --json     # agent：等待授权完成",
     ],
     invoke: ({ options }) => Promise.resolve(loginCommand({
       token: options.token as string | undefined,
@@ -130,6 +136,10 @@ const defs: CommandDef[] = [
       supabaseUrl: options.supabaseUrl as string | undefined,
       publishableKey: options.publishableKey as string | undefined,
       webAuthUrl: options.webAuthUrl as string | undefined,
+      start: options.start as boolean | undefined,
+      poll: options.poll as boolean | undefined,
+      session: options.session as string | undefined,
+      pollToken: options.pollToken as string | undefined,
     })),
   },
   {

@@ -19,17 +19,33 @@ node dist/index.js <command> # 等价
 
 要求：Node ≥ 18。**不需要 Python**。
 
-## 2. 鉴权（非交互）
+## 2. 鉴权
 
-agent 不能走浏览器登录。流程：人工登录一次 → 取 token → 注入 agent 环境。
+agent 不能自己开浏览器，但可以**把授权链接交给用户去点**（device flow）。任选一种：
+
+### 方式 A：device flow（agent 引导用户授权，推荐）
 
 ```bash
-# 人工在有浏览器的机器上执行一次
-arti login
-arti token            # 打印可粘贴的 export 行（token 等同密码，勿外泄）
+# 1) 取授权链接（立即返回，不阻塞、不开浏览器）
+arti login --start --json
+# → {"status":"authorize_pending","login_url":"https://artifin.ai/cli/auth?...",
+#    "user_code":"CWKQ6R","session_id":"...","poll_interval_ms":2000}
 ```
 
-把输出的三个变量设到 agent 运行环境即可免登录：
+agent 把 `login_url`（或 `user_code`）抛给用户 → 用户在浏览器/邮件点击确认。
+
+```bash
+# 2) 轮询确认（单次返回当前状态，按 poll_interval_ms 循环调用）
+arti login --poll --json
+# → {"status":"pending","poll_interval_ms":2000}      # 重复直到 ↓
+# → {"status":"authorized","email":"you@..."}          # token 已存，完成
+```
+
+`--start` 会把会话落盘，`--poll` 自动读取，无需 agent 自己穿 session_id。
+
+### 方式 B：已有 token（直接注入环境）
+
+人工在有浏览器的机器上 `arti login` 一次，再 `arti token` 取出三个值，设到 agent 环境：
 
 ```bash
 export ARTI_AUTH_TOKEN=<access-token>
@@ -37,7 +53,8 @@ export ARTI_AUTH_REFRESH_TOKEN=<refresh-token>
 export ARTI_AUTH_EXPIRES_AT=<unix-seconds>
 ```
 
-CLI 会在 token 过期时用 refresh token 自动续期。验证：`arti whoami --json`。
+两种方式都会让 CLI 在 token 过期时自动续期。验证：`arti whoami --json`。
+> 在非 TTY（agent）环境直接 `arti login` 也会自动改为打印链接而非开浏览器。
 
 ## 3. 能力与调用
 
