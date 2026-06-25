@@ -43,6 +43,26 @@ arti login --poll --json
 
 `--start` 会把会话落盘，`--poll` 自动读取，无需 agent 自己穿 session_id。
 
+**可直接照抄的完整流程**（取链接 → 抛给用户 → 自动轮询直到通过）：
+
+```bash
+# 1) 取链接，抛给用户去任意浏览器点确认
+LOGIN_URL=$(arti login --start --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["login_url"])')
+echo "请在浏览器打开并用账号登录确认：$LOGIN_URL"
+
+# 2) 轮询直到授权完成（用户点确认后自动结束）
+for i in $(seq 1 150); do
+  STATUS=$(arti login --poll --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["status"])')
+  case "$STATUS" in
+    authorized) echo "✅ 登录完成"; break ;;
+    pending)    sleep 2 ;;
+    *)          echo "⚠️ 会话失效（$STATUS），重新执行 arti login --start"; break ;;
+  esac
+done
+```
+
+用户只需在浏览器点一下确认，agent 这边自动检测完成、token 自动写入——之后所有 `arti ... --json` 调用都已鉴权。
+
 ### 方式 B：已有 token（直接注入环境）
 
 人工在有浏览器的机器上 `arti login` 一次，再 `arti token` 取出三个值，设到 agent 环境：
