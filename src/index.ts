@@ -11,7 +11,7 @@ import { chatCommand } from "./commands/chat.js";
 import { configSetCommand, configGetCommand, configListCommand, configResetCommand } from "./commands/config.js";
 import { completionCommand, installCompletion } from "./commands/completion.js";
 import { creditsCommand } from "./commands/credits.js";
-import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
+import { loginCommand, logoutCommand, whoamiCommand, tokenCommand } from "./commands/auth.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { shutdownBackendMcp } from "./data/mcp-client.js";
 import chalk from "chalk";
@@ -154,6 +154,19 @@ const defs: CommandDef[] = [
       "$ arti whoami --json",
     ],
     invoke: () => Promise.resolve(whoamiCommand()),
+  },
+  {
+    name: "token", aliases: [],
+    description: "打印登录 token（供 agent 非交互鉴权）",
+    usage: "token",
+    args: [],
+    options: [],
+    examples: [
+      "$ arti token              # 打印可粘贴的 export 行",
+      "$ arti token --json       # 结构化输出",
+      "$ eval \"$(arti token)\"     # 直接注入当前 shell",
+    ],
+    invoke: () => Promise.resolve(tokenCommand()),
   },
   {
     name: "doctor", aliases: ["diag"],
