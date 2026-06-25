@@ -48,7 +48,7 @@
 
 ```bash
 # 1. 进入项目根目录
-cd /Users/nicolechen/ARTI-CLI      # 或 ARTI_backend、arti-data
+cd /path/to/ARTI-CLI      # 或 ARTI_backend、arti-data
 
 # 2. 运行创建脚本
 ./scripts/create-rfc.sh

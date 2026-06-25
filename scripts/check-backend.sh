@@ -35,7 +35,7 @@ echo ""
 
 # 3. CLI 配置
 echo "3️⃣  CLI 配置:"
-cd /Users/nicolechen/ARTI-CLI
+cd "$(cd "$(dirname "$0")/.." && pwd)"   # 仓库根目录
 BACKEND_CONFIG=$(./dist/index.js config get backend.url 2>/dev/null)
 BACKEND_ENABLED=$(./dist/index.js config get backend.enabled 2>/dev/null)
 echo "   $BACKEND_CONFIG"
