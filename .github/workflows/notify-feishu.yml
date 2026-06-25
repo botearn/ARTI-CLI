@@ -1,0 +1,16 @@
+name: Notify Feishu on Push
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Feishu notification
+        run: |
+          curl -s -X POST "https://open.feishu.cn/open-apis/bot/v2/hook/b6a871a8-0488-4e11-8519-743ae458a452" \
+            -H "Content-Type: application/json" \
+            -d "{\"msg_type\":\"text\",\"content\":{\"text\":\"📦 ARTI-CLI 新提交\n分支：${{ github.ref_name }}\n提交者：${{ github.actor }}\n消息：${{ github.event.head_commit.message }}\nhttps://github.com/${{ github.repository }}/commit/${{ github.sha }}\"}}"

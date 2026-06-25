@@ -1,11 +1,11 @@
 {
-  "name": "arti-cli",
+  "name": "artifin-cli",
   "version": "0.3.4",
   "description": "ARTI 智能投研 CLI 工具 — OpenBB 驱动的股票分析命令行",
   "type": "module",
   "bin": {
-    "arti": "./dist/index.js",
-    "arti-mcp": "./dist/mcp-server.js"
+    "arti": "dist/index.js",
+    "arti-mcp": "dist/mcp-server.js"
   },
   "files": [
     "dist",
@@ -18,7 +18,8 @@
     "start": "node dist/index.js",
     "start:mcp": "node dist/mcp-server.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postpublish": "bash scripts/notify-feishu.sh"
   },
   "keywords": [
     "cli",
@@ -34,7 +35,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/YuqingNicole/ARTI-CLI.git"
+    "url": "git+https://github.com/YuqingNicole/ARTI-CLI.git"
   },
   "homepage": "https://github.com/YuqingNicole/ARTI-CLI#readme",
   "license": "MIT",

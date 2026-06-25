@@ -56,12 +56,12 @@ $ arti market
 curl -fsSL https://artifin.ai/cli/install.sh | bash
 ```
 
-脚本会检测 Node 环境并通过 npm 全局安装 `arti-cli`，几秒完成。
+脚本会检测 Node 环境并通过 npm 全局安装 `artifin-cli`，几秒完成。
 
 #### npm
 
 ```bash
-npm install -g arti-cli
+npm install -g artifin-cli
 ```
 
 #### Homebrew (macOS / Linux)
