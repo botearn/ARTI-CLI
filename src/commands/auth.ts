@@ -124,6 +124,28 @@ export function logoutCommand(): void {
   console.log(chalk.green("  已退出登录"));
 }
 
+/** 打印当前登录 token，方便取出后通过环境变量喂给 agent 做非交互鉴权 */
+export function tokenCommand(): void {
+  const auth = getAuthState();
+  if (!isLoggedIn(auth)) {
+    console.log(chalk.yellow("  当前未登录，先运行 arti login"));
+    return;
+  }
+  output(
+    {
+      token: auth.token || null,
+      refreshToken: auth.refreshToken || null,
+      expiresAt: auth.expiresAt || null,
+    },
+    () => {
+      console.log(chalk.gray("  # 设置到 agent 环境即可非交互鉴权（token 等同密码，勿外泄）"));
+      console.log(`  export ARTI_AUTH_TOKEN=${auth.token}`);
+      if (auth.refreshToken) console.log(`  export ARTI_AUTH_REFRESH_TOKEN=${auth.refreshToken}`);
+      if (auth.expiresAt) console.log(`  export ARTI_AUTH_EXPIRES_AT=${auth.expiresAt}`);
+    },
+  );
+}
+
 export async function whoamiCommand(): Promise<void> {
   const auth = getAuthState();
   let profile = {
