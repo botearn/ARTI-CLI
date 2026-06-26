@@ -4,11 +4,10 @@
   "description": "ARTI 智能投研 CLI 工具 — 聊天 / 快速扫描 / 全景 / 深度研报",
   "type": "module",
   "bin": {
-    "arti": "./dist/index.js"
+    "arti": "dist/index.js"
   },
   "files": [
-    "dist",
-    "scripts"
+    "dist"
   ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
