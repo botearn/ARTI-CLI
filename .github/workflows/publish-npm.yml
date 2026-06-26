@@ -1,0 +1,43 @@
+name: Publish to npm
+
+# merge / push 到 main 后：构建并在版本号有更新时自动发布到 npm。
+# 需在仓库 Secrets 配置 NPM_TOKEN（npm 包 owner 账号的 Automation 类型 token，可绕过 2FA）。
+
+on:
+  push:
+    branches: [main]
+
+# 避免两次 push 并发重复发布
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: 安装依赖（prepare 钩子会自动构建）
+        run: npm ci
+
+      - name: 构建
+        run: npm run build
+
+      - name: 版本号有更新才发布
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::$NAME@$VERSION 已存在于 npm，跳过发布（如需发布请在 package.json 升 version）"
+          else
+            echo "发布 $NAME@$VERSION 到 npm"
+            npm publish --access public
+          fi
