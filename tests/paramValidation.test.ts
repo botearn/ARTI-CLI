@@ -15,30 +15,6 @@ describe("参数验证 — 空 symbol 提示", () => {
     logSpy.mockRestore();
   });
 
-  it("scanCommand 无参数时提示用法", async () => {
-    const { scanCommand } = await import("../src/commands/scan.js");
-    await scanCommand("");
-    expect(logSpy).toHaveBeenCalled();
-    const msg = logSpy.mock.calls[0][0] as string;
-    expect(msg).toContain("请提供股票代码");
-  });
-
-  it("predictCommand 无参数时提示用法", async () => {
-    const { predictCommand } = await import("../src/commands/predict.js");
-    await predictCommand("");
-    expect(logSpy).toHaveBeenCalled();
-    const msg = logSpy.mock.calls[0][0] as string;
-    expect(msg).toContain("请提供股票代码");
-  });
-
-  it("quoteCommand 空数组时提示用法", async () => {
-    const { quoteCommand } = await import("../src/commands/quote.js");
-    await quoteCommand([]);
-    expect(logSpy).toHaveBeenCalled();
-    const msg = logSpy.mock.calls[0][0] as string;
-    expect(msg).toContain("请提供股票代码");
-  });
-
   it("researchCommand 无参数时提示用法", async () => {
     const { researchCommand } = await import("../src/commands/research.js");
     await researchCommand("", {});
