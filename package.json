@@ -32,9 +32,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YuqingNicole/ARTI-CLI.git"
+    "url": "git+https://github.com/botearn/ARTI-CLI.git"
   },
-  "homepage": "https://github.com/YuqingNicole/ARTI-CLI#readme",
+  "homepage": "https://github.com/botearn/ARTI-CLI#readme",
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^1.5.0",
