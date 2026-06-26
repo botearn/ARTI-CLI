@@ -22,7 +22,7 @@ describe("browser login flow", () => {
     expect(url.origin + url.pathname).toBe("https://www.artifin.ai/auth");
     expect(url.searchParams.get("cli")).toBe("1");
     expect(url.searchParams.get("session_id")).toBe("session-123");
-    expect(url.searchParams.get("code")).toBe("A7K9X2");
+    expect(url.searchParams.get("device_code")).toBe("A7K9X2");
   });
 
   it("polls the server-side login session and persists the approved session", async () => {
