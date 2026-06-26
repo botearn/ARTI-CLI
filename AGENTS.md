@@ -2,22 +2,15 @@
 
 给自动化 agent / 程序集成用的最小接入说明。ARTI CLI 是生产后端的瘦客户端，所有能力走线上产品函数，按账号计费。
 
-## 1. 安装（clone 即自运行）
+## 1. 安装（npm 全局安装，无需 clone）
 
 ```bash
-git clone https://github.com/botearn/ARTI-CLI.git
-cd ARTI-CLI
-npm install          # 触发 prepare 钩子自动构建，无需手动 build
+npm install -g artifin-cli   # 装完得到 `arti` 命令
 ```
 
-之后用以下任一方式调用（无需 `npm link`）：
+要求：Node ≥ 18，不需要 Python。之后直接 `arti <command>` 调用。
 
-```bash
-npx arti <command>           # 推荐
-node dist/index.js <command> # 等价
-```
-
-要求：Node ≥ 18。**不需要 Python**。
+> 仅在需要改源码时才克隆：`git clone https://github.com/botearn/ARTI-CLI.git && cd ARTI-CLI && npm install`（prepare 钩子自动构建），用 `npx arti <command>` 调用。
 
 ## 2. 鉴权
 
@@ -95,8 +88,8 @@ export ARTI_AUTH_EXPIRES_AT=<unix-seconds>
 
 ```bash
 export ARTI_AUTH_TOKEN=... ARTI_AUTH_REFRESH_TOKEN=... ARTI_AUTH_EXPIRES_AT=...
-npx arti quick-scan AAPL --json
-npx arti deep 01709.HK --json
+arti quick-scan AAPL --json
+arti deep 01709.HK --json
 ```
 
 ## 4. 计费 / 错误

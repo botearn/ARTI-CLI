@@ -35,28 +35,27 @@ $ arti
 
 ### 1. 安装
 
-只需 Node.js >= 18，无需 Python。
+只需 Node.js >= 18，**无需 clone 源码、无需 Python**：
 
 ```bash
-# 一行安装（推荐）
-curl -fsSL https://artifin.ai/cli/install.sh | bash
-
-# 或 npm
+# npm 全局安装（推荐）
 npm install -g artifin-cli
+
+# 或一行脚本
+curl -fsSL https://artifin.ai/cli/install.sh | bash
 
 # 或 Homebrew
 brew tap botearn/arti https://github.com/botearn/homebrew-arti
 brew install arti
 ```
 
-从源码构建（贡献者）：
+装完即可用 `arti` 命令（npm 包名是 `artifin-cli`，命令是 `arti`）。升级：`npm i -g artifin-cli@latest`。
 
-```bash
-git clone https://github.com/botearn/ARTI-CLI.git
-cd ARTI-CLI
-npm install && npm run build
-npm link
-```
+> 仅在需要修改源码（贡献者）时才克隆：
+> ```bash
+> git clone https://github.com/botearn/ARTI-CLI.git
+> cd ARTI-CLI && npm install && npm link
+> ```
 
 ### 2. 登录
 
