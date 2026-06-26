@@ -29,6 +29,9 @@ jobs:
       - name: 构建
         run: npm run build
 
+      - name: 测试（不过则不发布）
+        run: npm test
+
       - name: 版本号有更新才发布
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
