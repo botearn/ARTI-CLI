@@ -2,12 +2,12 @@
 # ARTI CLI 一行安装脚本
 #   curl -fsSL https://artifin.ai/cli/install.sh | bash
 #
-# 通过 npm 全局安装 arti-cli（生产数据源为 Backend MCP，无需本地 Python）。
+# 通过 npm 全局安装 artifin-cli（生产后端产品函数，无需本地 Python）。
 # 纯 POSIX sh，无交互，对 `curl | bash` 友好。
 
 set -e
 
-PKG="arti-cli"
+PKG="artifin-cli"
 MIN_NODE_MAJOR=18
 
 # ── 颜色（仅 TTY 启用） ──

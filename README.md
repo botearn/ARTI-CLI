@@ -42,7 +42,7 @@ $ arti
 curl -fsSL https://artifin.ai/cli/install.sh | bash
 
 # 或 npm
-npm install -g arti-cli
+npm install -g artifin-cli
 
 # 或 Homebrew
 brew tap botearn/arti https://github.com/botearn/homebrew-arti
