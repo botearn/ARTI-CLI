@@ -96,7 +96,7 @@ async function getClient(): Promise<McpClient> {
   clientPromise = (async () => {
     const { Client, StreamableHTTPClientTransport } = await loadSdk();
     const client = new Client(
-      { name: "arti-cli", version: "0.3.0" },
+      { name: "artifin-cli", version: "0.4.0" },
       { capabilities: {} },
     );
     const transport = new StreamableHTTPClientTransport(

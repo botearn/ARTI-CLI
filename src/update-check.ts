@@ -9,7 +9,7 @@ import chalk from "chalk";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const CHECK_FILE = join(CONFIG_DIR, "update-check.json");
-const PACKAGE_NAME = "arti-cli";
+const PACKAGE_NAME = "artifin-cli";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 小时
 
 interface CheckState {
@@ -93,6 +93,6 @@ export async function checkForUpdate(currentVersion: string): Promise<void> {
 function printUpdateNotice(current: string, latest: string): void {
   console.log(
     chalk.yellow(`\n  新版本可用: ${current} → ${chalk.bold(latest)}`) +
-    chalk.gray(`  运行 ${chalk.white("npm i -g arti-cli")} 更新\n`)
+    chalk.gray(`  运行 ${chalk.white("npm i -g artifin-cli")} 更新\n`)
   );
 }
