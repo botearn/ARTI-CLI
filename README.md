@@ -28,6 +28,7 @@ $ arti
 | 快速扫描 | `arti quick-scan <代码>` | 行情 + 技术面 + 基本面快速研判 |
 | 全景研报 | `arti full <代码>` | 多分析师 Layer 1 全景报告 |
 | 深度研报 | `arti deep <代码>` | 三层级深度研报（分析师 + 大师辩论 + 综合裁定） |
+| 预测市场 | `arti poly events` | ARTi Poly 公开 API：事件、摘要、跨平台价差 |
 
 支持美股、港股、A 股。无参运行 `arti` 进入交互终端，**直接打字即可**——内置意图识别会自动判断该聊天还是出报告。
 
@@ -113,6 +114,7 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 | `deep <symbol> [-f]` | 深度研报 |
 | `login` / `logout` / `whoami` | 账户 |
 | `credits` | 余额与套餐 |
+| `poly events|event|summary|compare|search` | ARTi Poly 预测市场数据 |
 | `doctor` | 连接诊断 |
 | `config` | 配置管理 |
 | `completion [bash\|zsh]` | Shell 补全 |
