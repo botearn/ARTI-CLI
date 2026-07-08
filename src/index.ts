@@ -13,6 +13,7 @@ import { completionCommand, installCompletion } from "./commands/completion.js";
 import { creditsCommand } from "./commands/credits.js";
 import { loginCommand, logoutCommand, whoamiCommand, tokenCommand } from "./commands/auth.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { polyCommand } from "./poly/commands.js";
 import { shutdownBackendMcp } from "./data/mcp-client.js";
 import chalk from "chalk";
 import { setJsonMode } from "./output.js";
@@ -222,6 +223,25 @@ const defs: CommandDef[] = [
       "$ arti credits --json     # JSON 格式输出",
     ],
     invoke: ({ options }) => creditsCommand({ setPlan: options.setPlan as string | undefined }),
+  },
+  {
+    name: "poly", aliases: [],
+    description: "预测市场数据（ARTi Poly）",
+    usage: "poly events|event|summary|compare|search [...args]",
+    args: [{ spec: "[args...]", desc: "子命令和参数" }],
+    options: [
+      { short: "-l", long: "--limit", key: "limit", type: "string", desc: "返回数量", hint: "<n>" },
+      { short: "", long: "--source", key: "source", type: "string", desc: "数据源: polymarket | kalshi", hint: "<source>" },
+      { short: "", long: "--category", key: "category", type: "string", desc: "事件分类过滤", hint: "<category>" },
+    ],
+    examples: [
+      "$ arti poly events --limit 5",
+      "$ arti poly event will-trump-win-2026 --source polymarket",
+      "$ arti poly summary --limit 10",
+      "$ arti poly compare",
+      "$ arti poly search fed",
+    ],
+    invoke: ({ positional, options }) => polyCommand(positional, options),
   },
   {
     name: "completion", aliases: [],

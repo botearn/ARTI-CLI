@@ -21,6 +21,14 @@ export function classifyError(err: unknown): ErrorInfo {
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
 
+    if (msg.includes("poly api key")) {
+      return {
+        title: "Poly API Key 未配置",
+        detail: err.message,
+        suggestion: "运行 arti config set poly.apiKey <your-key> 后重试",
+      };
+    }
+
     // DNS / 网络层
     if (msg.includes("getaddrinfo") || msg.includes("enotfound")) {
       return {
