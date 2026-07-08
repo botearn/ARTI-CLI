@@ -13,7 +13,8 @@ const LEGACY_API_BASE_URL = "https://laoclhqedllwjuboyqib.supabase.co/functions/
 const DEFAULT_API_BASE_URL = `${DEFAULT_SUPABASE_URL}/functions/v1`;
 const DEFAULT_BACKEND_URL = "https://api-gateway-production-b656.up.railway.app";
 const DEFAULT_BACKEND_MCP_URL = "https://mcp-market-production.up.railway.app/mcp";
-const DEFAULT_POLY_BASE_URL = "https://predict.artifin.ai/api/v1";
+const LEGACY_POLY_BASE_URL = "https://predict.artifin.ai/api/v1";
+const DEFAULT_POLY_BASE_URL = "https://www.artifin.ai/app/predict/api/v1";
 
 export interface ArtiConfig {
   api: {
@@ -129,6 +130,10 @@ export function loadConfig(): ArtiConfig {
       }
       if (!config.auth.publishableKey) {
         config.auth.publishableKey = DEFAULT_SUPABASE_PUBLISHABLE_KEY;
+        shouldPersistMigration = true;
+      }
+      if (!process.env.ARTI_POLY_API_URL && config.poly.apiBaseUrl === LEGACY_POLY_BASE_URL) {
+        config.poly.apiBaseUrl = DEFAULT_POLY_BASE_URL;
         shouldPersistMigration = true;
       }
     } catch {
