@@ -11,9 +11,8 @@ import chalk from "chalk";
 import { trackCommand } from "./session.js";
 import { getAuthState, isLoggedIn } from "../auth.js";
 import { VERSION } from "../version.js";
-import { classifyIntent } from "../api.js";
-import { quickScanCommand, fullReportCommand, deepReportCommand } from "../commands/product.js";
-import { chatCommand } from "../commands/chat.js";
+import { rawChatCommand } from "../commands/chat.js";
+import { dispatchNaturalText } from "./natural-dispatch.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const HISTORY_FILE = join(CONFIG_DIR, "repl_history");
@@ -268,31 +267,7 @@ async function dispatchFreeText(text: string): Promise<void> {
   appendHistory(text);
   trackCommand(text);
   try {
-    const res = await classifyIntent(text);
-    if (res.needs_symbol) {
-      console.log(chalk.yellow("  请带上股票代码，例如：茅台 / AAPL / 600519.SS"));
-      return;
-    }
-    switch (res.intent) {
-      case "quick-scan":
-        if (res.symbol) await quickScanCommand(res.symbol);
-        return;
-      case "panorama":
-        if (res.symbol) await fullReportCommand(res.symbol);
-        return;
-      case "deep":
-        if (res.symbol) await deepReportCommand(res.symbol);
-        return;
-      case "unsupported-market":
-        console.log(chalk.yellow("  暂不支持该市场"));
-        return;
-      case "roundtable":
-        console.log(chalk.yellow("  圆桌能力暂未开放"));
-        return;
-      default:
-        // general-chat 及其它 → 走对话
-        await chatCommand(text);
-    }
+    await dispatchNaturalText(text, { onGeneralChat: rawChatCommand });
   } catch (err) {
     console.error(chalk.red(`  处理失败: ${err instanceof Error ? err.message : String(err)}`));
   }
