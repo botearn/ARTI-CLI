@@ -50,7 +50,6 @@ export interface ArtiConfig {
   };
   poly: {
     apiBaseUrl: string;
-    apiKey: string;
   };
   watchlist: string[];
 }
@@ -90,7 +89,6 @@ const DEFAULT_CONFIG: ArtiConfig = {
   },
   poly: {
     apiBaseUrl: DEFAULT_POLY_BASE_URL,
-    apiKey: "",
   },
   watchlist: [],
 };
@@ -191,7 +189,6 @@ export function loadConfig(): ArtiConfig {
   if (process.env.ARTI_DATA_API_URL) config.data.artiDataBaseUrl = process.env.ARTI_DATA_API_URL;
   if (process.env.ARTI_DATA_INTERNAL_KEY) config.data.artiDataInternalKey = process.env.ARTI_DATA_INTERNAL_KEY;
   if (process.env.ARTI_POLY_API_URL) config.poly.apiBaseUrl = process.env.ARTI_POLY_API_URL;
-  if (process.env.ARTI_POLY_API_KEY) config.poly.apiKey = process.env.ARTI_POLY_API_KEY;
   if (process.env.ARTI_DATA_TIMEOUT) {
     const t = Number(process.env.ARTI_DATA_TIMEOUT);
     if (!isNaN(t) && t > 0) config.data.artiDataTimeout = t;
@@ -227,7 +224,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "auth.token", "auth.refreshToken", "auth.expiresAt", "auth.userId", "auth.email", "auth.supabaseUrl", "auth.publishableKey",
   "data.provider", "data.artiDataBaseUrl", "data.artiDataTimeout", "data.artiDataInternalKey",
   "display.market", "display.lang",
-  "poly.apiBaseUrl", "poly.apiKey",
+  "poly.apiBaseUrl",
   "watchlist",
 ]);
 

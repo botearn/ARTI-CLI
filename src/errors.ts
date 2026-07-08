@@ -21,11 +21,11 @@ export function classifyError(err: unknown): ErrorInfo {
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
 
-    if (msg.includes("poly api key")) {
+    if (msg.includes("未登录") || msg.includes("登录已过期") || msg.includes("refresh_token") || msg.includes("refresh token")) {
       return {
-        title: "Poly API Key 未配置",
+        title: "登录态不可用",
         detail: err.message,
-        suggestion: "运行 arti config set poly.apiKey <your-key> 后重试",
+        suggestion: "运行 arti login 后重试",
       };
     }
 
