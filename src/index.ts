@@ -43,15 +43,20 @@ const OPT_REFRESH: OptionDef = { short: "", long: "--refresh", key: "refresh", t
 const defs: CommandDef[] = [
   {
     name: "chat", aliases: ["c", "ask"],
-    description: "AI 投研对话",
-    usage: "chat <message...>",
+    description: "AI 投研对话（默认智能路由，--raw 纯聊天）",
+    usage: "chat [--raw] <message...>",
     args: [{ spec: "<message...>", desc: "你的问题" }],
-    options: [],
+    options: [
+      { short: "", long: "--raw", key: "raw", type: "boolean", desc: "跳过意图识别，直接走纯聊天" },
+    ],
     examples: [
-      "$ arti chat 美股今天怎么样",
+      "$ arti chat 今天的智谱        # 自动路由到快速扫描/研报/聊天",
+      "$ arti chat --raw 美股今天怎么样",
       "$ arti chat 帮我看看英伟达",
     ],
-    invoke: ({ positional }) => chatCommand(positional.join(" ")),
+    invoke: ({ positional, options }) => chatCommand(positional.join(" "), {
+      raw: options.raw as boolean | undefined,
+    }),
   },
   {
     name: "quick-scan", aliases: ["quick", "qs"],

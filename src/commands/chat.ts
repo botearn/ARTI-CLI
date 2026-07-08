@@ -7,8 +7,13 @@ import { streamChat } from "../api.js";
 import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
 import { track } from "../tracker.js";
+import { dispatchNaturalText } from "../core/natural-dispatch.js";
 
-export async function chatCommand(message: string): Promise<void> {
+export interface ChatCommandOptions {
+  raw?: boolean;
+}
+
+export async function rawChatCommand(message: string): Promise<void> {
   const text = message?.trim();
   if (!text) {
     console.log(chalk.red("请输入问题，例如：arti chat 美股今天怎么样"));
@@ -34,6 +39,25 @@ export async function chatCommand(message: string): Promise<void> {
       console.log(chalk.red(`\n  ✗ ${err.message}\n`));
       return;
     }
+    printError(err);
+  }
+}
+
+export async function chatCommand(message: string, options?: ChatCommandOptions): Promise<void> {
+  const text = message?.trim();
+  if (!text) {
+    console.log(chalk.red("请输入问题，例如：arti chat 美股今天怎么样"));
+    return;
+  }
+
+  if (options?.raw) {
+    await rawChatCommand(text);
+    return;
+  }
+
+  try {
+    await dispatchNaturalText(text, { onGeneralChat: rawChatCommand });
+  } catch (err) {
     printError(err);
   }
 }

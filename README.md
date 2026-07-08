@@ -24,7 +24,7 @@ $ arti
 
 | 能力 | 命令 | 说明 |
 |---|---|---|
-| 聊天 | `arti chat <问题>` | AI 投研对话（流式） |
+| 聊天 | `arti chat <问题>` | 智能路由到快速扫描 / 研报 / AI 投研对话 |
 | 快速扫描 | `arti quick-scan <代码>` | 行情 + 技术面 + 基本面快速研判 |
 | 全景研报 | `arti full <代码>` | 多分析师 Layer 1 全景报告 |
 | 深度研报 | `arti deep <代码>` | 三层级深度研报（分析师 + 大师辩论 + 综合裁定） |
@@ -87,6 +87,7 @@ arti quick-scan AAPL
 arti full NVDA
 arti deep TSLA
 arti chat 美股今天怎么样
+arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 ```
 
 ## 两种使用模式
@@ -100,13 +101,13 @@ arti chat 美股今天怎么样
 
 ### CLI 模式
 
-每个能力都有显式命令，适合脚本与一次性调用。所有命令支持 `--json` 输出结构化 JSON。
+每个能力都有显式命令，适合脚本与一次性调用。`arti chat <问题>` 默认复用产品意图识别，可能自动派发到快速扫描、全景研报、深度研报或聊天；需要强制纯聊天时使用 `arti chat --raw <问题>`。所有命令支持 `--json` 输出结构化 JSON。
 
 ## 命令一览
 
 | 命令 | 说明 |
 |---|---|
-| `chat <message...>` | AI 投研对话 |
+| `chat [--raw] <message...>` | 智能路由；`--raw` 为纯 AI 投研对话 |
 | `quick-scan <symbol>` | 快速研判 |
 | `full <symbol> [-f]` | 全景研报（`-f` 看完整内容） |
 | `deep <symbol> [-f]` | 深度研报 |
