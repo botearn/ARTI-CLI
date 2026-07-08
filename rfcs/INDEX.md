@@ -8,6 +8,7 @@
 |---|---|---|
 | [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) | 新用户上手 — 一行安装 + REPL 登录态 Onboarding | 2026-06-01 |
 | [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) | CLI 数据链收敛到生产产品函数，下线 OpenBB 第二套处理 | 2026-06-24 |
+| [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) | ARTi Poly CLI 集成 — `arti poly` 子命令接入 ARTi-poly 公开 API | 2026-07-08 |
 
 ---
 
@@ -65,7 +66,7 @@
 
 ### 🔧 CLI 命令
 
-- *待添加*
+- [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成（`arti poly` 子命令组）
 
 ### 🤖 AI & Research
 
@@ -89,6 +90,8 @@
 
 ### 2026
 
+- **2026-07-08** - [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成 (Draft)
+- **2026-06-24** - [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) - CLI 数据链收敛 (Draft)
 - **2026-06-01** - [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) - 新用户上手 / 一行安装 + Onboarding (Draft)
 - **2026-05-19** - [RFC-2026-0001](2026/RFC-2026-0001-backend-mcp-integration.md) - Backend MCP 集成 (Implemented)
 
@@ -102,13 +105,13 @@
 
 | 状态 | 数量 |
 |---|---|
-| Draft | 1 |
+| Draft | 3 |
 | Proposed | 0 |
 | Accepted | 0 |
 | Implementing | 0 |
 | Implemented | 1 |
 | Rejected | 0 |
 | Deprecated | 0 |
-| **总计** | **2** |
+| **总计** | **4** |
 
-**最后更新**: 2026-06-01
+**最后更新**: 2026-07-08
