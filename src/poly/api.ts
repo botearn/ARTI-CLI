@@ -1,3 +1,4 @@
+import { ensureValidAccessToken } from "../auth.js";
 import { loadConfig } from "../config.js";
 
 interface PolyErrorBody {
@@ -18,15 +19,15 @@ export class PolyApiError extends Error {
 
 export async function polyGet<T>(path: string): Promise<T> {
   const config = loadConfig();
-  const key = config.poly.apiKey.trim();
-  if (!key) {
-    throw new PolyApiError("未设置 Poly API Key。运行: arti config set poly.apiKey <your-key>");
+  const token = await ensureValidAccessToken();
+  if (!token) {
+    throw new PolyApiError("未登录。运行: arti login");
   }
 
   const baseUrl = config.poly.apiBaseUrl.replace(/\/+$/, "");
   const normalizedPath = path.replace(/^\/+/, "");
   const res = await fetch(`${baseUrl}/${normalizedPath}`, {
-    headers: { "X-API-Key": key },
+    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (!res.ok) {
