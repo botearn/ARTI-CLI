@@ -98,7 +98,7 @@ export async function polyGet<T>(path: string): Promise<T> {
 
 ```typescript
 poly: {
-  apiBaseUrl: string; // 默认 https://predict.artifin.ai/api/v1（待 canonical URL 确认）
+  apiBaseUrl: string; // 默认 https://www.artifin.ai/app/predict/api/v1
 };
 ```
 
@@ -159,12 +159,12 @@ ARTI_POLY_API_URL
 | 风险 | 概率 | 影响 | 缓解措施 |
 |---|---|---|---|
 | ARTi-poly API 未部署 Bearer 登录态支持 | 中 | 中 | 同步修改 ARTi-poly v1 鉴权；CLI 未登录/未授权时明确提示 |
-| Canonical Base URL 未确认 | 中 | 低 | 保留 `poly.apiBaseUrl` override |
+| 生产 Base URL 未来再次迁移 | 中 | 低 | 默认使用同源 `/app/predict/api/v1`；保留 `poly.apiBaseUrl` override |
 | ARTi-poly API 返回结构变化 | 低 | 中 | 格式化层做字段缺省降级，测试覆盖错误体解析 |
 
 ## 开放问题
 
-1. **Canonical Base URL**：默认值暂用 `https://predict.artifin.ai/api/v1`。确认最终同源路径后，更新默认值和文档。
+当前无开放问题。默认 Base URL 使用同源生产路径 `https://www.artifin.ai/app/predict/api/v1`；如部署拓扑未来变化，通过 `poly.apiBaseUrl` 覆盖并同步更新默认值。
 
 ## 变更历史
 
@@ -172,3 +172,4 @@ ARTI_POLY_API_URL
 |---|---|---|
 | 2026-07-08 | zhe | 创建 RFC |
 | 2026-07-08 | zhe | 修正鉴权决策：`arti poly` 复用 `arti login`，不再要求 `poly.apiKey` |
+| 2026-07-08 | zhe | 将默认 Base URL 更新为同源生产路径 `/app/predict/api/v1` |

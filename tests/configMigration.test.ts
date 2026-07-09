@@ -15,7 +15,7 @@ describe("config legacy API migration", () => {
     tempHome = null;
   });
 
-  it("migrates the legacy Supabase Edge default to the unified project", async () => {
+  it("migrates legacy default URLs", async () => {
     tempHome = mkdtempSync(join(tmpdir(), "arti-config-"));
     vi.stubEnv("HOME", tempHome);
 
@@ -52,6 +52,9 @@ describe("config legacy API migration", () => {
         market: "US",
         lang: "zh",
       },
+      poly: {
+        apiBaseUrl: "https://predict.artifin.ai/api/v1",
+      },
       watchlist: [],
     }, null, 2));
 
@@ -63,9 +66,11 @@ describe("config legacy API migration", () => {
     expect(config.auth.expiresAt).toBeNull();
     expect(config.auth.supabaseUrl).toBe("https://wklskhbrjnyppqfmxhxa.supabase.co");
     expect(config.auth.publishableKey).toBe("sb_publishable_5SIVwCD2q2QjtijkX8zn5Q_NSiocgl5");
+    expect(config.poly.apiBaseUrl).toBe("https://www.artifin.ai/app/predict/api/v1");
 
     const persisted = JSON.parse(readFileSync(configFile, "utf-8"));
     expect(persisted.api.baseUrl).toBe("https://wklskhbrjnyppqfmxhxa.supabase.co/functions/v1");
     expect(persisted.auth.publishableKey).toBe("sb_publishable_5SIVwCD2q2QjtijkX8zn5Q_NSiocgl5");
+    expect(persisted.poly.apiBaseUrl).toBe("https://www.artifin.ai/app/predict/api/v1");
   });
 });
