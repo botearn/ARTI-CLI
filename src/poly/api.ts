@@ -1,10 +1,5 @@
 import { ensureValidAccessToken } from "../auth.js";
-import { loadConfig } from "../config.js";
-
-interface PolyErrorBody {
-  error?: string | { code?: string; message?: string };
-  code?: string;
-}
+import { callEdge } from "../api.js";
 
 export class PolyApiError extends Error {
   constructor(
@@ -17,29 +12,22 @@ export class PolyApiError extends Error {
   }
 }
 
+interface PolyDataResponse<T> {
+  data: T;
+  meta?: Record<string, unknown>;
+}
+
 export async function polyGet<T>(path: string): Promise<T> {
-  const config = loadConfig();
   const token = await ensureValidAccessToken();
-  if (!token) {
-    throw new PolyApiError("未登录。运行: arti login");
+  if (!token) throw new PolyApiError("未登录。运行: arti login");
+
+  try {
+    const res = await callEdge<PolyDataResponse<T>>("poly-data", { path });
+    return res.data;
+  } catch (err) {
+    if (err instanceof Error) {
+      throw new PolyApiError(err.message);
+    }
+    throw err;
   }
-
-  const baseUrl = config.poly.apiBaseUrl.replace(/\/+$/, "");
-  const normalizedPath = path.replace(/^\/+/, "");
-  const res = await fetch(`${baseUrl}/${normalizedPath}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as PolyErrorBody;
-    const detail = typeof body.error === "string" ? body.error : body.error?.message;
-    const code = body.code ?? (typeof body.error === "object" ? body.error?.code : undefined);
-    throw new PolyApiError(
-      `Poly API ${res.status}: ${detail ?? res.statusText}`,
-      res.status,
-      code,
-    );
-  }
-
-  return res.json() as Promise<T>;
 }

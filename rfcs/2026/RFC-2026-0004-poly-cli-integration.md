@@ -3,33 +3,34 @@
 ## 元数据
 
 - **RFC 编号**: RFC-2026-0004
-- **标题**: ARTi Poly CLI 集成 — `arti poly` 子命令接入 ARTi-poly 数据 API
+- **标题**: ARTi Poly CLI 集成 — `arti poly` 通过主站 Edge Function 访问预测市场数据
 - **作者**: zhe
 - **状态**: Draft
 - **创建日期**: 2026-07-08
-- **最后更新**: 2026-07-08
-- **关联 RFC（外部）**: ARTi-poly RFC-2026-0005（公开 API）、RFC-2026-0022（同源化部署）
+- **最后更新**: 2026-07-09
+- **关联 RFC（外部）**: ARTi-poly RFC-2026-0005（公开 API）、ARTi-poly RFC-2026-0022（同源化部署）
 
 ## 摘要
 
-在 ARTI-CLI（`arti` 命令）中新增 `arti poly` 子命令组，通过现有 `arti login` 登录态访问 ARTi-poly 预测市场数据。Phase 1 只做只读查询；Credits 下注和 AI 流式分析延后到 Phase 2。
+在 ARTI-CLI（`arti` 命令）中新增 `arti poly` 子命令组。第一方 CLI 不直接调用 ARTi-poly Public API，也不使用 `X-API-Key`；它复用现有 `arti login` 登录态，通过主站 Supabase Edge Function `poly-data` 获取预测市场数据。
 
-## 当前实现校准（2026-07-08）
+Phase 1 只做只读查询；Credits 下注和 AI 流式分析延后到 Phase 2。
 
-第一版 RFC 曾建议 `arti poly` 直接使用 Public API v1 的 `X-API-Key`。该口径已被修正：`arti` 用户已经通过 `arti login` 建立 Supabase session，CLI 子命令不应再要求用户单独申请和配置 Public API Key。
+## 当前实现校准（2026-07-09）
 
-当前决策：
+第一版 RFC 曾建议 `arti poly` 直接调用 Public API v1，并使用 `X-API-Key` 或直接 Bearer 调 `/api/v1/*`。该方向已被修正：
 
-- `arti poly` 使用现有 `auth.token`，请求 Header 为 `Authorization: Bearer <token>`。
-- ARTi-poly `/api/v1/*` 保留 `X-API-Key` 给第三方开发者，同时接受 `Authorization: Bearer` 给第一方 CLI / 登录用户。
-- CLI 只保留 `poly.apiBaseUrl` 作为部署路径 override；不新增 `poly.apiKey`。
-- 未登录或 token 过期时提示用户运行 `arti login`。
+- `arti` 第一方 CLI 统一走现有 `callEdge()` 链路。
+- `arti poly` 调用 `callEdge("poly-data", { path })`。
+- `poly-data` 位于主站 `arti/supabase/functions/poly-data`，负责校验 `arti login` Bearer token 并代理预测市场只读数据。
+- 第三方 Public API 继续以 `X-API-Key` 为主鉴权方式。
+- `poly.apiBaseUrl` / `ARTI_POLY_API_URL` 不再参与 `arti poly` 运行时；保留仅作历史兼容，后续可清理。
 
 ## 动机
 
 ### 问题陈述
 
-ARTi-poly 已有预测市场数据 API，但目前主要通过浏览器/HTTP 客户端访问。用户希望在终端快速查看预测市场摘要、事件列表、事件详情和跨平台价差，并与现有 `arti` 登录态和 REPL 工作流无缝衔接。
+用户希望在终端快速查看预测市场摘要、事件列表、事件详情和跨平台价差，并与现有 `arti` 登录态和 REPL 工作流无缝衔接。
 
 ### 用户故事
 
@@ -50,7 +51,7 @@ arti poly compare
 arti poly search <keyword> [--limit <n>]
 ```
 
-REPL 中同样可用（通过统一 CommandDef 注册）：
+REPL 中同样可用：
 
 ```text
 > poly events
@@ -59,96 +60,98 @@ REPL 中同样可用（通过统一 CommandDef 注册）：
 
 ### 技术方案
 
-#### 目录结构
+#### ARTI-CLI
 
-```text
-src/
-  poly/
-    api.ts        # fetch 封装，注入 Authorization: Bearer，读取 poly.apiBaseUrl
-    format.ts     # 表格/摘要格式化
-    commands.ts   # poly 子动作分发
-```
-
-### `src/poly/api.ts`
-
-`polyGet` 使用现有 auth 模块：
+`src/poly/api.ts` 保留 `polyGet(path)` 对上层命令的接口，但底层改为：
 
 ```typescript
-import { ensureValidAccessToken } from "../auth.js";
-import { loadConfig } from "../config.js";
+import { callEdge } from "../api.js";
+
+interface PolyDataResponse<T> {
+  data: T;
+  meta?: Record<string, unknown>;
+}
 
 export async function polyGet<T>(path: string): Promise<T> {
-  const token = await ensureValidAccessToken();
-  if (!token) throw new Error("未登录。运行: arti login");
-
-  const baseUrl = loadConfig().poly.apiBaseUrl.replace(/\/+$/, "");
-  const normalizedPath = path.replace(/^\/+/, "");
-  const res = await fetch(`${baseUrl}/${normalizedPath}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  if (!res.ok) throw new Error(`Poly API ${res.status}`);
-  return res.json() as Promise<T>;
+  const res = await callEdge<PolyDataResponse<T>>("poly-data", { path });
+  return res.data;
 }
 ```
 
-### 配置键
-
-新增 `poly` 命名空间到 `ArtiConfig`：
-
-```typescript
-poly: {
-  apiBaseUrl: string; // 默认 https://www.artifin.ai/app/predict/api/v1
-};
-```
-
-`ALLOWED_CONFIG_KEYS` 新增：
+这样 `arti poly` 与 `quick-scan/full/deep/chat` 使用同一认证和网络路径：
 
 ```text
-poly.apiBaseUrl
+ARTI-CLI -> Supabase Edge Function -> 主站 predict 数据入口
 ```
 
-环境变量覆盖：
+#### 主站 Edge Function：`poly-data`
+
+新增：
 
 ```text
-ARTI_POLY_API_URL
+arti/supabase/functions/poly-data/index.ts
 ```
+
+请求：
+
+```http
+POST /functions/v1/poly-data
+Authorization: Bearer <arti login token>
+Content-Type: application/json
+
+{ "path": "events?limit=3&source=polymarket" }
+```
+
+职责：
+
+1. 校验 `Authorization: Bearer` 对应的 Supabase 用户。
+2. 校验 `path` 是 allowlisted relative path，避免 SSRF。
+3. 用服务端配置调用主站 predict 只读数据入口。
+4. 返回主站统一 Edge Function envelope。
+
+允许路径：
+
+- `events`
+- `events/<slug>`
+- `summary`
+- `market-comparison`
+- `markets/search`
 
 ### Phase 1 命令范围
 
-| 命令 | ARTi-poly 端点 | 说明 |
+| 命令 | poly-data path | 说明 |
 |---|---|---|
-| `poly events` | `GET /events` | 事件列表，支持 limit/source/category |
-| `poly event <slug>` | `GET /events/<slug>` | 事件详情 + 市场列表 |
-| `poly summary` | `GET /summary` | 热门事件 + ARTi Pick |
-| `poly compare` | `GET /market-comparison` | 跨平台赔率对比 |
-| `poly search <q>` | `GET /markets/search?source=kalshi&q=...` | Kalshi 市场搜索 |
+| `poly events` | `events?...` | 事件列表，支持 limit/source/category |
+| `poly event <slug>` | `events/<slug>?...` | 事件详情 + 市场列表 |
+| `poly summary` | `summary?...` | 热门事件 + ARTi Pick |
+| `poly compare` | `market-comparison` | 跨平台赔率对比 |
+| `poly search <q>` | `markets/search?source=kalshi&q=...` | Kalshi 市场搜索 |
 
-均为只读 GET 请求，不涉及下注、Credits、AI 流式分析。
-
-### 测试策略
-
-- **单元测试**：`polyGet` 注入 Bearer token、未登录报错、4xx/5xx 错误体解析。
-- **集成测试**：本机已登录后执行 `arti poly events --limit 5`。
-- **回归测试**：`npm test`、`npm run build`。
+均为只读请求，不涉及下注、Credits、AI 流式分析。
 
 ## 权衡与替代方案
 
-### 方案 A — 放入 ARTI-CLI 并复用登录态（选中）
+### 方案 A — ARTI-CLI 调主站 Edge Function（选中）
 
 **优点**：
-- 用户只需 `arti login`，不需要额外 API Key。
-- 复用现有 install、config、REPL、output、auth 基础设施。
-- 后续 Phase 2 接 Credits / AI / 下注时可沿用同一用户身份。
+
+- 与现有 `arti` CLI 架构一致。
+- 用户只需 `arti login`。
+- CLI 不依赖前端同源路径、Cloudflare、多 Zone rewrite 或 ARTi-poly 独立 Vercel URL。
+- Public API 可以继续清晰地服务第三方 `X-API-Key` 场景。
 
 **缺点**：
-- ARTi-poly `/api/v1/*` 需要同时支持 Public API Key 和第一方 Bearer 登录态。
 
-### 方案 B — 使用 Public API Key（已放弃）
+- 需要新增并部署一个主站 Supabase Edge Function。
+- `poly-data` 和 predict 数据入口之间会有一层服务端 HTTP 调用。
 
-**优点**：实现简单，复用公开 API 的第三方鉴权。
+### 方案 B — CLI 直接调用 ARTi-poly Public API（已放弃）
 
-**缺点**：对 `arti` 用户体验不合理；用户已登录仍需申请 key，且与未来 Credits/AI 登录态能力割裂。
+**缺点**：
+
+- 会把第一方 CLI 绑定到公开 API / 前端部署路径。
+- `arti login` 和 `X-API-Key` 体验割裂。
+- 后续 Credits、AI、下注等用户态功能仍要重新改链路。
 
 ### 方案 C — ARTi-poly 自带独立 CLI（未选中）
 
@@ -158,13 +161,15 @@ ARTI_POLY_API_URL
 
 | 风险 | 概率 | 影响 | 缓解措施 |
 |---|---|---|---|
-| ARTi-poly API 未部署 Bearer 登录态支持 | 中 | 中 | 同步修改 ARTi-poly v1 鉴权；CLI 未登录/未授权时明确提示 |
-| 生产 Base URL 未来再次迁移 | 中 | 低 | 默认使用同源 `/app/predict/api/v1`；保留 `poly.apiBaseUrl` override |
-| ARTi-poly API 返回结构变化 | 低 | 中 | 格式化层做字段缺省降级，测试覆盖错误体解析 |
+| `poly-data` path 校验不严导致 SSRF | 中 | 高 | 只接受 allowlisted relative path，拒绝 URL、`//`、`..`、反斜杠 |
+| 上游 predict 数据入口变化 | 中 | 中 | Edge Function 使用 `ARTI_POLY_INTERNAL_BASE_URL` 配置；CLI 不感知 |
+| 双层 envelope 处理错误 | 中 | 中 | `polyGet` 只 unwrap `poly-data` 外层，保留 predict 数据 envelope 给现有 formatter |
+| `poly-data` 未上线时 CLI 404 | 中 | 中 | 先部署主站 Edge Function，再合并/发布 CLI |
 
 ## 开放问题
 
-当前无开放问题。默认 Base URL 使用同源生产路径 `https://www.artifin.ai/app/predict/api/v1`；如部署拓扑未来变化，通过 `poly.apiBaseUrl` 覆盖并同步更新默认值。
+- `poly.apiBaseUrl` / `ARTI_POLY_API_URL` 当前已不参与运行时。为减少破坏，先保留；后续单独清理。
+- `ARTi-poly /api/v1/*` 已支持 Bearer 的兼容逻辑可以保留，但不作为 `arti poly` 主链路。
 
 ## 变更历史
 
@@ -173,3 +178,4 @@ ARTI_POLY_API_URL
 | 2026-07-08 | zhe | 创建 RFC |
 | 2026-07-08 | zhe | 修正鉴权决策：`arti poly` 复用 `arti login`，不再要求 `poly.apiKey` |
 | 2026-07-08 | zhe | 将默认 Base URL 更新为同源生产路径 `/app/predict/api/v1` |
+| 2026-07-09 | zhe | 再次收敛架构：`arti poly` 改为通过主站 `poly-data` Edge Function 获取数据 |
