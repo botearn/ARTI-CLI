@@ -88,7 +88,6 @@ const api = require('./dist/index.js');
 const functions = [
   'callBackend',
   'scanStockBackend',
-  'generateReport',
   'streamOrchestratorBackend',
   'routeIntent',
 ];

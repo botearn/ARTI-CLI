@@ -55,9 +55,11 @@ const defs: CommandDef[] = [
       "$ arti chat --raw 美股今天怎么样",
       "$ arti chat 帮我看看英伟达",
     ],
-    invoke: ({ positional, options }) => chatCommand(positional.join(" "), {
-      raw: options.raw as boolean | undefined,
-    }),
+    invoke: async ({ positional, options }) => {
+      await chatCommand(positional.join(" "), {
+        raw: options.raw as boolean | undefined,
+      });
+    },
   },
   {
     name: "quick-scan", aliases: ["quick", "qs"],

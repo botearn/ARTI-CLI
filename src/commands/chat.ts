@@ -9,11 +9,20 @@ import { printError } from "../errors.js";
 import { track } from "../tracker.js";
 import { dispatchNaturalText } from "../core/natural-dispatch.js";
 
-export interface ChatCommandOptions {
-  raw?: boolean;
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
-export async function rawChatCommand(message: string): Promise<void> {
+export interface ChatCommandOptions {
+  raw?: boolean;
+  history?: ChatMessage[];
+}
+
+export async function rawChatCommand(
+  message: string,
+  options?: Pick<ChatCommandOptions, "history">,
+): Promise<string | undefined> {
   const text = message?.trim();
   if (!text) {
     console.log(chalk.red("请输入问题，例如：arti chat 美股今天怎么样"));
@@ -23,17 +32,19 @@ export async function rawChatCommand(message: string): Promise<void> {
   try {
     const billed = await withBilling("chat", async () => {
       track("chat", []);
-      let received = false;
+      let assistantText = "";
       process.stdout.write("\n  ");
-      for await (const delta of streamChat([{ role: "user", content: text }])) {
+      const messages = [...(options?.history ?? []), { role: "user" as const, content: text }];
+      for await (const delta of streamChat(messages)) {
         process.stdout.write(delta);
-        received = true;
+        assistantText += delta;
       }
       process.stdout.write("\n");
-      return received ? true : undefined;
+      return assistantText || undefined;
     });
     if (!billed) return;
     printDeductResult(billed.deduct);
+    return billed.result;
   } catch (err) {
     if (err instanceof InsufficientCreditsError) {
       console.log(chalk.red(`\n  ✗ ${err.message}\n`));
@@ -43,7 +54,10 @@ export async function rawChatCommand(message: string): Promise<void> {
   }
 }
 
-export async function chatCommand(message: string, options?: ChatCommandOptions): Promise<void> {
+export async function chatCommand(
+  message: string,
+  options?: ChatCommandOptions,
+): Promise<string | undefined> {
   const text = message?.trim();
   if (!text) {
     console.log(chalk.red("请输入问题，例如：arti chat 美股今天怎么样"));
@@ -51,12 +65,17 @@ export async function chatCommand(message: string, options?: ChatCommandOptions)
   }
 
   if (options?.raw) {
-    await rawChatCommand(text);
-    return;
+    return rawChatCommand(text, { history: options.history });
   }
 
   try {
-    await dispatchNaturalText(text, { onGeneralChat: rawChatCommand });
+    let assistantText: string | undefined;
+    await dispatchNaturalText(text, {
+      onGeneralChat: async (chatText) => {
+        assistantText = await rawChatCommand(chatText, { history: options?.history });
+      },
+    });
+    return assistantText;
   } catch (err) {
     printError(err);
   }
