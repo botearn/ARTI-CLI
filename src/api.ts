@@ -427,7 +427,7 @@ export async function callBackend<T>(
   throw lastError;
 }
 
-// ── Backend: scan-stock ──
+// ── Edge: scan-stock ──
 
 export interface BackendStockData {
   code: string;
@@ -486,25 +486,18 @@ export interface BackendScanResponse {
   scan: BackendStockData;
 }
 
+interface V1SuccessEnvelope<T> {
+  data: T;
+  meta: {
+    requestId: string;
+    apiVersion: "v1";
+    billing?: Record<string, unknown>;
+  };
+}
+
 export async function scanStockBackend(symbol: string): Promise<BackendScanResponse> {
-  return callBackend("/v1/scan-stock", { symbol });
-}
-
-// ── Backend: generate-report (异步任务) ──
-
-export interface GenerateReportRequest {
-  symbol: string;
-  reportType?: "stock" | "panorama" | "deep" | "premarket" | "postmarket" | "full";
-  analystAgents?: string[];
-}
-
-export interface GenerateReportResponse {
-  taskId: string;
-  status: "pending";
-}
-
-export async function generateReport(req: GenerateReportRequest): Promise<GenerateReportResponse> {
-  return callBackend("/v1/generate-report", req);
+  const envelope = await callEdge<V1SuccessEnvelope<BackendScanResponse>>("v1-scan-stock", { symbol });
+  return envelope.data;
 }
 
 // ── Backend: orchestrator (SSE 流式) ──
@@ -585,44 +578,46 @@ export async function* streamOrchestratorBackend(
   }
 }
 
-// ── Backend: chat（SSE 流式）──
+// ── Edge: chat（SSE 流式）──
 
-/** 从一段 SSE chunk 提取文本增量（chat 流是纯文本 token，也兼容 JSON delta） */
-function parseChatDelta(chunk: string): string {
-  const trimmed = chunk.trim();
-  if (!trimmed || trimmed.startsWith(":")) return "";
-  const dataLines = trimmed
-    .split(/\r?\n/)
-    .filter(line => line.startsWith("data:"))
-    .map(line => line.slice(5).replace(/^ /, ""));
-  if (!dataLines.length) return "";
-  const payload = dataLines.join("\n");
-  if (payload === "[DONE]") return "";
+type ChatSseEvent =
+  | { type: "message.delta"; data: { content?: string } }
+  | { type: "message.done"; data: { requestId?: string; model?: string } }
+  | { type: "billing"; data: Record<string, unknown> }
+  | { type: "error"; data: { code?: string; message?: string; status?: number } }
+  | { type: string; data: Record<string, unknown> };
+
+function parseChatSseEvent(frame: string): ChatSseEvent | null {
+  let type = "";
+  const dataLines: string[] = [];
+
+  for (const line of frame.trim().split(/\r?\n/)) {
+    if (line.startsWith("event:")) type = line.slice(6).trim();
+    if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+  }
+  if (!type || !dataLines.length) return null;
+
   try {
-    const obj = JSON.parse(payload);
-    if (typeof obj === "string") return obj;
-    // OpenAI 风格：choices[0].delta.content；兼容其它字段名
-    return (obj.choices?.[0]?.delta?.content ?? obj.text ?? obj.content ?? obj.delta ?? "") as string;
+    const data = JSON.parse(dataLines.join("\n"));
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    return { type, data } as ChatSseEvent;
   } catch {
-    return payload;
+    return null;
   }
 }
 
-/** 调用产品 chat 函数，流式返回文本增量 */
+/** 调用产品 v1-chat 函数，流式返回文本增量 */
 export async function* streamChat(
   messages: Array<{ role: string; content: string }>,
 ): AsyncGenerator<string> {
   const config = loadConfig();
-  const baseUrl = config.backend.url;
-  const authToken = config.auth.token;
-  if (!baseUrl) throw new Error("Backend URL 未配置");
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 300_000); // 5 分钟超时
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
-  try {
-    const res = await fetch(`${baseUrl}/v1/chat`, {
+  const request = async (forceRefresh = false): Promise<Response> => {
+    const authToken = await ensureValidAccessToken(forceRefresh ? { forceRefresh: true } : undefined);
+    return fetch(`${config.api.baseUrl}/v1-chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -631,31 +626,42 @@ export async function* streamChat(
       body: JSON.stringify({ messages }),
       signal: controller.signal,
     });
+  };
+
+  try {
+    let res = await request();
+    if (res.status === 401 && config.auth.refreshToken) res = await request(true);
 
     if (!res.ok) {
       const text = await res.text().catch(() => "unknown");
-      throw new ApiError("/v1/chat", res.status, text);
+      throw new ApiError("v1-chat", res.status, text);
     }
     if (!res.body) throw new Error("SSE 响应无 body");
 
     reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let done = false;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const chunks = buffer.split(/\r?\n\r?\n/);
-      buffer = chunks.pop() || "";
-      for (const chunk of chunks) {
-        const delta = parseChatDelta(chunk);
-        if (delta) yield delta;
+    while (!done) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() || "";
+
+      for (const frame of frames) {
+        const event = parseChatSseEvent(frame);
+        if (event?.type === "message.delta" && typeof event.data.content === "string") {
+          yield event.data.content;
+        } else if (event?.type === "message.done") {
+          done = true;
+        } else if (event?.type === "error") {
+          const error = event.data as { code?: string; message?: string; status?: number };
+          throw new ApiError("v1-chat", error.status ?? 500, error.message ?? error.code ?? "聊天失败");
+        }
+        // billing 与未知事件不产出正文；消费完成即确认计费。
       }
-    }
-    if (buffer.trim()) {
-      const delta = parseChatDelta(buffer);
-      if (delta) yield delta;
     }
   } finally {
     if (reader) {

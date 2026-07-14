@@ -11,8 +11,17 @@ import chalk from "chalk";
 import { trackCommand } from "./session.js";
 import { getAuthState, isLoggedIn } from "../auth.js";
 import { VERSION } from "../version.js";
-import { rawChatCommand } from "../commands/chat.js";
-import { dispatchNaturalText } from "./natural-dispatch.js";
+import {
+  chatCommand,
+  rawChatCommand,
+  type ChatCommandOptions,
+  type ChatMessage,
+} from "../commands/chat.js";
+import {
+  dispatchNaturalText,
+  type NaturalDispatchOptions,
+  type NaturalDispatchResult,
+} from "./natural-dispatch.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const HISTORY_FILE = join(CONFIG_DIR, "repl_history");
@@ -261,13 +270,67 @@ function findCommand(name: string): ReplCommand | undefined {
   return commands.find(c => c.name === name || c.aliases.includes(name));
 }
 
+const MAX_CHAT_MESSAGES = 12;
+
+type NaturalDispatcher = (
+  text: string,
+  options: NaturalDispatchOptions,
+) => Promise<NaturalDispatchResult | undefined>;
+type RawChatRunner = (
+  message: string,
+  options?: Pick<ChatCommandOptions, "history">,
+) => Promise<string | undefined>;
+type ChatRunner = (
+  message: string,
+  options?: ChatCommandOptions,
+) => Promise<string | undefined>;
+
+export function appendChatTurn(
+  history: ChatMessage[],
+  userText: string,
+  assistantText: string,
+): void {
+  history.push(
+    { role: "user", content: userText },
+    { role: "assistant", content: assistantText },
+  );
+  if (history.length > MAX_CHAT_MESSAGES) {
+    history.splice(0, history.length - MAX_CHAT_MESSAGES);
+  }
+}
+
+export function clearChatHistory(history: ChatMessage[]): void {
+  history.splice(0, history.length);
+}
+
+export async function dispatchReplChat(
+  args: string[],
+  history: ChatMessage[],
+  runChat: ChatRunner = chatCommand,
+): Promise<void> {
+  const raw = args.includes("--raw");
+  const text = args.filter(arg => arg !== "--raw").join(" ").trim();
+  const assistantText = await runChat(text, { raw, history: [...history] });
+  if (assistantText) appendChatTurn(history, text, assistantText);
+}
+
 /** 自由文本 → 复用产品意图识别 → 派发到对应能力 */
-async function dispatchFreeText(text: string): Promise<void> {
+export async function dispatchReplFreeText(
+  text: string,
+  history: ChatMessage[],
+  dispatch: NaturalDispatcher = dispatchNaturalText,
+  runRawChat: RawChatRunner = rawChatCommand,
+): Promise<void> {
   if (!text) return;
   appendHistory(text);
   trackCommand(text);
   try {
-    await dispatchNaturalText(text, { onGeneralChat: rawChatCommand });
+    await dispatch(text, {
+      onGeneralChat: async (chatText) => {
+        const assistantText = await runRawChat(chatText, { history: [...history] });
+        if (assistantText) appendChatTurn(history, chatText, assistantText);
+      },
+    });
   } catch (err) {
     console.error(chalk.red(`  处理失败: ${err instanceof Error ? err.message : String(err)}`));
   }
@@ -278,6 +341,7 @@ export async function startRepl(): Promise<void> {
   printBanner();
 
   const history = loadHistory();
+  const chatHistory: ChatMessage[] = [];
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -314,8 +378,18 @@ export async function startRepl(): Promise<void> {
       rl.prompt();
       return;
     }
-    if (cmdName === "clear" || cmdName === "cls") {
+    if (["clear", "cls", "/clear", "reset"].includes(cmdName)) {
+      clearChatHistory(chatHistory);
       console.clear();
+      rl.prompt();
+      return;
+    }
+
+    if (["chat", "c", "ask"].includes(cmdName)) {
+      appendHistory(line.trim());
+      trackCommand(line.trim());
+      await dispatchReplChat(args, chatHistory);
+      console.log();
       rl.prompt();
       return;
     }
@@ -323,7 +397,7 @@ export async function startRepl(): Promise<void> {
     // 查找注册命令；非命令则当作自由文本走意图识别
     const cmd = findCommand(cmdName);
     if (!cmd) {
-      await dispatchFreeText(line.trim());
+      await dispatchReplFreeText(line.trim(), chatHistory);
       console.log();
       rl.prompt();
       return;
