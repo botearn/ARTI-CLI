@@ -9,6 +9,7 @@
 | [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) | 新用户上手 — 一行安装 + REPL 登录态 Onboarding | 2026-06-01 |
 | [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) | CLI 数据链收敛到生产产品函数，下线 OpenBB 第二套处理 | 2026-06-24 |
 | [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) | ARTi Poly CLI 集成 — `arti poly` 子命令接入 ARTi-poly 公开 API | 2026-07-08 |
+| [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) | chat / quick-scan 切换 Supabase Edge /v1 + REPL 会话历史（arti#0055 姊妹篇） | 2026-07-14 |
 
 ---
 
@@ -63,6 +64,7 @@
 ### 📊 数据源 & API
 
 - [RFC-2026-0001](2026/RFC-2026-0001-backend-mcp-integration.md) - Backend MCP 集成
+- [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) - chat / quick-scan 切换 Edge /v1（arti#0055 姊妹篇）
 
 ### 🔧 CLI 命令
 
@@ -90,6 +92,7 @@
 
 ### 2026
 
+- **2026-07-14** - [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) - chat / quick-scan 切换 Edge /v1 (Draft, arti#0055 姊妹篇)
 - **2026-07-08** - [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成 (Draft)
 - **2026-06-24** - [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) - CLI 数据链收敛 (Draft)
 - **2026-06-01** - [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) - 新用户上手 / 一行安装 + Onboarding (Draft)
@@ -105,13 +108,13 @@
 
 | 状态 | 数量 |
 |---|---|
-| Draft | 3 |
+| Draft | 4 |
 | Proposed | 0 |
 | Accepted | 0 |
 | Implementing | 0 |
 | Implemented | 1 |
 | Rejected | 0 |
 | Deprecated | 0 |
-| **总计** | **4** |
+| **总计** | **5** |
 
-**最后更新**: 2026-07-08
+**最后更新**: 2026-07-14
