@@ -61,7 +61,7 @@ artifin.ai/cli (落地页)
 #### install.sh 行为
 
 1. 检测 `node` 是否存在且 `>=18`；缺失则打印 Node 安装指引并退出非零。
-2. 检测 `npm`；执行 `npm install -g arti-cli`（失败给出 sudo/权限提示）。
+2. 检测 `npm`；执行 `npm install -g artifin-cli`（失败给出 sudo/权限提示）。
 3. 成功后打印下一步：`arti login` 与示例命令。
 4. 纯 POSIX sh，set -e，对 `curl | bash` 友好（不依赖交互输入）。
 

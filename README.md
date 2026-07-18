@@ -6,6 +6,8 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
+[![npm](https://img.shields.io/npm/v/artifin-cli)](https://www.npmjs.com/package/artifin-cli)
+[![Repository](https://img.shields.io/badge/repo-botearn%2FARTI--CLI-black)](https://github.com/botearn/ARTI-CLI)
 
 </div>
 

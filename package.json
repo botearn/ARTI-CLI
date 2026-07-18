@@ -34,6 +34,9 @@
     "type": "git",
     "url": "git+https://github.com/botearn/ARTI-CLI.git"
   },
+  "bugs": {
+    "url": "https://github.com/botearn/ARTI-CLI/issues"
+  },
   "homepage": "https://github.com/botearn/ARTI-CLI#readme",
   "license": "MIT",
   "dependencies": {

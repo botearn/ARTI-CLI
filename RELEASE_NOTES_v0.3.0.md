@@ -229,7 +229,7 @@ arti quote AAPL
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YuqingNicole/ARTI-CLI.git
+git clone https://github.com/botearn/ARTI-CLI.git
 cd ARTI-CLI
 
 # 安装依赖
@@ -287,7 +287,7 @@ cat docs/SETUP_COMPLETE.md
 ## 📞 支持
 
 **问题反馈：**
-- GitHub Issues: https://github.com/YuqingNicole/ARTI-CLI/issues
+- GitHub Issues: https://github.com/botearn/ARTI-CLI/issues
 
 **文档：**
 - 查看 `docs/` 目录下所有文档

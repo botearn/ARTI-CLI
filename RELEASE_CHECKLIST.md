@@ -1,5 +1,7 @@
 # Release Checklist - v0.3.0
 
+> 历史发布归档。当前包名为 `artifin-cli`，主分支为 `main`，仓库地址为 `https://github.com/botearn/ARTI-CLI`。
+
 ## 📋 发布前检查清单
 
 ### ✅ 代码质量
@@ -79,7 +81,7 @@ git tag -a v0.3.0 -m "Release v0.3.0: CLI 改用 Backend HTTP API
 ### 3. 推送到远程
 
 ```bash
-git push origin master
+git push origin main
 git push origin v0.3.0
 ```
 
@@ -146,7 +148,7 @@ npm publish
 ### 2. 测试安装（如果发布到 npm）
 
 ```bash
-npm install -g arti-cli@0.3.0
+npm install -g artifin-cli@0.3.0
 arti --version  # 应显示 0.3.0
 ```
 
@@ -196,11 +198,11 @@ git commit -m "chore: bump version to 0.3.0"
 git tag -a v0.3.0 -m "Release v0.3.0: CLI 改用 Backend HTTP API"
 
 # 3. 推送
-git push origin master
+git push origin main
 git push origin v0.3.0
 
 # 4. 在 GitHub 创建 Release（可选）
-# 访问：https://github.com/YuqingNicole/ARTI-CLI/releases/new
+# 访问：https://github.com/botearn/ARTI-CLI/releases/new
 ```
 
 ---
