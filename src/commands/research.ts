@@ -205,10 +205,64 @@ function isDebugEnabled(): boolean {
   return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 
-function isUsableReport(report: ResearchReport): boolean {
+export function isUsableResearchReport(report: ResearchReport): boolean {
   if (normalizeConfidence(report.confidence) < 0.3) return false;
   if (/(暂无|数据缺失|无法获取|缺少.*数据)/i.test(report.summary)) return false;
   return true;
+}
+
+export function buildResearchStartupProgress(symbol: string): {
+  searching: string;
+  fetching: string;
+  connecting: string;
+} {
+  return {
+    searching: `正在搜索股票代码 ${symbol}...`,
+    fetching: `正在获取 ${symbol} 行情与技术数据...`,
+    connecting: "连接 ARTI 研报引擎...",
+  };
+}
+
+export function buildLayer1AgentDoneProgress(
+  label: string,
+  report: ResearchReport,
+  completed: number,
+  total = 8,
+): string {
+  return `Layer 1 — ${label} 完成 (${report.sentiment}, 置信度 ${Math.round(normalizeConfidence(report.confidence) * 100)}%) | 进度 ${completed}/${total}`;
+}
+
+export function buildLayer1AgentSkippedProgress(label: string, completed: number, total = 8): string {
+  return `Layer 1 — ${label} 数据不足，跳过 | 进度 ${completed}/${total}`;
+}
+
+export function buildResearchTimeoutWarning(elapsedSeconds: number): string {
+  return `分析耗时较长（已等待 ${elapsedSeconds}s），您可以按 Ctrl+C 取消，或继续等待...`;
+}
+
+export interface AnalystOverviewRow {
+  index: number;
+  label: string;
+  sentiment: string;
+  confidence: number;
+  skipped: boolean;
+  skipReason?: string;
+}
+
+export function buildAnalystOverviewRows(
+  reports: { agent: string; report: ResearchReport }[],
+): AnalystOverviewRow[] {
+  return reports.map(({ agent, report }, index) => {
+    const usable = isUsableResearchReport(report);
+    return {
+      index: index + 1,
+      label: AGENT_LABELS[agent] || agent,
+      sentiment: report.sentiment,
+      confidence: normalizeConfidence(report.confidence),
+      skipped: !usable,
+      skipReason: usable ? undefined : "数据获取中，跳过",
+    };
+  });
 }
 
 function summarizeMarketSnapshot(stockData: string): string {
@@ -878,10 +932,11 @@ async function runOrchestrator(
   featureKey: FeatureKey,
   billingState: BillingState,
 ): Promise<void> {
-  let spinner = ora(`正在搜索股票代码 ${symbol}...`).start();
+  const startupProgress = buildResearchStartupProgress(symbol);
+  let spinner = ora(startupProgress.searching).start();
 
   // R1: 实时进度反馈 - 显示数据获取阶段
-  spinner.text = `正在获取 ${symbol} 行情与技术数据...`;
+  spinner.text = startupProgress.fetching;
   const context = await buildResearchStockContext(symbol);
   const stockData = context.stockData;
   const backendStockData = context.backendStockData || stockData;
@@ -896,7 +951,7 @@ async function runOrchestrator(
     }
   }
 
-  spinner.text = `连接 ARTI 研报引擎...`;
+  spinner.text = startupProgress.connecting;
 
   // 收集所有结果
   const reports: { agent: string; report: ResearchReport }[] = [];
@@ -916,7 +971,7 @@ async function runOrchestrator(
     if (elapsed >= 60 && !timeoutWarningShown) {
       spinner.warn(
         chalk.yellow(
-          `分析耗时较长（已等待 ${elapsed}s），您可以按 Ctrl+C 取消，或继续等待...`
+          buildResearchTimeoutWarning(elapsed)
         )
       );
       timeoutWarningShown = true;
@@ -956,11 +1011,11 @@ async function runOrchestrator(
             layer1Count++;
             // R1: 实时进度反馈 - 显示每个分析师完成状态
             const label = event.label || AGENT_LABELS[event.agent] || event.agent;
-            spinner.text = `Layer 1 — ${label} 完成 (${event.report.sentiment}, 置信度 ${Math.round(normalizeConfidence(event.report.confidence) * 100)}%) | 进度 ${layer1Count}/8`;
+            spinner.text = buildLayer1AgentDoneProgress(label, event.report, layer1Count);
           } else if (event.error) {
             layer1Count++;
             const label = event.label || AGENT_LABELS[event.agent || ""] || event.agent || "?";
-            spinner.text = `Layer 1 — ${label} 数据不足，跳过 | 进度 ${layer1Count}/8`;
+            spinner.text = buildLayer1AgentSkippedProgress(label, layer1Count);
           }
           break;
 
@@ -1013,27 +1068,24 @@ async function runOrchestrator(
           }
 
           // R3: 消除暂无数据尴尬 - 过滤掉置信度过低或明显缺数据的分析师
-          const validReports = reports.filter(({ report }) => isUsableReport(report));
+          const validReports = reports.filter(({ report }) => isUsableResearchReport(report));
 
           // R4: 分层展示详情 - 先显示简洁列表
           console.log(chalk.bold(`\n  ── 8位分析师观点 ──\n`));
-          let idx = 1;
-          for (const { agent, report } of reports) {
+          const analystRows = buildAnalystOverviewRows(reports);
+          for (const row of analystRows) {
             // 如果数据不足，简短说明后跳过
-            if (!validReports.find(r => r.agent === agent)) {
+            if (row.skipped) {
               console.log(
-                `  ${chalk.gray(`${idx}. ${AGENT_LABELS[agent]}`)} ${chalk.dim("数据获取中，跳过")}`
+                `  ${chalk.gray(`${row.index}. ${row.label}`)} ${chalk.dim(row.skipReason)}`
               );
-              idx++;
               continue;
             }
-            const label = AGENT_LABELS[agent] || agent;
             console.log(
-              `  ${chalk.bold(`${idx}. ${label}`)} ` +
-              `${sentimentBadge(report.sentiment)} ` +
-              `${confidenceBar(normalizeConfidence(report.confidence))}`
+              `  ${chalk.bold(`${row.index}. ${row.label}`)} ` +
+              `${sentimentBadge(row.sentiment)} ` +
+              `${confidenceBar(row.confidence)}`
             );
-            idx++;
           }
 
           if (options.mode === "layer1-only") {
@@ -1141,7 +1193,7 @@ async function runOrchestrator(
 
           // R4: 最终展示详细报告（可选）
           if (options.full) {
-            const validReports = reports.filter(({ report }) => isUsableReport(report));
+            const validReports = reports.filter(({ report }) => isUsableResearchReport(report));
             renderDeepReportDocument(
               symbol,
               finalReportType,
