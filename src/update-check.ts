@@ -51,15 +51,19 @@ function isNewer(latest: string, current: string): boolean {
 
 /**
  * 静默检查更新。仅在超过 24h 未检查时发起请求。
- * 如果有新版本，打印提示。不抛异常、不阻塞。
+ * 发现新版本时通过 onUpdate 回调通知（展示方式由调用方决定）。
+ * 不抛异常、不阻塞；定时器 unref，不拖住进程退出。
  */
-export async function checkForUpdate(currentVersion: string): Promise<void> {
+export async function checkForUpdate(
+  currentVersion: string,
+  onUpdate?: (latest: string) => void,
+): Promise<void> {
   try {
     const state = loadState();
     if (Date.now() - state.lastCheck < CHECK_INTERVAL_MS) {
       // 上次检查距离现在不到 24h，用缓存结果
       if (state.latestVersion && isNewer(state.latestVersion, currentVersion)) {
-        printUpdateNotice(currentVersion, state.latestVersion);
+        onUpdate?.(state.latestVersion);
       }
       return;
     }
@@ -67,6 +71,7 @@ export async function checkForUpdate(currentVersion: string): Promise<void> {
     // 发起 npm registry 查询
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
+    timeout.unref?.();
 
     const res = await fetch(`https://registry.npmjs.org/${PACKAGE_NAME}/latest`, {
       signal: controller.signal,
@@ -83,16 +88,17 @@ export async function checkForUpdate(currentVersion: string): Promise<void> {
     saveState({ lastCheck: Date.now(), latestVersion: latest });
 
     if (latest && isNewer(latest, currentVersion)) {
-      printUpdateNotice(currentVersion, latest);
+      onUpdate?.(latest);
     }
   } catch {
     // 静默失败 — 网络不通、超时等不影响使用
   }
 }
 
-function printUpdateNotice(current: string, latest: string): void {
-  console.log(
-    chalk.yellow(`\n  新版本可用: ${current} → ${chalk.bold(latest)}`) +
-    chalk.gray(`  运行 ${chalk.white("npm i -g artifin-cli")} 更新\n`)
+/** 单行更新提示文本（含颜色转义） */
+export function formatUpdateNotice(current: string, latest: string): string {
+  return (
+    chalk.yellow(`  新版本可用: ${current} → ${chalk.bold(latest)}`) +
+    chalk.gray(`  运行 ${chalk.white("npm i -g artifin-cli")} 更新`)
   );
 }

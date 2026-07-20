@@ -11,6 +11,9 @@ import chalk from "chalk";
 import { trackCommand } from "./session.js";
 import { getAuthState, isLoggedIn } from "../auth.js";
 import { VERSION } from "../version.js";
+import { printBanner, renderStatusContent, type PrintedBanner } from "./banner.js";
+import { getActiveBillingState } from "../billing.js";
+import { checkForUpdate, formatUpdateNotice } from "../update-check.js";
 import {
   chatCommand,
   rawChatCommand,
@@ -74,34 +77,57 @@ function appendHistory(line: string): void {
   }
 }
 
-/** 打印 banner */
-function printBanner(): void {
-  console.log(chalk.hex("#FFD700").bold(`
-   █████╗ ██████╗ ████████╗██╗
-  ██╔══██╗██╔══██╗╚══██╔══╝██║
-  ███████║██████╔╝   ██║   ██║
-  ██╔══██║██╔══██╗   ██║   ██║
-  ██║  ██║██║  ██║   ██║   ██║
-  ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝`));
-  console.log(chalk.gray(`  智能投研终端 v${VERSION} — 输入 help 查看命令`));
-  printAuthHint();
-  console.log();
-}
-
-/** 登录态提示 — 仅本地读取 token，无网络请求；失败时静默退回 */
-function printAuthHint(): void {
+/** 本地读取登录身份（email 或 userId）；未登录/读取失败返回 null，不发起网络请求 */
+function readLocalWho(): string | null {
   try {
     const auth = getAuthState();
-    if (isLoggedIn(auth)) {
-      const who = auth.email || auth.userId || "已登录账户";
-      console.log(chalk.gray("  已登录 ") + chalk.green(who));
-    } else {
-      console.log(
-        chalk.gray("  未登录 — 输入 ") + chalk.cyan("login") + chalk.gray(" 开始（浏览器登录）"),
-      );
-    }
+    if (!isLoggedIn(auth)) return null;
+    return auth.email || auth.userId || "已登录账户";
   } catch {
-    // 读取登录态失败不应阻塞 REPL 启动
+    return null;
+  }
+}
+
+/** 在 prompt 上方插入一行（保留当前输入），用于异步更新提示 */
+function insertLineAbovePrompt(rl: readline.Interface, text: string): void {
+  readline.cursorTo(process.stdout, 0);
+  readline.clearLine(process.stdout, 0);
+  process.stdout.write(text + "\n");
+  rl.prompt(true);
+}
+
+/** 就地重写 banner 中的状态行（余额回填）。仅在 banner 之后尚无新输出时调用 */
+function rewriteBannerStatus(rl: readline.Interface, banner: PrintedBanner, content: string): void {
+  if (banner.statusLineIndex < 0) return;
+  const up = banner.totalLines - banner.statusLineIndex;
+  readline.moveCursor(process.stdout, 0, -up);
+  readline.cursorTo(process.stdout, 0);
+  readline.clearLine(process.stdout, 0);
+  process.stdout.write(content);
+  readline.moveCursor(process.stdout, 0, up);
+  readline.cursorTo(process.stdout, 0);
+  readline.clearLine(process.stdout, 0);
+  rl.prompt(true);
+}
+
+/** banner 异步信息：更新提示（网络检查）+ 余额回填。canUpdate 不满足时静默丢弃 */
+function wireBannerAsyncInfo(
+  rl: readline.Interface,
+  banner: PrintedBanner,
+  who: string | null,
+  canUpdate: () => boolean,
+): void {
+  void checkForUpdate(VERSION, (latest) => {
+    if (canUpdate()) insertLineAbovePrompt(rl, formatUpdateNotice(VERSION, latest));
+  });
+  if (who) {
+    void getActiveBillingState()
+      .then((state) => {
+        if (canUpdate()) rewriteBannerStatus(rl, banner, renderStatusContent(who, state));
+      })
+      .catch(() => {
+        if (canUpdate()) rewriteBannerStatus(rl, banner, renderStatusContent(who, "error"));
+      });
   }
 }
 
@@ -338,7 +364,10 @@ export async function dispatchReplFreeText(
 
 /** 启动 REPL */
 export async function startRepl(): Promise<void> {
-  printBanner();
+  // 仅交互终端打印 banner；管道输入/输出时保持安静
+  const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  const who = interactive ? readLocalWho() : null;
+  const banner = interactive ? printBanner({ who }) : null;
 
   const history = loadHistory();
   const chatHistory: ChatMessage[] = [];
@@ -356,9 +385,16 @@ export async function startRepl(): Promise<void> {
     historySize: MAX_HISTORY,
   });
 
+  // 仅当 banner 之后尚无新输出、且用户未在输入时，允许异步回填（余额/更新提示）
+  let bannerFresh = banner !== null;
+  if (banner) {
+    wireBannerAsyncInfo(rl, banner, who, () => bannerFresh && rl.line.length === 0);
+  }
+
   rl.prompt();
 
   rl.on("line", async (line: string) => {
+    bannerFresh = false;
     const parsed = parseLine(line);
     if (!parsed) {
       rl.prompt();

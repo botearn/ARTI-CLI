@@ -5,6 +5,17 @@ All notable changes to ARTI CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### ✨ Added
+
+- **启动画面升级**：金→橙渐变 logo、状态区（登录身份 + 套餐/余额异步回填）、每日轮换提示；banner 秒出不阻塞，余额到位后就地刷新状态行
+
+### 🔧 Changed
+
+- 窄终端（< 50 列）与非 Unicode 终端自动回退单行字标 / 纯 ASCII；非 TTY（管道）环境不再打印 banner
+- 更新检查改为回调模式：REPL 内异步插入提示、命令模式改走 stderr、`--json` 模式完全跳过（stdout 保持纯净）；定时器 unref 不再拖住进程退出
+
 ## [0.4.0] - 2026-06-24
 
 ### 🔄 重大重构（RFC-2026-0003）

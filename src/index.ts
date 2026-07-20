@@ -17,7 +17,7 @@ import { polyCommand } from "./poly/commands.js";
 import { shutdownBackendMcp } from "./data/mcp-client.js";
 import chalk from "chalk";
 import { setJsonMode } from "./output.js";
-import { checkForUpdate } from "./update-check.js";
+import { checkForUpdate, formatUpdateNotice } from "./update-check.js";
 import { VERSION } from "./version.js";
 import { startRepl } from "./core/repl.js";
 import { buildCli, buildRepl, type CommandDef, type OptionDef } from "./core/registry.js";
@@ -283,9 +283,6 @@ configCmd.command("list").description("列出所有配置")
 configCmd.command("reset").description("重置为默认配置")
   .action(configResetCommand);
 
-// ── 版本更新检查（静默、不阻塞） ──
-checkForUpdate(VERSION);
-
 // ── 入口 ──
 async function main(): Promise<void> {
   if (process.argv.includes("--install-completion")) {
@@ -296,6 +293,13 @@ async function main(): Promise<void> {
   if (process.argv.length <= 2) {
     startRepl();
     return;
+  }
+
+  // 版本更新检查（静默、不阻塞；--json 模式跳过以保持 stdout 纯净；提示走 stderr）
+  if (!process.argv.includes("--json")) {
+    void checkForUpdate(VERSION, (latest) => {
+      process.stderr.write(formatUpdateNotice(VERSION, latest) + "\n");
+    });
   }
 
   try {
