@@ -287,8 +287,8 @@ export async function getActiveBillingState(): Promise<BillingState> {
 
   const effectiveTier = resolveEffectiveTier(subscriber.data ?? null);
   const plan = mapTierToPlan(effectiveTier);
-  const tierRow = (tiers.data ?? []).find((row) => row.tier === effectiveTier)
-    ?? (tiers.data ?? []).find((row) => row.tier === "free");
+  const tierRow = (tiers ?? []).find((row) => row.tier === effectiveTier)
+    ?? (tiers ?? []).find((row) => row.tier === "free");
 
   const usedWeekly = snapshot.data?.used_weekly ?? 0;
   const weeklyQuota = tierRow?.window_weekly_limit ?? 0;
@@ -315,7 +315,7 @@ export async function getActiveBillingState(): Promise<BillingState> {
     limit5h: tierRow?.window_5h_limit ?? 0,
     snapshotAt: snapshot.data?.snapshot_at ?? null,
     resetAt: null,
-    pricing: pricing.data ?? [],
+    pricing: pricing ?? [],
   };
 }
 
