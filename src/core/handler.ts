@@ -29,6 +29,7 @@ export async function handleCommand<T>(
   } catch (err) {
     spinner.fail(label.replace("...", "失败"));
     printError(err);
+    process.exitCode = 1;
     return undefined;
   }
 }

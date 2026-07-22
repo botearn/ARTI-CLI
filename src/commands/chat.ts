@@ -46,6 +46,7 @@ export async function rawChatCommand(
     printDeductResult(billed.deduct);
     return billed.result;
   } catch (err) {
+    process.exitCode = 1;
     if (err instanceof InsufficientCreditsError) {
       console.log(chalk.red(`\n  ✗ ${err.message}\n`));
       return;
@@ -78,5 +79,6 @@ export async function chatCommand(
     return assistantText;
   } catch (err) {
     printError(err);
+    process.exitCode = 1;
   }
 }
