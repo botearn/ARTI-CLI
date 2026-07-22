@@ -1,7 +1,7 @@
 /**
  * 配置管理 — 读写 ~/.config/arti/config.json
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -96,8 +96,15 @@ const DEFAULT_CONFIG: ArtiConfig = {
 
 function ensureConfigDir(): void {
   if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+    mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   }
+  // 目录含凭据文件，收紧为仅本人可访问（覆盖历史遗留的 0755）
+  try { chmodSync(CONFIG_DIR, 0o700); } catch { /* 部分平台不支持 chmod，忽略 */ }
+}
+
+/** 配置文件含 access/refresh token，收紧为 0600（覆盖历史遗留的 0644） */
+function tightenConfigFilePerms(): void {
+  try { chmodSync(CONFIG_FILE, 0o600); } catch { /* 文件不存在或平台不支持，忽略 */ }
 }
 
 export function loadConfig(): ArtiConfig {
@@ -106,6 +113,7 @@ export function loadConfig(): ArtiConfig {
   if (!existsSync(CONFIG_FILE)) {
     config = { ...DEFAULT_CONFIG };
   } else {
+    tightenConfigFilePerms();
     try {
       const raw = readFileSync(CONFIG_FILE, "utf-8");
       const saved = JSON.parse(raw);
@@ -208,7 +216,9 @@ export function loadConfig(): ArtiConfig {
 
 export function saveConfig(config: ArtiConfig): void {
   ensureConfigDir();
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", "utf-8");
+  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", { encoding: "utf-8", mode: 0o600 });
+  // mode 仅在建文件时生效，已有文件需显式收紧
+  tightenConfigFilePerms();
 }
 
 /** 通过点号路径获取配置值，如 "api.timeout" */

@@ -31,6 +31,7 @@ export async function quickScanCommand(symbol: string): Promise<void> {
       return res.scan;
     }));
   } catch (err) {
+    process.exitCode = 1;
     if (err instanceof InsufficientCreditsError) {
       console.log(chalk.red(`\n  ✗ ${err.message}\n`));
       return;

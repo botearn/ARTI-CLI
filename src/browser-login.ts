@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { getDefaultSupabasePublishableKey, getDefaultSupabaseUrl, saveConfig, loadConfig } from "./config.js";
@@ -97,8 +97,10 @@ export interface PendingLogin {
 }
 
 export function savePendingLogin(p: PendingLogin): void {
-  mkdirSync(dirname(PENDING_FILE), { recursive: true });
-  writeFileSync(PENDING_FILE, JSON.stringify(p, null, 2));
+  mkdirSync(dirname(PENDING_FILE), { recursive: true, mode: 0o700 });
+  // 含 session_id + poll_token（泄露可被抢先轮询领走 token 对），仅本人可读写
+  writeFileSync(PENDING_FILE, JSON.stringify(p, null, 2), { mode: 0o600 });
+  try { chmodSync(PENDING_FILE, 0o600); } catch { /* 部分平台不支持 chmod，忽略 */ }
 }
 
 export function loadPendingLogin(): PendingLogin | null {

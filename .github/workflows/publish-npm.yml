@@ -26,6 +26,9 @@ jobs:
       - name: 安装依赖（prepare 钩子会自动构建）
         run: npm ci
 
+      - name: 类型检查（tsup 不做类型检查，单独把关）
+        run: npx tsc --noEmit
+
       - name: 构建
         run: npm run build
 

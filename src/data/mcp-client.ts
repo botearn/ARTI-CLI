@@ -58,9 +58,11 @@ class BackendMcpError extends Error {
 }
 
 type McpClient = {
-  connect: (transport: any, options?: unknown) => Promise<void>;
-  request: (request: Record<string, unknown>, schema: unknown, options?: unknown) => Promise<McpCallResult>;
-  close?: () => Promise<void>;
+  // 结构类型只覆盖本项目用到的最小面；method 语法走双变参数检查，与 SDK Client 结构兼容
+  // connect 的 options 声明为 never：调用方从不传第二个参数
+  connect(transport: any, options?: never): Promise<void>;
+  request(request: any, schema: any, options?: any): Promise<McpCallResult>;
+  close?(): Promise<void>;
 };
 
 let clientPromise: Promise<McpClient> | null = null;
@@ -93,7 +95,7 @@ async function getClient(): Promise<McpClient> {
     return clientPromise;
   }
 
-  clientPromise = (async () => {
+  const promise = (async () => {
     const { Client, StreamableHTTPClientTransport } = await loadSdk();
     const client = new Client(
       { name: "artifin-cli", version: "0.4.0" },
@@ -114,16 +116,20 @@ async function getClient(): Promise<McpClient> {
     activeClient = client;
     return client;
   })();
+  clientPromise = promise;
   cachedUrl = url;
   cachedToken = token;
 
   try {
-    return await clientPromise;
+    return await promise;
   } catch (err) {
-    clientPromise = null;
-    activeClient = null;
-    cachedUrl = null;
-    cachedToken = null;
+    // 仅清理本次创建的缓存，避免清掉并发 getClient 刚写入的新连接
+    if (clientPromise === promise) {
+      clientPromise = null;
+      activeClient = null;
+      cachedUrl = null;
+      cachedToken = null;
+    }
     throw err;
   }
 }

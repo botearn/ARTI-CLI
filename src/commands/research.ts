@@ -805,6 +805,7 @@ export async function researchCommand(
   try {
     billingState = await assertSufficientCredits(featureKey);
   } catch (err) {
+    process.exitCode = 1;
     if (err instanceof InsufficientCreditsError) {
       console.log(chalk.red(`\n  ✗ ${err.message}\n`));
       return;
@@ -868,6 +869,7 @@ async function runSingleAgent(
   } catch (err) {
     spinner.fail("分析失败");
     printError(err);
+    process.exitCode = 1;
   }
 }
 
@@ -1276,5 +1278,6 @@ async function runFallback(symbol: string, full?: boolean): Promise<void> {
   } catch (err) {
     spinner.fail("回退模式也失败了");
     printError(err);
+    process.exitCode = 1;
   }
 }
