@@ -1,16 +1,12 @@
 /**
- * 服务端 Credits 计费体系
- * 真源：Supabase subscribers / usage_tiers / usage_snapshots / user_credits / credit_pricing / consume_credits_atomic
+ * 服务端 Credits 计费体系（只读）
+ * 真源：Supabase subscribers / usage_tiers / usage_snapshots / user_credits / credit_pricing
+ * 注：CLI 不做本地扣费，计费一律服务端权威（RFC-2026-0007）。
  */
-import chalk from "chalk";
 import { ensureValidAccessToken, getAuthState } from "./auth.js";
 import { fetchWithTimeout } from "./http.js";
 
 const CREDIT_USD_VALUE = 0.04;
-const SUPABASE_JSON_HEADERS = {
-  "Content-Type": "application/json",
-  Prefer: "return=representation",
-};
 
 export type PlanId = "free" | "basic" | "pro" | "flagship";
 export type AlertsLevel = "none" | "standard" | "realtime";
@@ -107,15 +103,6 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   postRecap: "盘后复盘",
 };
 
-const FEATURE_ACTIONS: Record<FeatureKey, CreditAction> = {
-  chat: "chat_general",
-  quickScan: "analysis_light",
-  panorama: "analysis_light",
-  deepReport: "debate_council",
-  preBrief: "report_stock",
-  postRecap: "report_stock",
-};
-
 const FEATURE_RECOMMENDED_PLAN: Record<FeatureKey, PlanId> = {
   chat: "basic",
   quickScan: "basic",
@@ -154,18 +141,6 @@ export interface BillingState {
   pricing: CreditPricingRow[];
 }
 
-export interface DeductResult {
-  cost: number;
-  balanceBefore: number;
-  balanceAfter: number;
-  feature: FeatureKey;
-  skipped?: boolean;
-  failed?: boolean; // L21：结果已产出但扣费失败（降级，非测试模式）
-  weeklyPart?: number;
-  permanentPart?: number;
-  transactionId?: string;
-}
-
 export interface CreditPricingRow {
   action: CreditAction | string;
   cost: number;
@@ -196,17 +171,6 @@ interface UsageSnapshotRow {
   used_weekly?: number | null;
   week_start?: string | null;
   snapshot_at?: string | null;
-}
-
-interface ConsumeRpcRow {
-  success: boolean;
-  reason?: string;
-  cost: number;
-  weekly_part: number;
-  permanent_part: number;
-  transaction_id: string | null;
-  weekly_remaining: number;
-  permanent_balance: number;
 }
 
 function isBillingBypassed(): boolean {
@@ -240,12 +204,6 @@ export class PlanAccessError extends Error {
 }
 
 // L14：扣费/计费后端不可用（区别于"积分不足"的 InsufficientCreditsError）
-export class BillingBackendError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BillingBackendError";
-  }
-}
 
 export function isPlanId(value: string): value is PlanId {
   return PLAN_ORDER.includes(value as PlanId);
@@ -336,95 +294,6 @@ export function setPlan(planId: PlanId): BillingState {
   };
 }
 
-export async function assertSufficientCredits(feature: FeatureKey, state?: BillingState): Promise<BillingState> {
-  const billingState = state ?? await getActiveBillingState();
-  if (isBillingBypassed()) {
-    return billingState;
-  }
-
-  const cost = getFeatureCost(feature, billingState.pricing);
-  const affordable = billingState.weeklyRemaining + billingState.permanentBalance;
-
-  if (billingState.limit5h > 0 && billingState.used5h + cost > billingState.limit5h) {
-    throw new InsufficientCreditsError(cost, affordable, feature, "rate_limited_5h");
-  }
-  if (affordable < cost) {
-    throw new InsufficientCreditsError(cost, affordable, feature, "insufficient_credits");
-  }
-  return billingState;
-}
-
-export async function checkAndDeduct(feature: FeatureKey): Promise<DeductResult> {
-  const state = await assertSufficientCredits(feature);
-  return applyDeduction(feature, state);
-}
-
-export async function applyDeduction(feature: FeatureKey, state?: BillingState): Promise<DeductResult> {
-  const billingState = state ?? await getActiveBillingState();
-  if (isBillingBypassed()) {
-    return {
-      cost: 0,
-      balanceBefore: billingState.balance,
-      balanceAfter: billingState.balance,
-      feature,
-      skipped: true,
-    };
-  }
-
-  const action = FEATURE_ACTIONS[feature];
-  const cost = getFeatureCost(feature, billingState.pricing);
-  const reason = `${FEATURE_LABELS[feature]}：CLI`;
-  const row = await consumeCreditsAtomic(billingState.userId, action, reason);
-
-  if (!row.success) {
-    const available = (row.weekly_remaining ?? billingState.weeklyRemaining)
-      + (row.permanent_balance ?? billingState.permanentBalance);
-    throw new InsufficientCreditsError(cost, available, feature, row.reason);
-  }
-
-  return {
-    cost: row.cost,
-    balanceBefore: billingState.balance,
-    balanceAfter: row.weekly_remaining + row.permanent_balance,
-    feature,
-    weeklyPart: row.weekly_part,
-    permanentPart: row.permanent_part,
-    transactionId: row.transaction_id ?? undefined,
-  };
-}
-
-export async function withBilling<T>(
-  feature: FeatureKey,
-  fn: () => Promise<T>,
-): Promise<{ result: T; deduct: DeductResult } | undefined> {
-  const state = await assertSufficientCredits(feature);
-  const result = await fn();
-
-  if (result === undefined) {
-    return undefined;
-  }
-
-  // L21：结果已产出。扣费失败降级为告警，不丢弃已经算好的结果
-  // （积分不足在 assertSufficientCredits 已前置拦截；此处失败多为后端扣费不可用）。
-  try {
-    return { result, deduct: await applyDeduction(feature, state) };
-  } catch (err) {
-    if (err instanceof InsufficientCreditsError) throw err;
-    console.error(chalk.yellow(`  ⚠ 扣费未成功（结果已生成）: ${err instanceof Error ? err.message : String(err)}`));
-    return {
-      result,
-      deduct: {
-        cost: 0,
-        balanceBefore: state.balance,
-        balanceAfter: state.balance,
-        feature,
-        skipped: true,
-        failed: true,
-      },
-    };
-  }
-}
-
 export async function assertWatchlistCapacity(nextCount: number, state?: BillingState): Promise<BillingState> {
   const billingState = state ?? await getActiveBillingState();
   const plan = PLANS[billingState.plan];
@@ -443,32 +312,6 @@ export async function assertWatchlistCapacity(nextCount: number, state?: Billing
   return billingState;
 }
 
-export function printDeductResult(result: DeductResult): void {
-  if (result.skipped) {
-    const tag = result.failed ? chalk.yellow("[扣费失败·未计费]") : chalk.cyan("[测试模式未扣费]");
-    console.log(
-      chalk.gray(
-        `  ─ ${FEATURE_LABELS[result.feature]} ${tag}` +
-        `  余额 ${chalk.cyan(result.balanceAfter.toString())} Credits`,
-      ),
-    );
-    return;
-  }
-
-  const source = [
-    typeof result.weeklyPart === "number" ? `周包 ${result.weeklyPart}` : "",
-    typeof result.permanentPart === "number" ? `永久 ${result.permanentPart}` : "",
-  ].filter(Boolean).join(" + ");
-
-  console.log(
-    chalk.gray(
-      `  ─ ${FEATURE_LABELS[result.feature]} ${chalk.yellow(`-${result.cost} Credits`)}` +
-      `  余额 ${chalk.cyan(result.balanceAfter.toString())} Credits` +
-      (source ? `  (${source})` : ""),
-    ),
-  );
-}
-
 export function getBillingPath(): string {
   return "supabase://credits";
 }
@@ -478,39 +321,6 @@ export function getFeatureCost(feature: FeatureKey, pricing: CreditPricingRow[])
   const row = pricing.find((item) => item.action === action);
   if (!row) return 0;
   return Math.ceil(row.cost * (row.cost_multiplier ?? 1));
-}
-
-async function consumeCreditsAtomic(
-  userId: string,
-  action: CreditAction,
-  reason: string,
-): Promise<ConsumeRpcRow> {
-  const auth = getAuthState();
-  const token = await ensureValidAccessToken();
-  const res = await fetchWithTimeout(`${auth.supabaseUrl}/rest/v1/rpc/consume_credits_atomic`, {
-    method: "POST",
-    headers: {
-      ...SUPABASE_JSON_HEADERS,
-      apikey: auth.publishableKey,
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      p_user_id: userId,
-      p_action: action,
-      p_reason: reason,
-      p_metadata: {},
-      p_task_id: null,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "unknown error");
-    // L14：扣费 RPC 失败属于后端不可用，用专门错误类型与"积分不足"区分
-    throw new BillingBackendError(`扣费服务暂时不可用（HTTP ${res.status}）: ${text}`);
-  }
-
-  const json = await res.json() as ConsumeRpcRow | ConsumeRpcRow[];
-  return Array.isArray(json) ? json[0] : json;
 }
 
 async function supabaseSelect<T>(

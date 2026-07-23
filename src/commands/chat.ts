@@ -4,7 +4,7 @@
  */
 import chalk from "chalk";
 import { streamChat } from "../api.js";
-import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
+import { InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
 import { track } from "../tracker.js";
 import { dispatchNaturalText } from "../core/natural-dispatch.js";
@@ -32,26 +32,23 @@ export async function rawChatCommand(
 
   const jsonMode = isJsonMode();
   try {
-    const billed = await withBilling("chat", async () => {
-      track("chat", []);
-      let assistantText = "";
-      // L13：JSON 模式下不流式打印（避免污染 stdout），收集全文后由末尾统一输出
-      if (!jsonMode) process.stdout.write("\n  ");
-      const messages = [...(options?.history ?? []), { role: "user" as const, content: text }];
-      for await (const delta of streamChat(messages)) {
-        if (!jsonMode) process.stdout.write(delta);
-        assistantText += delta;
-      }
-      if (!jsonMode) process.stdout.write("\n");
-      return assistantText || undefined;
-    });
-    if (!billed) return;
-    if (jsonMode) {
-      output({ answer: billed.result ?? "", deduct: billed.deduct }, () => {});
-    } else {
-      printDeductResult(billed.deduct);
+    // 计费由服务端权威处理（RFC-2026-0007），CLI 不再本地扣费/展示消耗
+    track("chat", []);
+    let assistantText = "";
+    // JSON 模式下不流式打印（避免污染 stdout），收集全文后由末尾统一输出
+    if (!jsonMode) process.stdout.write("\n  ");
+    const messages = [...(options?.history ?? []), { role: "user" as const, content: text }];
+    for await (const delta of streamChat(messages)) {
+      if (!jsonMode) process.stdout.write(delta);
+      assistantText += delta;
     }
-    return billed.result;
+    if (!jsonMode) process.stdout.write("\n");
+
+    const result = assistantText || undefined;
+    if (jsonMode) {
+      output({ answer: result ?? "" }, () => {});
+    }
+    return result;
   } catch (err) {
     process.exitCode = 1;
     if (err instanceof InsufficientCreditsError) {

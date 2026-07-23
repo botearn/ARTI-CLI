@@ -34,8 +34,6 @@ describe("chat natural routing", () => {
     }));
     vi.doMock("../src/billing.js", () => ({
       InsufficientCreditsError: class extends Error {},
-      withBilling: vi.fn(),
-      printDeductResult: vi.fn(),
     }));
     vi.doMock("../src/errors.js", () => ({
       printError: vi.fn(),
@@ -58,10 +56,6 @@ describe("chat natural routing", () => {
     const streamChat = vi.fn(async function* () {
       yield "智谱 AI 未上市，暂无行情";
     });
-    const withBilling = vi.fn(async (_kind: string, fn: () => Promise<unknown>) => ({
-      result: await fn(),
-      deduct: { credits: 1 },
-    }));
 
     vi.doMock("../src/api.js", () => ({
       classifyIntent,
@@ -74,8 +68,6 @@ describe("chat natural routing", () => {
     }));
     vi.doMock("../src/billing.js", () => ({
       InsufficientCreditsError: class extends Error {},
-      withBilling,
-      printDeductResult: vi.fn(),
     }));
     vi.doMock("../src/errors.js", () => ({
       printError: vi.fn(),
@@ -88,8 +80,8 @@ describe("chat natural routing", () => {
 
     await chatCommand("今天的智谱", { raw: true });
 
+    // --raw 直接走纯 chat：不做意图分发，直接把单条 message 发给 streamChat
     expect(classifyIntent).not.toHaveBeenCalled();
-    expect(withBilling).toHaveBeenCalledWith("chat", expect.any(Function));
     expect(streamChat).toHaveBeenCalledWith([{ role: "user", content: "今天的智谱" }]);
   });
 });

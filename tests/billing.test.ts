@@ -3,8 +3,6 @@ import {
   PLANS,
   PlanAccessError,
   assertWatchlistCapacity,
-  assertSufficientCredits,
-  applyDeduction,
   creditDollarValue,
   formatPlanLimit,
   type BillingState,
@@ -54,23 +52,5 @@ describe("billing plan rules", () => {
     expect(formatPlanLimit(5, "支")).toBe("5支");
     expect(formatPlanLimit(null, "支")).toBe("无限支");
     expect(creditDollarValue(30)).toBeCloseTo(1.2, 6);
-  });
-
-  it("开启 ARTI_BILLING_BYPASS 时跳过余额校验", async () => {
-    process.env.ARTI_BILLING_BYPASS = "true";
-    const lowBalanceState = { ...makeState("free"), balance: 0 };
-    await expect(assertSufficientCredits("panorama", lowBalanceState)).resolves.toBeDefined();
-    delete process.env.ARTI_BILLING_BYPASS;
-  });
-
-  it("开启 ARTI_BILLING_BYPASS 时不实际扣费", async () => {
-    process.env.ARTI_BILLING_BYPASS = "true";
-    const state = { ...makeState("basic"), balance: 20 };
-    const result = await applyDeduction("panorama", state);
-    expect(result.skipped).toBe(true);
-    expect(result.cost).toBe(0);
-    expect(result.balanceAfter).toBe(20);
-    expect(state.balance).toBe(20);
-    delete process.env.ARTI_BILLING_BYPASS;
   });
 });

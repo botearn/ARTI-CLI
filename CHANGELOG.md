@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 窄终端（< 50 列）与非 Unicode 终端自动回退单行字标 / 纯 ASCII；非 TTY（管道）环境不再打印 banner
 - 更新检查改为回调模式：REPL 内异步插入提示、命令模式改走 stderr、`--json` 模式完全跳过（stdout 保持纯净）；定时器 unref 不再拖住进程退出
+- **计费一律服务端权威（RFC-2026-0007）**：移除 CLI 侧本地扣费（chat / quick-scan / full / deep 不再调用 `consume_credits_atomic`），消除 chat / quick-scan 的双重扣费；命令结尾不再展示"消耗 / 余额"行，`arti credits` 仍可查询余额
+
+### ⚠️ 已知问题
+
+- **full / deep 暂时免费**：其后端链路（Railway `/v1/orchestrator`）尚未接入服务端扣费，在后端补齐前 `full` / `deep` 不计费。跟踪见 RFC-2026-0007「待后端跟进」
 
 ## [0.4.0] - 2026-06-24
 

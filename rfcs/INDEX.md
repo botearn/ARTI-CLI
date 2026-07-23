@@ -11,6 +11,7 @@
 | [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) | ARTi Poly CLI 集成 — `arti poly` 子命令接入 ARTi-poly 公开 API | 2026-07-08 |
 | [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) | chat / quick-scan 切换 Supabase Edge /v1 + REPL 会话历史（arti#0055 姊妹篇） | 2026-07-14 |
 | [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) | CLI 加固与审计缺陷修复计划（取代 docs/BACKLOG.md） | 2026-07-23 |
+| [RFC-2026-0007](2026/RFC-2026-0007-remove-cli-local-billing.md) | 移除 CLI 本地扣费，计费一律服务端权威 | 2026-07-23 |
 
 ---
 
@@ -61,6 +62,7 @@
 ### 💰 计费 & Credits
 
 - [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) - CLI 加固与审计缺陷修复计划（含双重扣费等待后端确认项）
+- [RFC-2026-0007](2026/RFC-2026-0007-remove-cli-local-billing.md) - 移除 CLI 本地扣费，计费一律服务端权威
 
 ### 📊 数据源 & API
 
@@ -110,13 +112,13 @@
 
 | 状态 | 数量 |
 |---|---|
-| Draft | 5 |
+| Draft | 6 |
 | Proposed | 0 |
 | Accepted | 0 |
 | Implementing | 0 |
 | Implemented | 1 |
 | Rejected | 0 |
 | Deprecated | 0 |
-| **总计** | **6** |
+| **总计** | **7** |
 
 **最后更新**: 2026-07-23
