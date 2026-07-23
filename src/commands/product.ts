@@ -74,8 +74,8 @@ function renderQuickScan(symbol: string, d: BackendStockData): void {
   console.log(title(`${symbol} 快速扫描${d.name ? ` · ${d.name}` : ""}`));
 
   // 行情与综合研判
-  console.log(kvLine("  当前价格", chalk.bold(`$${d.price.toFixed(2)}`)));
-  console.log(kvLine("  涨跌幅", colorChange(d.pct, "%")));
+  console.log(kvLine("  当前价格", chalk.bold(d.price != null ? `$${d.price.toFixed(2)}` : "—")));
+  console.log(kvLine("  涨跌幅", d.pct != null ? colorChange(d.pct, "%") : "—"));
   if (d.overall_signal) console.log(kvLine("  综合研判", sentimentBadge(d.overall_signal)));
   if (d.trend_signal && d.trend_signal !== d.overall_signal) {
     console.log(kvLine("  趋势", sentimentBadge(d.trend_signal)));
@@ -92,7 +92,7 @@ function renderQuickScan(symbol: string, d: BackendStockData): void {
   if (maRows.length) {
     console.log(chalk.bold.cyan("  【均线系统】"));
     for (const [label, val] of maRows) {
-      const pos = d.price > val ? chalk.red("▲ 上方") : chalk.green("▼ 下方");
+      const pos = d.price == null ? "" : d.price > val ? chalk.red("▲ 上方") : chalk.green("▼ 下方");
       console.log(`    ${chalk.white(label.padEnd(6))} ${chalk.bold(val.toFixed(2).padStart(10))} ${pos}`);
     }
     console.log();
