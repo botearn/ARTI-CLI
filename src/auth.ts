@@ -5,6 +5,7 @@ import {
   saveConfig,
   type ArtiConfig,
 } from "./config.js";
+import { fetchWithTimeout } from "./http.js";
 
 const AUTH_EXPIRY_SKEW_SECONDS = 60;
 
@@ -115,19 +116,33 @@ export async function loginWithPassword(email: string, password: string): Promis
   return persistSession(session, { supabaseUrl, publishableKey });
 }
 
+// M-S4: 并发刷新去重。多路请求同时命中过期 token 时，共用同一次刷新，
+// 避免 Supabase refresh token rotation 下先返回者使旧 token 失效、后续刷新失败被登出。
+let inflightRefresh: Promise<AuthState> | null = null;
+
 export async function refreshAuthSession(current = getAuthState()): Promise<AuthState> {
   if (!current.refreshToken) {
     throw new Error("当前登录态缺少 refresh token，请重新登录");
   }
+  if (inflightRefresh) return inflightRefresh;
+
   ensureSupabaseKey(current.publishableKey, "自动续期");
 
-  const session = await requestSupabaseSession(
-    current.supabaseUrl,
-    current.publishableKey,
-    "refresh_token",
-    { refresh_token: current.refreshToken },
-  );
-  return persistSession(session, current);
+  inflightRefresh = (async () => {
+    const session = await requestSupabaseSession(
+      current.supabaseUrl,
+      current.publishableKey,
+      "refresh_token",
+      { refresh_token: current.refreshToken },
+    );
+    return persistSession(session, current);
+  })();
+
+  try {
+    return await inflightRefresh;
+  } finally {
+    inflightRefresh = null;
+  }
 }
 
 export function saveSupabaseSession(
@@ -175,7 +190,7 @@ export async function getAuthenticatedUserProfile(): Promise<{
     return { id, email };
   }
 
-  const res = await fetch(`${auth.supabaseUrl}/auth/v1/user`, {
+  const res = await fetchWithTimeout(`${auth.supabaseUrl}/auth/v1/user`, {
     headers: {
       apikey: auth.publishableKey,
       Authorization: `Bearer ${token}`,
@@ -258,7 +273,7 @@ async function requestSupabaseSession(
   grantType: "password" | "refresh_token",
   body: Record<string, unknown>,
 ): Promise<SupabaseAuthResponse> {
-  const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=${grantType}`, {
+  const res = await fetchWithTimeout(`${supabaseUrl}/auth/v1/token?grant_type=${grantType}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { getDefaultSupabasePublishableKey, getDefaultSupabaseUrl, saveConfig, loadConfig } from "./config.js";
 import { getAuthState, saveSupabaseSession, type AuthState, type SupabaseAuthResponse } from "./auth.js";
+import { fetchWithTimeout } from "./http.js";
 
 const DEFAULT_WEB_AUTH_URL = "https://artifin.ai/cli/auth";
 const PENDING_FILE = join(homedir(), ".config", "arti", "pending-login.json");
@@ -155,7 +156,7 @@ export function buildBrowserLoginUrl(webAuthUrl: string, sessionId: string, code
 
 export async function startLoginSession(): Promise<CliAuthStartResponse> {
   const auth = getAuthState();
-  const res = await fetch(`${auth.supabaseUrl}/functions/v1/cli-auth`, {
+  const res = await fetchWithTimeout(`${auth.supabaseUrl}/functions/v1/cli-auth`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -179,10 +180,11 @@ export async function pollLoginSession(sessionId: string, pollToken: string): Pr
   const url = new URL(`${auth.supabaseUrl}/functions/v1/cli-auth`);
   url.searchParams.set("session_id", sessionId);
   url.searchParams.set("poll_token", pollToken);
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url.toString(), {
     headers: {
       apikey: auth.publishableKey,
     },
+    timeoutMs: 15_000,
   });
   if (!res.ok) {
     throw new Error(`查询网页登录状态失败: ${await safeText(res)}`);

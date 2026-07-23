@@ -25,6 +25,7 @@ import {
   type NaturalDispatchOptions,
   type NaturalDispatchResult,
 } from "./natural-dispatch.js";
+import { shutdownBackendMcp } from "../data/mcp-client.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const HISTORY_FILE = join(CONFIG_DIR, "repl_history");
@@ -391,6 +392,19 @@ export async function startRepl(): Promise<void> {
     wireBannerAsyncInfo(rl, banner, who, () => bannerFresh && rl.line.length === 0);
   }
 
+  // M-C9：退出前 graceful 关闭 backend MCP 连接。幂等 + 防重入。
+  let exiting = false;
+  const gracefulExit = async (code: number): Promise<void> => {
+    if (exiting) return;
+    exiting = true;
+    try {
+      await shutdownBackendMcp();
+    } catch {
+      // 关闭失败不阻塞退出
+    }
+    process.exit(code);
+  };
+
   rl.prompt();
 
   rl.on("line", async (line: string) => {
@@ -407,7 +421,8 @@ export async function startRepl(): Promise<void> {
     if (cmdName === "exit" || cmdName === "quit") {
       console.log(chalk.gray("  再见 👋"));
       rl.close();
-      process.exit(0);
+      await gracefulExit(0);
+      return;
     }
     if (cmdName === "help" || cmdName === "?" || cmdName === "/") {
       await printHelp();
@@ -453,6 +468,6 @@ export async function startRepl(): Promise<void> {
   });
 
   rl.on("close", () => {
-    process.exit(0);
+    void gracefulExit(0);
   });
 }
