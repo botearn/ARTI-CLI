@@ -86,6 +86,7 @@ describe("researchCommand layer1-only", () => {
     }));
 
     vi.doMock("../src/output.js", () => ({
+      isJsonMode: () => false,
       output: (_data: unknown, render: () => void) => render(),
     }));
 
@@ -194,6 +195,7 @@ describe("researchCommand layer1-only", () => {
     }));
 
     vi.doMock("../src/output.js", () => ({
+      isJsonMode: () => false,
       output: (_data: unknown, render: () => void) => render(),
     }));
 

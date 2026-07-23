@@ -22,7 +22,7 @@ import {
 } from "../api.js";
 import { title, divider, sentimentBadge, confidenceBar } from "../format.js";
 import { printError } from "../errors.js";
-import { output } from "../output.js";
+import { output, isJsonMode } from "../output.js";
 import { track } from "../tracker.js";
 import {
   assertSufficientCredits,
@@ -934,6 +934,11 @@ async function runOrchestrator(
   featureKey: FeatureKey,
   billingState: BillingState,
 ): Promise<void> {
+  // H6：JSON 模式下跳过所有人类可读渲染，最终只由 output(jsonData) 写一份 JSON。
+  // spinner(ora)写 stderr 不污染 stdout；此 log 包装令 stdout 渲染在 JSON 模式静默。
+  const jsonMode = isJsonMode();
+  const log = (...args: unknown[]): void => { if (!jsonMode) console.log(...args); };
+
   const startupProgress = buildResearchStartupProgress(symbol);
   let spinner = ora(startupProgress.searching).start();
 
@@ -1034,18 +1039,18 @@ async function runOrchestrator(
           const reportTypeLabel = isPanoramaReport ? "全景报告" : "深度研报";
           const reportIconLabel = isPanoramaReport ? "📊" : "📈";
 
-          console.log(chalk.bold.cyan(`\n  ${reportIconLabel} ${symbol} ${reportTypeLabel} · 核心结论\n`));
+          log(chalk.bold.cyan(`\n  ${reportIconLabel} ${symbol} ${reportTypeLabel} · 核心结论\n`));
           const consensusSentiment = bullish > bearish + neutral ? "看多" :
                                       bearish > bullish + neutral ? "看空" : "中性";
           const avgConfidenceRatio = normalizeConfidence(
             reports.reduce((sum, r) => sum + normalizeConfidence(r.report.confidence), 0) / reports.length
           );
           const avgConfidence = Math.round(avgConfidenceRatio * 100);
-          console.log(
+          log(
             `  ${sentimentBadge(consensusSentiment)} ` +
             `${chalk.gray("综合置信度")} ${confidenceBar(avgConfidenceRatio)} ${chalk.gray(`(${avgConfidence}%)`)}`
           );
-          console.log(
+          log(
             `  ${chalk.gray("分析师共识:")} ` +
             `${chalk.red(`看多 ${bullish}`)} | ` +
             `${chalk.green(`看空 ${bearish}`)} | ` +
@@ -1054,9 +1059,9 @@ async function runOrchestrator(
 
           // 显示报告覆盖范围
           if (isPanoramaReport) {
-            console.log(chalk.gray(`  ${chalk.dim("覆盖范围:")} 宏观环境 · 板块轮动 · 技术面 · 基本面 · 风控`));
+            log(chalk.gray(`  ${chalk.dim("覆盖范围:")} 宏观环境 · 板块轮动 · 技术面 · 基本面 · 风控`));
           } else {
-            console.log(chalk.gray(`  ${chalk.dim("覆盖范围:")} 8维全面分析 · 量化验证 · 组合策略`));
+            log(chalk.gray(`  ${chalk.dim("覆盖范围:")} 8维全面分析 · 量化验证 · 组合策略`));
           }
 
           const quickSummary = buildActionableSummary(reports, backendStockData);
@@ -1066,24 +1071,24 @@ async function runOrchestrator(
             quickSummary.levelLine ? quickSummary.levelLine : "",
           ].filter(Boolean);
           if (quickBits.length) {
-            console.log(chalk.gray(`  ${chalk.dim("操作摘要:")} ${quickBits.join(" | ")}`));
+            log(chalk.gray(`  ${chalk.dim("操作摘要:")} ${quickBits.join(" | ")}`));
           }
 
           // R3: 消除暂无数据尴尬 - 过滤掉置信度过低或明显缺数据的分析师
           const validReports = reports.filter(({ report }) => isUsableResearchReport(report));
 
           // R4: 分层展示详情 - 先显示简洁列表
-          console.log(chalk.bold(`\n  ── 8位分析师观点 ──\n`));
+          log(chalk.bold(`\n  ── 8位分析师观点 ──\n`));
           const analystRows = buildAnalystOverviewRows(reports);
           for (const row of analystRows) {
             // 如果数据不足，简短说明后跳过
             if (row.skipped) {
-              console.log(
+              log(
                 `  ${chalk.gray(`${row.index}. ${row.label}`)} ${chalk.dim(row.skipReason)}`
               );
               continue;
             }
-            console.log(
+            log(
               `  ${chalk.bold(`${row.index}. ${row.label}`)} ` +
               `${sentimentBadge(row.sentiment)} ` +
               `${confidenceBar(row.confidence)}`
@@ -1091,7 +1096,7 @@ async function runOrchestrator(
           }
 
           if (options.mode === "layer1-only") {
-            if (options.full) {
+            if (options.full && !jsonMode) {
               renderPanoramaReportDocument(
                 symbol,
                 reportTypeLabel,
@@ -1102,14 +1107,14 @@ async function runOrchestrator(
                 backendStockData,
               );
             } else {
-              console.log(chalk.gray("\n  💡 提示: 使用 --full 选项查看完整详细报告\n"));
+              log(chalk.gray("\n  💡 提示: 使用 --full 选项查看完整详细报告\n"));
             }
-            console.log(divider());
+            log(divider());
             break eventLoop;
           }
 
-          console.log(chalk.gray(`\n  提示: 详细报告将在 Layer 2 大师辩论后一并展示\n`));
-          console.log(divider());
+          log(chalk.gray(`\n  提示: 详细报告将在 Layer 2 大师辩论后一并展示\n`));
+          log(divider());
           spinner = ora("Layer 2 — 大师路由中...").start();
           break;
 
@@ -1138,22 +1143,24 @@ async function runOrchestrator(
 
           // 渲染大师辩论
           const debateIcon = isPanoramaMode ? "💬" : "🎯";
-          console.log(title(`${debateIcon} 投资大师圆桌 (Layer 2)`));
+          log(title(`${debateIcon} 投资大师圆桌 (Layer 2)`));
 
           if (isPanoramaMode) {
-            console.log(chalk.gray(`  ${chalk.dim("模式:")} 全景模式 — 聚焦核心分歧，快速定位关键风险`));
+            log(chalk.gray(`  ${chalk.dim("模式:")} 全景模式 — 聚焦核心分歧，快速定位关键风险`));
           } else {
-            console.log(chalk.gray(`  ${chalk.dim("模式:")} 深度模式 — 七位大师完整辩论，多空充分博弈`));
+            log(chalk.gray(`  ${chalk.dim("模式:")} 深度模式 — 七位大师完整辩论，多空充分博弈`));
           }
 
           if (routeRule) {
-            console.log(chalk.gray(`  ${chalk.dim("路由策略:")} ${routeRule}`));
-            if (routeReasoning) console.log(chalk.gray(`  ${routeReasoning}\n`));
+            log(chalk.gray(`  ${chalk.dim("路由策略:")} ${routeRule}`));
+            if (routeReasoning) log(chalk.gray(`  ${routeReasoning}\n`));
           }
-          for (const { master, opinion } of masterOpinions) {
-            renderMasterOpinion(master, opinion);
+          if (!jsonMode) {
+            for (const { master, opinion } of masterOpinions) {
+              renderMasterOpinion(master, opinion);
+            }
           }
-          console.log(divider());
+          log(divider());
 
           const synthesisType = isPanoramaMode ? "压缩总结" : "深度裁定";
           spinner = ora(`Synthesis — 生成${synthesisType}...`).start();
@@ -1166,14 +1173,14 @@ async function runOrchestrator(
 
           spinner.succeed(`${synthesisLabel}完成`);
 
-          if (synthesis) {
+          if (synthesis && !jsonMode) {
             renderSynthesis(synthesis);
           }
 
           // 显示报告完成状态
           const finalReportType = isFinalPanorama ? "全景报告" : "深度研报";
           const finalReportIcon = isFinalPanorama ? "📊" : "📈";
-          console.log(chalk.bold.green(`\n  ${finalReportIcon} ${finalReportType}已生成完成\n`));
+          log(chalk.bold.green(`\n  ${finalReportIcon} ${finalReportType}已生成完成\n`));
 
           // 显示关键指标总结
           const finalBullish = reports.filter(r => r.report.sentiment === "看多").length;
@@ -1184,17 +1191,17 @@ async function runOrchestrator(
             ) * 100
           );
 
-          console.log(chalk.gray(`  分析师维度: ${reports.length} 位 | 大师辩论: ${masterOpinions.length} 位`));
-          console.log(chalk.gray(`  多空比: ${chalk.red(finalBullish)}:${chalk.green(finalBearish)} | 平均置信度: ${finalAvgConf}%`));
+          log(chalk.gray(`  分析师维度: ${reports.length} 位 | 大师辩论: ${masterOpinions.length} 位`));
+          log(chalk.gray(`  多空比: ${chalk.red(finalBullish)}:${chalk.green(finalBearish)} | 平均置信度: ${finalAvgConf}%`));
 
           if (isFinalPanorama) {
-            console.log(chalk.gray(`  用途场景: 快速全景扫描 · 日常监控 · 趋势判断`));
+            log(chalk.gray(`  用途场景: 快速全景扫描 · 日常监控 · 趋势判断`));
           } else {
-            console.log(chalk.gray(`  用途场景: 重仓决策 · 深度研究 · 投委会报告`));
+            log(chalk.gray(`  用途场景: 重仓决策 · 深度研究 · 投委会报告`));
           }
 
           // R4: 最终展示详细报告（可选）
-          if (options.full) {
+          if (options.full && !jsonMode) {
             const validReports = reports.filter(({ report }) => isUsableResearchReport(report));
             renderDeepReportDocument(
               symbol,
@@ -1208,12 +1215,12 @@ async function runOrchestrator(
               synthesis,
             );
           } else {
-            console.log(
+            log(
               chalk.gray("\n  💡 提示: 使用 --full 选项查看完整详细报告\n")
             );
           }
 
-          console.log("\n" + divider());
+          log("\n" + divider());
           break;
 
         case "error":
@@ -1267,7 +1274,7 @@ async function runOrchestrator(
     printError(err);
 
     // Fallback：orchestrator 不可用时回退到直接调用分析师
-    console.log(chalk.yellow("\n  尝试回退到直接分析模式...\n"));
+    log(chalk.yellow("\n  尝试回退到直接分析模式...\n"));
     return runFallback(symbol, options.full);
   } finally {
     clearInterval(timeoutChecker);

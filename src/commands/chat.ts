@@ -8,6 +8,7 @@ import { withBilling, printDeductResult, InsufficientCreditsError } from "../bil
 import { printError } from "../errors.js";
 import { track } from "../tracker.js";
 import { dispatchNaturalText } from "../core/natural-dispatch.js";
+import { isJsonMode, output } from "../output.js";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -29,21 +30,27 @@ export async function rawChatCommand(
     return;
   }
 
+  const jsonMode = isJsonMode();
   try {
     const billed = await withBilling("chat", async () => {
       track("chat", []);
       let assistantText = "";
-      process.stdout.write("\n  ");
+      // L13：JSON 模式下不流式打印（避免污染 stdout），收集全文后由末尾统一输出
+      if (!jsonMode) process.stdout.write("\n  ");
       const messages = [...(options?.history ?? []), { role: "user" as const, content: text }];
       for await (const delta of streamChat(messages)) {
-        process.stdout.write(delta);
+        if (!jsonMode) process.stdout.write(delta);
         assistantText += delta;
       }
-      process.stdout.write("\n");
+      if (!jsonMode) process.stdout.write("\n");
       return assistantText || undefined;
     });
     if (!billed) return;
-    printDeductResult(billed.deduct);
+    if (jsonMode) {
+      output({ answer: billed.result ?? "", deduct: billed.deduct }, () => {});
+    } else {
+      printDeductResult(billed.deduct);
+    }
     return billed.result;
   } catch (err) {
     process.exitCode = 1;
