@@ -417,33 +417,30 @@ export async function startRepl(): Promise<void> {
 
   rl.prompt();
 
-  rl.on("line", async (line: string) => {
+  // 处理单行输入。返回 true 表示已触发退出（调用方不应再 prompt）。
+  const processLine = async (line: string): Promise<boolean> => {
     bannerFresh = false;
     const parsed = parseLine(line);
-    if (!parsed) {
-      rl.prompt();
-      return;
-    }
+    if (!parsed) return false;
 
     const { cmdName, args } = parsed;
+    const wholeLine = args.length === 0; // L11：无参内置命令仅在整行匹配时触发
 
-    // 内置命令
-    if (cmdName === "exit" || cmdName === "quit") {
+    // 内置命令（仅整行匹配，避免 "exit 仓位" / "help 分析茅台" 误触发）
+    if (wholeLine && (cmdName === "exit" || cmdName === "quit")) {
       console.log(chalk.gray("  再见 👋"));
       rl.close();
       await gracefulExit(0);
-      return;
+      return true;
     }
-    if (cmdName === "help" || cmdName === "?" || cmdName === "/") {
+    if (wholeLine && (cmdName === "help" || cmdName === "?" || cmdName === "/")) {
       await printHelp();
-      rl.prompt();
-      return;
+      return false;
     }
-    if (["clear", "cls", "/clear", "reset"].includes(cmdName)) {
+    if (wholeLine && ["clear", "cls", "/clear", "reset"].includes(cmdName)) {
       clearChatHistory(chatHistory);
       console.clear();
-      rl.prompt();
-      return;
+      return false;
     }
 
     if (["chat", "c", "ask"].includes(cmdName)) {
@@ -451,8 +448,7 @@ export async function startRepl(): Promise<void> {
       trackCommand(line.trim());
       await dispatchReplChat(args, chatHistory);
       console.log();
-      rl.prompt();
-      return;
+      return false;
     }
 
     // 查找注册命令；非命令则当作自由文本走意图识别
@@ -460,8 +456,7 @@ export async function startRepl(): Promise<void> {
     if (!cmd) {
       await dispatchReplFreeText(line.trim(), chatHistory);
       console.log();
-      rl.prompt();
-      return;
+      return false;
     }
 
     // 执行命令
@@ -474,7 +469,30 @@ export async function startRepl(): Promise<void> {
     }
 
     console.log(); // 命令间空行
+    return false;
+  };
+
+  // M-C4：命令执行期间继续到达的输入行进入队列，串行处理，避免并发竞态与输出交错
+  const pending: string[] = [];
+  let processing = false;
+  const drain = async (): Promise<void> => {
+    if (processing) return;
+    processing = true;
+    try {
+      while (pending.length) {
+        const next = pending.shift() as string;
+        const exited = await processLine(next);
+        if (exited) return; // 已退出，停止处理
+      }
+    } finally {
+      processing = false;
+    }
     rl.prompt();
+  };
+
+  rl.on("line", (line: string) => {
+    pending.push(line);
+    void drain();
   });
 
   rl.on("close", () => {

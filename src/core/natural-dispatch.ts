@@ -31,15 +31,23 @@ export async function dispatchNaturalText(
     return "needs-symbol";
   }
 
+  // L10：识别到能力意图但缺 symbol 时给出提示，避免完全沉默
+  const missingSymbolHint = () => {
+    console.log(chalk.yellow("  未能识别出股票代码，请带上代码或名称，例如：茅台 / AAPL / 600519.SS"));
+  };
+
   switch (res.intent) {
     case "quick-scan":
       if (res.symbol) await quickScanCommand(res.symbol);
+      else missingSymbolHint();
       return "quick-scan";
     case "panorama":
       if (res.symbol) await fullReportCommand(res.symbol);
+      else missingSymbolHint();
       return "panorama";
     case "deep":
       if (res.symbol) await deepReportCommand(res.symbol);
+      else missingSymbolHint();
       return "deep";
     case "unsupported-market":
       console.log(chalk.yellow("  暂不支持该市场"));
