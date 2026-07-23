@@ -32,21 +32,3 @@ export interface HistoricalBar {
   volume: number;
 }
 
-export interface TechnicalData {
-  symbol: string;
-  price: number;
-  change: number;
-  change_percent: number;
-  ma: Record<string, number>;
-  rsi: number | null;
-  macd: { MACD: number; signal: number; histogram: number } | null;
-  bbands: { upper: number; middle: number; lower: number } | null;
-  atr: number | null;
-  adx: number | null;
-  obv: number | null;
-  stochastic: { K: number; D: number } | null;
-  recent: { date: string; close: number; volume: number }[];
-  signals: string[];
-  overall_signal: string;
-  error?: string;
-}

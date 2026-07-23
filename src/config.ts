@@ -40,7 +40,7 @@ export interface ArtiConfig {
     publishableKey: string;
   };
   data: {
-    provider: "openbb" | "arti-data" | "hybrid";
+    provider: "arti-data" | "hybrid";
     artiDataBaseUrl: string;
     artiDataTimeout: number;
     artiDataInternalKey: string;
@@ -195,7 +195,7 @@ export function loadConfig(): ArtiConfig {
   }
   if (process.env.ARTI_DATA_PROVIDER) {
     const provider = process.env.ARTI_DATA_PROVIDER;
-    if (provider === "openbb" || provider === "arti-data" || provider === "hybrid") {
+    if (provider === "arti-data" || provider === "hybrid") {
       config.data.provider = provider;
     }
   }

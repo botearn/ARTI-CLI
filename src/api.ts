@@ -138,39 +138,6 @@ export async function callEdge<T>(
   throw lastError;
 }
 
-// ── 行情接口 ──
-
-export interface StockQuote {
-  symbol: string;
-  name: string;
-  nameZh: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: string;
-  market: "US" | "HK" | "CN";
-  sparkline: number[];
-}
-
-export interface MarketIndex {
-  name: string;
-  nameZh: string;
-  value: number;
-  change: number;
-  changePercent: number;
-}
-
-export async function fetchQuotes(symbols: string): Promise<{ quotes: StockQuote[]; indices: MarketIndex[] }> {
-  return callEdge("stock-quotes", { symbols });
-}
-
-// ── 股票代码解析 ──
-
-export async function resolveStock(text: string): Promise<string | null> {
-  const res = await callEdge<{ symbol: string | null }>("resolve-stock", { text });
-  return res.symbol;
-}
-
 // ── 研报接口 ──
 
 export interface ResearchReport {
@@ -219,8 +186,6 @@ export interface OrchestratorSSEEvent {
   theme?: string | null;
 }
 
-export const AGENT_TYPES = ["natasha", "steve", "tony", "thor", "clint", "sam", "vision", "wanda"] as const;
-
 export const AGENT_LABELS: Record<string, string> = {
   natasha: "情报·宏观",
   steve: "板块轮动",
@@ -241,14 +206,6 @@ export const MASTER_LABELS: Record<string, string> = {
   druckenmiller: "德鲁肯米勒·动量派",
   duan: "段永平·生意模式派",
 };
-
-export async function fetchResearch(
-  symbol: string,
-  agentType: string,
-  stockData?: string,
-): Promise<ResearchReport> {
-  return callEdge("stock-research", { symbol, agentType, stockData });
-}
 
 /**
  * 调用 orchestrator SSE 端点，返回异步事件迭代器
@@ -339,92 +296,6 @@ export async function* streamOrchestrator(
     controller.abort();
     clearTimeout(timer);
   }
-}
-
-// ── 技术扫描 ──
-
-export async function scanStock(symbol: string): Promise<Record<string, unknown>> {
-  return callEdge("scan-stock", { symbol });
-}
-
-// ────────────────────────────────────────────────────────────────────
-// Railway Backend API 客户端
-// ────────────────────────────────────────────────────────────────────
-
-/**
- * 调用 Railway Backend API (Python FastAPI)
- * 支持超时控制、自动重试、JWT 鉴权
- */
-export async function callBackend<T>(
-  endpoint: string,
-  body: Record<string, unknown>,
-  options: { timeout?: number; maxRetries?: number } = {},
-): Promise<T> {
-  const config = loadConfig();
-  const baseUrl = config.backend.url;
-  const timeout = options.timeout ?? config.backend.timeout;
-  const maxRetries = options.maxRetries ?? MAX_RETRIES;
-
-  if (!baseUrl) {
-    throw new Error(
-      "Backend URL 未配置，请设置 ARTI_BACKEND_URL 环境变量或运行: arti config set backend.url <URL>"
-    );
-  }
-
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const authToken = await ensureValidAccessToken();
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeout);
-
-      const res = await fetch(`${baseUrl}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timer);
-
-      if (res.status === 401 && config.auth.refreshToken) {
-        if (attempt < maxRetries) {
-          await ensureValidAccessToken({ forceRefresh: true });
-          continue;
-        }
-      }
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "unknown error");
-        let msg = text;
-        try {
-          const json = JSON.parse(text);
-          if (json.error) msg = json.error;
-          if (json.detail) msg = json.detail; // FastAPI 格式
-        } catch { /* 非 JSON，用原始文本 */ }
-        throw new ApiError(endpoint, res.status, msg);
-      }
-
-      return await res.json() as T;
-    } catch (err) {
-      lastError = err;
-      // AbortController 超时转为友好错误
-      if (err instanceof DOMException && err.name === "AbortError") {
-        lastError = new Error(`Backend 请求超时（${timeout / 1000}s）: ${endpoint}`);
-      }
-      if (attempt < maxRetries && isRetryable(err)) {
-        await sleep(RETRY_DELAY_MS * (attempt + 1));
-        continue;
-      }
-      break;
-    }
-  }
-
-  throw lastError;
 }
 
 // ── Edge: scan-stock ──
@@ -694,32 +565,3 @@ export async function classifyIntent(text: string, lastSymbol?: string | null): 
   return callEdge<IntentResult>("classify-intent", { text, last_symbol: lastSymbol ?? null });
 }
 
-// ── Backend: route ──
-
-export interface RouteDecision {
-  rule: string;
-  condition: string;
-  selectedMasters: string[];
-  reasoning: string;
-}
-
-export async function routeIntent(
-  input: string,
-  chatHistory?: Array<{ role: string; content: string }>,
-  watchlistSymbols?: string[],
-): Promise<RouteDecision> {
-  return callBackend("/v1/route", { input, chatHistory, watchlistSymbols });
-}
-
-// ── Backend: stock-quotes (可选，可保留 yfinance 作为 fallback) ──
-
-export async function fetchQuotesBackend(symbols: string): Promise<{ quotes: StockQuote[]; indices: MarketIndex[] }> {
-  return callBackend("/v1/stock-quotes", { symbols });
-}
-
-// ── Backend: resolve-stock ──
-
-export async function resolveStockBackend(text: string, watchlistSymbols?: string[]): Promise<string | null> {
-  const res = await callBackend<{ symbol: string | null }>("/v1/resolve-stock", { text, watchlistSymbols });
-  return res.symbol;
-}

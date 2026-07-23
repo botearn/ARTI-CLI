@@ -1,5 +1,5 @@
 import { loadConfig } from "../config.js";
-import type { HistoricalBar, QuoteData, TechnicalData } from "./types.js";
+import type { HistoricalBar, QuoteData } from "./types.js";
 
 type McpCallResult = {
   content: Array<{ type: string; text?: string }>;
@@ -244,48 +244,6 @@ function mapMcpQuoteToQuoteData(symbol: string, payload: Record<string, unknown>
   };
 }
 
-function mapMcpTechnicalToTechnicalData(symbol: string, payload: Record<string, unknown>): TechnicalData {
-  const macd = payload.macd as Record<string, unknown> | undefined;
-  const boll = payload.boll as Record<string, unknown> | undefined;
-  const kdj = payload.kdj as Record<string, unknown> | undefined;
-
-  const price = asNumber(payload.latest_close) ?? 0;
-
-  return {
-    symbol: String(payload.symbol ?? symbol).toUpperCase(),
-    price,
-    change: 0,
-    change_percent: 0,
-    ma: {
-      MA5: asNumber(payload.ma5) ?? 0,
-      MA10: asNumber(payload.ma10) ?? 0,
-      MA20: asNumber(payload.ma20) ?? 0,
-      MA60: asNumber(payload.ma60) ?? 0,
-    },
-    rsi: asNumber(payload.rsi14),
-    macd: macd ? {
-      MACD: asNumber(macd.macd) ?? 0,
-      signal: asNumber(macd.dea) ?? 0,
-      histogram: asNumber(macd.dif) ?? 0,
-    } : null,
-    bbands: boll ? {
-      upper: asNumber(boll.upper) ?? 0,
-      middle: asNumber(boll.mid) ?? 0,
-      lower: asNumber(boll.lower) ?? 0,
-    } : null,
-    atr: asNumber(payload.atr14),
-    adx: null,
-    obv: null,
-    stochastic: kdj ? {
-      K: asNumber(kdj.k) ?? 0,
-      D: asNumber(kdj.d) ?? 0,
-    } : null,
-    recent: [],
-    signals: [],
-    overall_signal: "中性",
-  };
-}
-
 function mapMcpBars(payload: Record<string, unknown>): HistoricalBar[] {
   const bars = Array.isArray(payload.bars) ? payload.bars : [];
   return bars
@@ -342,50 +300,9 @@ export async function fetchQuoteFromBackendMcp(symbol: string, forceRefresh = fa
   return mapMcpQuoteToQuoteData(symbol, payload);
 }
 
-export async function fetchTechnicalFromBackendMcp(symbol: string, forceRefresh = false): Promise<TechnicalData> {
-  const payload = await callToolWithCircuit("get_technical_indicators", { symbol, force_refresh: forceRefresh });
-  return mapMcpTechnicalToTechnicalData(symbol, payload);
-}
-
 export async function fetchDailyBarsFromBackendMcp(symbol: string, days = 60, forceRefresh = false): Promise<HistoricalBar[]> {
   const payload = await callToolWithCircuit("get_daily_bars", { symbol, days, adjust: "qfq", force_refresh: forceRefresh });
   return mapMcpBars(payload);
-}
-
-export async function fetchStockInfoFromBackendMcp(symbol: string, forceRefresh = false): Promise<Record<string, unknown>> {
-  return callBackendMcpTool("get_stock_info", { symbol, force_refresh: forceRefresh });
-}
-
-export async function fetchCompanyProfileFromBackendMcp(symbol: string, forceRefresh = false): Promise<Record<string, unknown>> {
-  return callBackendMcpTool("get_company_profile", { symbol, force_refresh: forceRefresh });
-}
-
-export async function fetchFinancialReportFromBackendMcp(
-  symbol: string,
-  reportType: "income" | "balance" | "cashflow",
-  forceRefresh = false,
-): Promise<Record<string, unknown>> {
-  return callBackendMcpTool("get_financial_report", {
-    symbol,
-    report_type: reportType,
-    force_refresh: forceRefresh,
-  });
-}
-
-export async function fetchDividendHistoryFromBackendMcp(symbol: string, forceRefresh = false): Promise<Record<string, unknown>> {
-  return callBackendMcpTool("get_dividend_history", { symbol, force_refresh: forceRefresh });
-}
-
-export async function fetchMacroIndicatorsFromBackendMcp(
-  country: "us" | "cn" = "us",
-  options?: { frequency?: string; days?: number; forceRefresh?: boolean },
-): Promise<Record<string, unknown>> {
-  return callBackendMcpTool("get_macro_indicators", {
-    country,
-    frequency: options?.frequency,
-    days: options?.days ?? 90,
-    force_refresh: options?.forceRefresh ?? false,
-  });
 }
 
 export async function fetchStockFundFlowFromBackendMcp(symbol: string, forceRefresh = false): Promise<Record<string, unknown>> {

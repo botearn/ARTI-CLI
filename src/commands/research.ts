@@ -12,8 +12,6 @@ import ora from "ora";
 import {
   streamOrchestrator,
   streamOrchestratorBackend,
-  fetchResearch,
-  AGENT_TYPES,
   AGENT_LABELS,
   MASTER_LABELS,
   type ResearchReport,
@@ -835,10 +833,10 @@ function renderDeepReportDocument(
 
 export async function researchCommand(
   symbol: string,
-  options: { agent?: string; full?: boolean; mode?: string },
+  options: { full?: boolean; mode?: string },
 ): Promise<void> {
   if (!symbol) {
-    console.log(chalk.red("请提供股票代码，例如：arti research AAPL"));
+    console.log(chalk.red("请提供股票代码，例如：arti full AAPL"));
     return;
   }
 
@@ -848,11 +846,6 @@ export async function researchCommand(
   // 计费由服务端权威处理（RFC-2026-0007）。full/deep 走的 Railway orchestrator
   // 暂未接服务端扣费，处于临时免费窗口，待后端补齐（见 RFC-2026-0007「待后端跟进」）。
   track("research", [symbol]);
-
-  // 单分析师模式：直接调 stock-research（不走 orchestrator）
-  if (options.agent) {
-    return runSingleAgent(symbol, options.agent, options.full);
-  }
 
   // 完整三层级模式：调 orchestrator SSE
   return runOrchestrator(symbol, { ...options, mode: normalizedMode });
@@ -869,36 +862,6 @@ export function normalizeResearchMode(mode?: string): "full" | "layer1-only" {
       return "layer1-only";
     default:
       return "full";
-  }
-}
-
-/** 单分析师快速分析 */
-async function runSingleAgent(
-  symbol: string,
-  agent: string,
-  full: boolean | undefined,
-): Promise<void> {
-  const spinner = ora(`${AGENT_LABELS[agent] || agent} 分析 ${symbol}...`).start();
-
-  try {
-    const context = await buildResearchStockContext(symbol);
-
-    const report = await fetchResearch(symbol, agent, context.stockData);
-    spinner.stop();
-
-    output({ symbol, agent, label: AGENT_LABELS[agent], technicalSource: context.technicalSource, ...report }, () => {
-      console.log(title(`${symbol} ${AGENT_LABELS[agent] || agent}分析`));
-      renderAnalystBrief(agent, report);
-      if (full) {
-        console.log(chalk.gray("  ── 正文摘录 ──\n"));
-        renderAnalystTerminalDetail(report);
-      }
-      console.log(divider());
-    });
-  } catch (err) {
-    spinner.fail("分析失败");
-    printError(err);
-    process.exitCode = 1;
   }
 }
 
@@ -1241,71 +1204,8 @@ async function runOrchestrator(
     clearInterval(timeoutChecker);
     spinner.fail("研报生成失败");
     printError(err);
-
-    // Fallback：orchestrator 不可用时回退到直接调用分析师
-    log(chalk.yellow("\n  尝试回退到直接分析模式...\n"));
-    return runFallback(symbol, options.full);
+    process.exitCode = 1;
   } finally {
     clearInterval(timeoutChecker);
-  }
-}
-
-/** 回退模式：直接并行调用 7 位分析师（无大师辩论） */
-async function runFallback(symbol: string, full?: boolean): Promise<void> {
-  const spinner = ora(`直接模式 — 7 位分析师并行分析 ${symbol}...`).start();
-
-  try {
-    const context = await buildResearchStockContext(symbol);
-    const stockData = context.stockData;
-
-    const agents: string[] = [...AGENT_TYPES].filter(a => a !== "wanda");
-    const settled = await Promise.allSettled(
-      agents.map(a => fetchResearch(symbol, a, stockData).then(report => ({ agent: a, report }))),
-    );
-    spinner.stop();
-
-    const completed: { agent: string; report: ResearchReport }[] = [];
-    for (const r of settled) {
-      if (r.status === "fulfilled") completed.push(r.value);
-    }
-
-    const jsonData = {
-      symbol,
-      mode: "fallback",
-      technicalSource: context.technicalSource,
-      layer1: {
-        reports: completed.map(r => ({
-          agent: r.agent,
-          label: AGENT_LABELS[r.agent],
-          ...r.report,
-        })),
-        summary: {
-          bullish: completed.filter(r => r.report.sentiment === "看多").length,
-          bearish: completed.filter(r => r.report.sentiment === "看空").length,
-          neutral: completed.filter(r => r.report.sentiment === "中性").length,
-        },
-      },
-    };
-
-    output(jsonData, () => {
-      console.log(title(`${symbol} 多维度研报 (直接模式)`));
-      for (const r of completed) {
-        renderAnalystBrief(r.agent, r.report);
-        if (full) {
-          renderAnalystTerminalDetail(r.report);
-        }
-      }
-      console.log(
-        `\n  ${chalk.bold("综合意见:")} ` +
-        `${chalk.red(`看多 ${jsonData.layer1.summary.bullish}`)} | ` +
-        `${chalk.green(`看空 ${jsonData.layer1.summary.bearish}`)} | ` +
-        `${chalk.yellow(`中性 ${jsonData.layer1.summary.neutral}`)}`
-      );
-      console.log(chalk.gray("\n  注：直接模式无大师辩论和圆桌合成\n"));
-    });
-  } catch (err) {
-    spinner.fail("回退模式也失败了");
-    printError(err);
-    process.exitCode = 1;
   }
 }
