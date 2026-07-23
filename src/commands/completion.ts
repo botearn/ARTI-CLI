@@ -12,18 +12,16 @@ import { execSync } from "node:child_process";
 const BASH_COMPLETION = `###-begin-arti-completions-###
 _arti_completions() {
   local cur="\${COMP_WORDS[COMP_CWORD]}"
-  local commands="login logout whoami quick-scan quick qs full panorama fr deep dr quote market scan predict news research config watchlist insights watch export completion credits"
-  local market_subs="gainers losers active"
+  local commands="chat c ask quick-scan quick qs full panorama fr deep dr credits config poly login logout whoami token doctor diag completion"
   local config_subs="set get list reset"
-  local watchlist_subs="add remove list"
+  local poly_subs="events event summary compare search"
 
   if [ "\${COMP_CWORD}" -eq 1 ]; then
     COMPREPLY=( $(compgen -W "\${commands}" -- "\${cur}") )
   elif [ "\${COMP_CWORD}" -eq 2 ]; then
     case "\${COMP_WORDS[1]}" in
-      market) COMPREPLY=( $(compgen -W "\${market_subs}" -- "\${cur}") ) ;;
       config) COMPREPLY=( $(compgen -W "\${config_subs}" -- "\${cur}") ) ;;
-      watchlist) COMPREPLY=( $(compgen -W "\${watchlist_subs}" -- "\${cur}") ) ;;
+      poly) COMPREPLY=( $(compgen -W "\${poly_subs}" -- "\${cur}") ) ;;
       completion) COMPREPLY=( $(compgen -W "bash zsh" -- "\${cur}") ) ;;
     esac
   fi
@@ -33,39 +31,31 @@ complete -F _arti_completions arti
 
 const ZSH_COMPLETION = `###-begin-arti-completions-###
 _arti() {
-  local -a commands market_subs config_subs watchlist_subs
+  local -a commands config_subs poly_subs
   commands=(
-    'quick-scan:主产品 Quick Scan'
-    'full:主产品 Full 全景研报'
-    'deep:主产品 Deep 深度研报'
+    'chat:AI 投研对话'
+    'quick-scan:快速研判'
+    'full:全景研报'
+    'deep:深度研报'
+    'credits:查看 Credits 与套餐'
+    'config:配置管理'
+    'poly:预测市场数据'
     'login:登录 ARTI 账户'
     'logout:退出当前账户'
     'whoami:查看当前登录状态'
-    'quote:查询实时行情'
-    'market:全球市场概览'
-    'scan:技术指标扫描'
-    'predict:综合预测分析'
-    'news:财经新闻'
-    'research:AI 多维研报'
-    'config:配置管理'
-    'watchlist:自选股管理'
-    'insights:投研洞察'
-    'watch:实时行情 Dashboard'
-    'export:导出历史数据'
-    'credits:查看 Credits 与套餐'
+    'token:打印登录 token'
+    'doctor:连接诊断'
     'completion:生成自动补全脚本'
   )
-  market_subs=('gainers:涨幅榜' 'losers:跌幅榜' 'active:活跃榜')
   config_subs=('set:设置配置项' 'get:查看配置项' 'list:列出配置' 'reset:重置配置')
-  watchlist_subs=('add:添加自选' 'remove:移除自选' 'list:列出自选')
+  poly_subs=('events:事件列表' 'event:事件详情' 'summary:市场概览' 'compare:对比' 'search:搜索')
 
   if (( CURRENT == 2 )); then
     _describe 'command' commands
   elif (( CURRENT == 3 )); then
     case "\${words[2]}" in
-      market) _describe 'subcommand' market_subs ;;
       config) _describe 'subcommand' config_subs ;;
-      watchlist) _describe 'subcommand' watchlist_subs ;;
+      poly) _describe 'subcommand' poly_subs ;;
       completion) _describe 'shell' '(bash zsh)' ;;
     esac
   fi

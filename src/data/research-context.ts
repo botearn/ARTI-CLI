@@ -92,10 +92,10 @@ export function formatBackendResearchStockData(
 export async function buildResearchStockContext(symbol: string): Promise<ResearchStockContext> {
   const [scanSettled, mcpContextSettled, fundFlowSettled] = await Promise.allSettled([
     scanStockBackend(symbol),
-    canUseBackendMcp(symbol)
+    canUseBackendMcp()
       ? fetchStockContextFromBackendMcp(symbol, ["quote", "technicals", "profile", "fundamentals"])
       : Promise.resolve(null),
-    canUseBackendMcp(symbol)
+    canUseBackendMcp()
       ? fetchStockFundFlowFromBackendMcp(symbol)
       : Promise.resolve(null),
   ]);

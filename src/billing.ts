@@ -159,6 +159,7 @@ export interface DeductResult {
   balanceAfter: number;
   feature: FeatureKey;
   skipped?: boolean;
+  failed?: boolean; // L21：结果已产出但扣费失败（降级，非测试模式）
   weeklyPart?: number;
   permanentPart?: number;
   transactionId?: string;
@@ -234,6 +235,14 @@ export class PlanAccessError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PlanAccessError";
+  }
+}
+
+// L14：扣费/计费后端不可用（区别于"积分不足"的 InsufficientCreditsError）
+export class BillingBackendError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BillingBackendError";
   }
 }
 
@@ -394,10 +403,25 @@ export async function withBilling<T>(
     return undefined;
   }
 
-  return {
-    result,
-    deduct: await applyDeduction(feature, state),
-  };
+  // L21：结果已产出。扣费失败降级为告警，不丢弃已经算好的结果
+  // （积分不足在 assertSufficientCredits 已前置拦截；此处失败多为后端扣费不可用）。
+  try {
+    return { result, deduct: await applyDeduction(feature, state) };
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) throw err;
+    console.error(chalk.yellow(`  ⚠ 扣费未成功（结果已生成）: ${err instanceof Error ? err.message : String(err)}`));
+    return {
+      result,
+      deduct: {
+        cost: 0,
+        balanceBefore: state.balance,
+        balanceAfter: state.balance,
+        feature,
+        skipped: true,
+        failed: true,
+      },
+    };
+  }
 }
 
 export async function assertWatchlistCapacity(nextCount: number, state?: BillingState): Promise<BillingState> {
@@ -420,9 +444,10 @@ export async function assertWatchlistCapacity(nextCount: number, state?: Billing
 
 export function printDeductResult(result: DeductResult): void {
   if (result.skipped) {
+    const tag = result.failed ? chalk.yellow("[扣费失败·未计费]") : chalk.cyan("[测试模式未扣费]");
     console.log(
       chalk.gray(
-        `  ─ ${FEATURE_LABELS[result.feature]} ${chalk.cyan("[测试模式未扣费]")}` +
+        `  ─ ${FEATURE_LABELS[result.feature]} ${tag}` +
         `  余额 ${chalk.cyan(result.balanceAfter.toString())} Credits`,
       ),
     );
@@ -479,7 +504,8 @@ async function consumeCreditsAtomic(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "unknown error");
-    throw new Error(`扣费失败: ${text}`);
+    // L14：扣费 RPC 失败属于后端不可用，用专门错误类型与"积分不足"区分
+    throw new BillingBackendError(`扣费服务暂时不可用（HTTP ${res.status}）: ${text}`);
   }
 
   const json = await res.json() as ConsumeRpcRow | ConsumeRpcRow[];

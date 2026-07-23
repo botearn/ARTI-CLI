@@ -3,7 +3,7 @@
  * 参考 CLI-Anything 的 session.py 设计
  * 文件位于 ~/.config/arti/session.json
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -62,7 +62,10 @@ export function saveSession(): void {
   session.lastUpdated = new Date().toISOString();
   try {
     ensureDir();
-    writeFileSync(SESSION_FILE, JSON.stringify(session, null, 2) + "\n", "utf-8");
+    // L12：原子写（临时文件 + rename），避免写入中断/并发损坏文件
+    const tmp = `${SESSION_FILE}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(session, null, 2) + "\n", "utf-8");
+    renameSync(tmp, SESSION_FILE);
   } catch {
     // 静默失败
   }

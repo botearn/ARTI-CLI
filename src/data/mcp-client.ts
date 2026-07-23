@@ -301,7 +301,9 @@ function mapMcpBars(payload: Record<string, unknown>): HistoricalBar[] {
     .filter((row): row is HistoricalBar => row !== null);
 }
 
-export function canUseBackendMcp(symbol?: string): boolean {
+// L20：熔断器状态按服务（单一后端 MCP 端点）全局共享——服务不可用时对所有 symbol
+// 都应熔断，这是有意设计。移除此前未被使用的 symbol 形参，避免误导调用方。
+export function canUseBackendMcp(): boolean {
   const config = loadConfig();
   if (!config.backend.mcpEnabled) return false;
   if (!config.backend.mcpUrl.trim()) return false;
