@@ -10,6 +10,7 @@
 | [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) | CLI 数据链收敛到生产产品函数，下线 OpenBB 第二套处理 | 2026-06-24 |
 | [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) | ARTi Poly CLI 集成 — `arti poly` 子命令接入 ARTi-poly 公开 API | 2026-07-08 |
 | [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) | chat / quick-scan 切换 Supabase Edge /v1 + REPL 会话历史（arti#0055 姊妹篇） | 2026-07-14 |
+| [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) | CLI 加固与审计缺陷修复计划（取代 docs/BACKLOG.md） | 2026-07-23 |
 
 ---
 
@@ -59,7 +60,7 @@
 
 ### 💰 计费 & Credits
 
-- *待添加*
+- [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) - CLI 加固与审计缺陷修复计划（含双重扣费等待后端确认项）
 
 ### 📊 数据源 & API
 
@@ -84,7 +85,7 @@
 
 ### 🔐 安全 & 认证
 
-- *待添加*
+- [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) - CLI 加固与审计缺陷修复计划（超时/token 刷新/scheme 校验等）
 
 ---
 
@@ -92,6 +93,7 @@
 
 ### 2026
 
+- **2026-07-23** - [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) - CLI 加固与审计缺陷修复计划 (Draft, 取代 BACKLOG.md)
 - **2026-07-14** - [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) - chat / quick-scan 切换 Edge /v1 (Draft, arti#0055 姊妹篇)
 - **2026-07-08** - [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成 (Draft)
 - **2026-06-24** - [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) - CLI 数据链收敛 (Draft)
@@ -108,13 +110,13 @@
 
 | 状态 | 数量 |
 |---|---|
-| Draft | 4 |
+| Draft | 5 |
 | Proposed | 0 |
 | Accepted | 0 |
 | Implementing | 0 |
 | Implemented | 1 |
 | Rejected | 0 |
 | Deprecated | 0 |
-| **总计** | **5** |
+| **总计** | **6** |
 
-**最后更新**: 2026-07-14
+**最后更新**: 2026-07-23
