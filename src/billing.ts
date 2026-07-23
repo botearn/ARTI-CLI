@@ -4,6 +4,7 @@
  */
 import chalk from "chalk";
 import { ensureValidAccessToken, getAuthState } from "./auth.js";
+import { fetchWithTimeout } from "./http.js";
 
 const CREDIT_USD_VALUE = 0.04;
 const SUPABASE_JSON_HEADERS = {
@@ -461,7 +462,7 @@ async function consumeCreditsAtomic(
 ): Promise<ConsumeRpcRow> {
   const auth = getAuthState();
   const token = await ensureValidAccessToken();
-  const res = await fetch(`${auth.supabaseUrl}/rest/v1/rpc/consume_credits_atomic`, {
+  const res = await fetchWithTimeout(`${auth.supabaseUrl}/rest/v1/rpc/consume_credits_atomic`, {
     method: "POST",
     headers: {
       ...SUPABASE_JSON_HEADERS,
@@ -494,7 +495,7 @@ async function supabaseSelect<T>(
 ): Promise<{ data: T }> {
   const auth = getAuthState();
   const qs = query ? `&${query}` : "";
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${auth.supabaseUrl}/rest/v1/${table}?select=${encodeURIComponent(select)}${qs}`,
     {
       headers: {
@@ -519,7 +520,7 @@ async function supabaseMaybeSingle<T>(
   token: string,
 ): Promise<{ data: T | null }> {
   const auth = getAuthState();
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${auth.supabaseUrl}/rest/v1/${table}?select=${encodeURIComponent(select)}&${query}`,
     {
       headers: {

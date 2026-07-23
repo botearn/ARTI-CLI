@@ -95,6 +95,13 @@ async function getClient(): Promise<McpClient> {
     return clientPromise;
   }
 
+  // M-C7：token/url 变化触发重建时，先关闭旧连接，避免泄漏。不阻塞新连接建立。
+  const staleClient = activeClient;
+  activeClient = null;
+  if (staleClient?.close) {
+    void Promise.resolve(staleClient.close()).catch(() => { /* 旧连接关闭失败忽略 */ });
+  }
+
   const promise = (async () => {
     const { Client, StreamableHTTPClientTransport } = await loadSdk();
     const client = new Client(

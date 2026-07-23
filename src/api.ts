@@ -508,7 +508,6 @@ export async function* streamOrchestratorBackend(
 ): AsyncGenerator<OrchestratorSSEEvent> {
   const config = loadConfig();
   const baseUrl = config.backend.url;
-  const authToken = config.auth.token;
 
   if (!baseUrl) {
     throw new Error("Backend URL 未配置");
@@ -518,22 +517,32 @@ export async function* streamOrchestratorBackend(
   const timer = setTimeout(() => controller.abort(), 600_000); // 10 分钟超时
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
+  // M-S5：用 ensureValidAccessToken 取 token（过期自动刷新），并在 401 时强制刷新后重试
+  const body = JSON.stringify({
+    symbol,
+    stockData: opts?.stockData || "",
+    mode: opts?.mode || "layer1-only",  // 修复：默认全景报告而非深度报告
+    layer1Agents: opts?.layer1Agents,
+    layer2Masters: opts?.layer2Masters,
+  });
+  const doFetch = (token: string) => fetch(`${baseUrl}/v1/orchestrator`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body,
+    signal: controller.signal,
+  });
+
   try {
-    const res = await fetch(`${baseUrl}/v1/orchestrator`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: JSON.stringify({
-        symbol,
-        stockData: opts?.stockData || "",
-        mode: opts?.mode || "layer1-only",  // 修复：默认全景报告而非深度报告
-        layer1Agents: opts?.layer1Agents,
-        layer2Masters: opts?.layer2Masters,
-      }),
-      signal: controller.signal,
-    });
+    let authToken = await ensureValidAccessToken();
+    let res = await doFetch(authToken);
+
+    if (res.status === 401 && config.auth.refreshToken) {
+      authToken = await ensureValidAccessToken({ forceRefresh: true });
+      res = await doFetch(authToken);
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "unknown");
