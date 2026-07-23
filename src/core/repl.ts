@@ -57,11 +57,11 @@ function getAllCommandNames(): string[] {
   return names;
 }
 
-/** 加载历史记录 */
+/** 加载历史记录（文件为旧→新顺序，readline 期望 history[0] 为最新，故 reverse） */
 function loadHistory(): string[] {
   if (!existsSync(HISTORY_FILE)) return [];
   try {
-    return readFileSync(HISTORY_FILE, "utf-8").trim().split("\n").filter(Boolean);
+    return readFileSync(HISTORY_FILE, "utf-8").trim().split("\n").filter(Boolean).reverse();
   } catch {
     return [];
   }
@@ -211,6 +211,16 @@ function interactiveSelect(items: SelectItem[]): Promise<string | null> {
   return new Promise((resolve) => {
     const selectableIndices = items.map((it, i) => it.isSep ? -1 : i).filter(i => i >= 0);
     if (!selectableIndices.length) { resolve(null); return; }
+
+    // 非 TTY（管道/重定向）下 setRawMode 不存在，退化为纯文本列表，不进入键盘交互
+    if (!process.stdin.isTTY || typeof process.stdin.setRawMode !== "function") {
+      for (const it of items) {
+        if (it.isSep) continue;
+        console.log(`  ${it.label}${it.hint ? chalk.dim(`  ${it.hint}`) : ""}`);
+      }
+      resolve(null);
+      return;
+    }
 
     let cursor = selectableIndices[0];
     const maxVisible = Math.min(selectableIndices.length, (process.stdout.rows || 24) - 6);

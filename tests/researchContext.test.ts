@@ -54,4 +54,13 @@ describe("formatResearchStockData", () => {
     expect(parsed.technical.ma20).toBe(11.8);
     expect(parsed.technical.overallSignal).toBe("偏多");
   });
+
+  // M-C3: 后端违背类型契约回 null 时，格式化不应崩溃（此前 scan.pct.toFixed 抛 TypeError）
+  it("price/pct 为 null 时不崩溃，渲染占位符", () => {
+    const scan = makeScan({ price: null as unknown as number, pct: null as unknown as number });
+    expect(() => formatResearchStockData("AAPL", scan)).not.toThrow();
+    const text = formatResearchStockData("AAPL", scan);
+    expect(text).toContain("AAPL: $—");
+    expect(text).toContain("—");
+  });
 });

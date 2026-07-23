@@ -937,24 +937,6 @@ async function runOrchestrator(
   const startupProgress = buildResearchStartupProgress(symbol);
   let spinner = ora(startupProgress.searching).start();
 
-  // R1: 实时进度反馈 - 显示数据获取阶段
-  spinner.text = startupProgress.fetching;
-  const context = await buildResearchStockContext(symbol);
-  const stockData = context.stockData;
-  const backendStockData = context.backendStockData || stockData;
-  const marketSnapshot = summarizeMarketSnapshot(stockData);
-
-  if (isDebugEnabled()) {
-    console.log(chalk.gray(`\n  [调试] stockData 长度: ${stockData.length} 字符`));
-    if (stockData.length > 0) {
-      console.log(chalk.gray(`  [调试] stockData 预览: ${stockData.substring(0, 100)}...`));
-    } else {
-      console.log(chalk.red(`  [调试] ⚠️ stockData 为空！`));
-    }
-  }
-
-  spinner.text = startupProgress.connecting;
-
   // 收集所有结果
   const reports: { agent: string; report: ResearchReport }[] = [];
   const masterOpinions: { master: string; opinion: MasterOpinion }[] = [];
@@ -982,6 +964,24 @@ async function runOrchestrator(
   }, 5000);
 
   try {
+    // R1: 实时进度反馈 - 显示数据获取阶段（置于 try 内，获取失败可被下方 catch 兜底）
+    spinner.text = startupProgress.fetching;
+    const context = await buildResearchStockContext(symbol);
+    const stockData = context.stockData;
+    const backendStockData = context.backendStockData || stockData;
+    const marketSnapshot = summarizeMarketSnapshot(stockData);
+
+    if (isDebugEnabled()) {
+      console.log(chalk.gray(`\n  [调试] stockData 长度: ${stockData.length} 字符`));
+      if (stockData.length > 0) {
+        console.log(chalk.gray(`  [调试] stockData 预览: ${stockData.substring(0, 100)}...`));
+      } else {
+        console.log(chalk.red(`  [调试] ⚠️ stockData 为空！`));
+      }
+    }
+
+    spinner.text = startupProgress.connecting;
+
     // 优先使用 Railway 后端，回退到 Supabase
     const config = await import("../config.js").then(m => m.loadConfig());
     const useBackend = config.backend.enabled && config.backend.url;

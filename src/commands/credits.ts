@@ -12,6 +12,7 @@ import {
   type FeatureKey,
 } from "../billing.js";
 import { output } from "../output.js";
+import { printError } from "../errors.js";
 
 interface CreditsOptions {
   setPlan?: string;
@@ -22,7 +23,14 @@ export async function creditsCommand(options?: CreditsOptions): Promise<void> {
     console.log(chalk.yellow("  `credits --set-plan` 已废弃，CLI 现使用服务端真实套餐与余额。"));
   }
 
-  const state = await getActiveBillingState();
+  let state;
+  try {
+    state = await getActiveBillingState();
+  } catch (err) {
+    process.exitCode = 1;
+    printError(err);
+    return;
+  }
   const plan = PLANS[state.plan];
 
   output(

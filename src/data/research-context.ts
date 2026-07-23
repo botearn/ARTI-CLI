@@ -18,7 +18,8 @@ export function formatResearchStockData(
   if (scan) {
     const t = scan.tech;
     const volume = typeof scan.curr_vol === "number" ? scan.curr_vol.toLocaleString() : String(scan.curr_vol ?? "");
-    parts.push(`${symbol}: $${scan.price} ${scan.pct >= 0 ? "+" : ""}${scan.pct.toFixed(2)}% 成交量:${volume}`);
+    const pctStr = scan.pct != null ? `${scan.pct >= 0 ? "+" : ""}${scan.pct.toFixed(2)}%` : "—";
+    parts.push(`${symbol}: $${scan.price ?? "—"} ${pctStr} 成交量:${volume}`);
 
     const bits: string[] = [];
     if (t?.ma20 != null) bits.push(`MA20:${t.ma20}`);
