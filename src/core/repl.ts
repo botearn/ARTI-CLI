@@ -68,8 +68,18 @@ function loadHistory(): string[] {
   }
 }
 
+// L1：含敏感参数的命令行不写入明文历史（如 login --token <jwt>、config set auth.token <jwt>）
+function isSensitiveLine(line: string): boolean {
+  const lower = line.toLowerCase();
+  if (/(^|\s)--(token|refresh-token|password)(\s|=)/.test(lower)) return true;
+  if (/\bconfig\s+set\s+(auth\.(token|refreshtoken)|data\.artidatainternalkey|poly\.apikey)\b/.test(lower)) return true;
+  if (/(^|\s)(login|token)\b/.test(lower) && /\beyj[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+/i.test(line)) return true;
+  return false;
+}
+
 /** 追加历史记录 */
 function appendHistory(line: string): void {
+  if (isSensitiveLine(line)) return; // 敏感命令跳过历史，避免 JWT/密码落盘
   try {
     if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true });
     appendFileSync(HISTORY_FILE, line + "\n");

@@ -245,6 +245,35 @@ const ALLOWED_CONFIG_KEYS = new Set([
 
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
+// M-S1：承载 Bearer token 的 URL 类配置键。非 localhost 强制 https，避免 token 明文传输。
+const URL_CONFIG_KEYS = new Set([
+  "api.baseUrl", "backend.url", "backend.mcpUrl",
+  "auth.supabaseUrl", "data.artiDataBaseUrl", "poly.apiBaseUrl",
+]);
+
+function isLocalhost(hostname: string): boolean {
+  return hostname === "localhost"
+    || hostname === "127.0.0.1"
+    || hostname === "::1"
+    || hostname === "0.0.0.0";
+}
+
+/** 校验 URL 类配置值：必须是合法 URL，且非 localhost 时强制 https */
+function assertSafeUrl(key: string, value: string): void {
+  if (!value.trim()) return; // 允许清空
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`配置项 ${key} 不是合法 URL: ${value}`);
+  }
+  if (url.protocol === "https:") return;
+  if (url.protocol === "http:" && isLocalhost(url.hostname)) return;
+  throw new Error(
+    `配置项 ${key} 必须使用 https（仅 localhost 允许 http），当前: ${url.protocol}//${url.hostname}`,
+  );
+}
+
 /** 通过点号路径设置配置值，如 "api.timeout" "60000" */
 export function setConfigValue(key: string, value: string): void {
   if (!ALLOWED_CONFIG_KEYS.has(key)) {
@@ -253,6 +282,9 @@ export function setConfigValue(key: string, value: string): void {
   const parts = key.split(".");
   if (parts.some(p => DANGEROUS_KEYS.has(p))) {
     throw new Error("非法配置键");
+  }
+  if (URL_CONFIG_KEYS.has(key)) {
+    assertSafeUrl(key, value);
   }
 
   const config = loadConfig();

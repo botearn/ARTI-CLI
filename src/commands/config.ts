@@ -13,7 +13,9 @@ const SECRET_KEYS = new Set(["token", "refreshToken", "artiDataInternalKey", "ap
 export function configSetCommand(key: string, value: string): void {
   try {
     setConfigValue(key, value);
-    console.log(chalk.green(`  ${key} = ${value}`));
+    // L2：敏感键回显脱敏，避免 token 等明文打到 stdout
+    const shown = isSecretConfigKey(key) && value ? maskSecret(value) : value;
+    console.log(chalk.green(`  ${key} = ${shown}`));
   } catch (err) {
     console.error(chalk.red(`设置失败: ${err instanceof Error ? err.message : String(err)}`));
   }
