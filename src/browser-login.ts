@@ -9,6 +9,7 @@ const DEFAULT_WEB_AUTH_URL = "https://artifin.ai/cli/auth";
 const PENDING_FILE = join(homedir(), ".config", "arti", "pending-login.json");
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_POLL_INTERVAL_MS = 2000;
+const MIN_POLL_INTERVAL_MS = 1000;
 
 interface BrowserLoginOptions {
   webAuthUrl?: string;
@@ -63,7 +64,8 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
     if (polled.status === "expired") {
       throw new Error("网页登录已过期（5 分钟未操作）。请重新执行 arti login");
     }
-    await delay(polled.poll_after_ms || pollIntervalMs);
+    // L4：钳制轮询间隔下限，防止服务端返回极小值导致高频轮询
+    await delay(Math.max(polled.poll_after_ms || pollIntervalMs, MIN_POLL_INTERVAL_MS));
   }
 
   throw new Error(
@@ -122,10 +124,11 @@ export function clearPendingLogin(): void {
 
 export async function openExternalUrl(url: string): Promise<void> {
   const platform = process.platform;
+  // L5：Windows 用 explorer.exe 打开 URL，规避 cmd start 对含 & 的 URL 的解析问题
   const command = platform === "darwin"
     ? { cmd: "open", args: [url] }
     : platform === "win32"
-      ? { cmd: "cmd", args: ["/c", "start", "", url] }
+      ? { cmd: "explorer.exe", args: [url] }
       : { cmd: "xdg-open", args: [url] };
 
   await new Promise<void>((resolve, reject) => {

@@ -115,10 +115,10 @@ const defs: CommandDef[] = [
     usage: "login | login --email <email> --password <password> | login --token <token> [--refresh-token <token>]",
     args: [],
     options: [
-      { short: "", long: "--token", key: "token", type: "string", desc: "ARTI access token", hint: "<token>" },
-      { short: "", long: "--refresh-token", key: "refreshToken", type: "string", desc: "ARTI refresh token", hint: "<token>" },
+      { short: "", long: "--token", key: "token", type: "string", desc: "ARTI access token（⚠️ 会留在 shell 历史/ps，建议用无参 arti login 走浏览器授权）", hint: "<token>" },
+      { short: "", long: "--refresh-token", key: "refreshToken", type: "string", desc: "ARTI refresh token（⚠️ 同 --token，注意泄露风险）", hint: "<token>" },
       { short: "", long: "--email", key: "email", type: "string", desc: "用户邮箱（可选）", hint: "<email>" },
-      { short: "", long: "--password", key: "password", type: "string", desc: "用户密码（可选）", hint: "<password>" },
+      { short: "", long: "--password", key: "password", type: "string", desc: "用户密码（⚠️ 会留在 shell 历史/ps，建议用无参 arti login）", hint: "<password>" },
       { short: "", long: "--user-id", key: "userId", type: "string", desc: "用户 ID（可选）", hint: "<id>" },
       { short: "", long: "--supabase-url", key: "supabaseUrl", type: "string", desc: "Supabase URL（可选）", hint: "<url>" },
       { short: "", long: "--publishable-key", key: "publishableKey", type: "string", desc: "Supabase publishable key（可选）", hint: "<key>" },

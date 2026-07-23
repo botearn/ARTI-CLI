@@ -94,11 +94,23 @@ export function classifyError(err: unknown): ErrorInfo {
   };
 }
 
+/**
+ * L3：清洗来自服务端的错误文本，剥离 ANSI/控制字符（防终端控制序列注入）并截断。
+ * 保留常见空白（换行/制表符）以维持可读性。
+ */
+function sanitizeDetail(text: string, maxLen = 500): string {
+  // 移除 ESC/CSI 序列
+  const noAnsi = text.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "").replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, "");
+  // 移除其余控制字符（保留 \t \n \r）
+  const noCtrl = noAnsi.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
+  return noCtrl.length > maxLen ? `${noCtrl.slice(0, maxLen)}…（已截断）` : noCtrl;
+}
+
 export function printError(err: unknown): void {
   const info = classifyError(err);
   console.error("");
   console.error(chalk.red.bold(`  x ${info.title}`));
-  console.error(chalk.gray(`    ${info.detail}`));
+  console.error(chalk.gray(`    ${sanitizeDetail(info.detail)}`));
   console.error(chalk.yellow(`    -> ${info.suggestion}`));
   console.error("");
 }
