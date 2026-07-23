@@ -30,12 +30,6 @@ describe("rawChatCommand JSON 模式", () => {
     }));
     vi.doMock("../src/billing.js", () => ({
       InsufficientCreditsError: class extends Error {},
-      // withBilling 直接跑 fn 并返回 { result, deduct }
-      withBilling: async (_feature: string, fn: () => Promise<unknown>) => ({
-        result: await fn(),
-        deduct: { cost: 1, balanceAfter: 100, feature: "chat" },
-      }),
-      printDeductResult: vi.fn(),
     }));
     vi.doMock("../src/errors.js", () => ({ printError: vi.fn() }));
     vi.doMock("../src/tracker.js", () => ({ track: vi.fn() }));

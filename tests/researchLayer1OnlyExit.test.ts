@@ -100,9 +100,6 @@ describe("researchCommand layer1-only", () => {
 
     vi.doMock("../src/billing.js", () => ({
       InsufficientCreditsError: class extends Error {},
-      assertSufficientCredits: vi.fn(() => ({ credits: 100 })),
-      applyDeduction: vi.fn(() => undefined),
-      printDeductResult: vi.fn(),
     }));
 
     vi.doMock("../src/format.js", () => ({
@@ -209,9 +206,6 @@ describe("researchCommand layer1-only", () => {
 
     vi.doMock("../src/billing.js", () => ({
       InsufficientCreditsError: class extends Error {},
-      assertSufficientCredits: vi.fn(() => ({ credits: 100 })),
-      applyDeduction: vi.fn(() => undefined),
-      printDeductResult: vi.fn(),
     }));
 
     vi.doMock("../src/format.js", () => ({

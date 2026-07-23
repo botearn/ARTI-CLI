@@ -19,15 +19,6 @@ export function classifyError(err: unknown): ErrorInfo {
     };
   }
 
-  // L14：扣费后端不可用，与"积分不足"区分
-  if (err instanceof Error && err.name === "BillingBackendError") {
-    return {
-      title: "计费服务不可用",
-      detail: err.message,
-      suggestion: "后端计费服务暂时异常，请稍后重试；若持续出现请反馈",
-    };
-  }
-
   if (err instanceof TypeError && String(err.message).includes("fetch")) {
     return {
       title: "网络请求失败",

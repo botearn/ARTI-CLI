@@ -24,14 +24,6 @@ import { title, divider, sentimentBadge, confidenceBar } from "../format.js";
 import { printError } from "../errors.js";
 import { output, isJsonMode } from "../output.js";
 import { track } from "../tracker.js";
-import {
-  assertSufficientCredits,
-  applyDeduction,
-  printDeductResult,
-  InsufficientCreditsError,
-  type BillingState,
-  type FeatureKey,
-} from "../billing.js";
 import { buildResearchStockContext } from "../data/research-context.js";
 
 interface BackendSnapshot {
@@ -853,32 +845,17 @@ export async function researchCommand(
   symbol = symbol.toUpperCase();
   const normalizedMode = normalizeResearchMode(options.mode);
 
-  // 判断功能档位：单分析师/layer1-only = 全景报告，完整三层 = 深度报告
-  const isDeep = !options.agent && normalizedMode !== "layer1-only";
-  const featureKey = isDeep ? "deepReport" : "panorama";
-
-  let billingState: BillingState;
-  try {
-    billingState = await assertSufficientCredits(featureKey);
-  } catch (err) {
-    process.exitCode = 1;
-    if (err instanceof InsufficientCreditsError) {
-      console.log(chalk.red(`\n  ✗ ${err.message}\n`));
-      return;
-    }
-    printError(err);
-    return;
-  }
-
+  // 计费由服务端权威处理（RFC-2026-0007）。full/deep 走的 Railway orchestrator
+  // 暂未接服务端扣费，处于临时免费窗口，待后端补齐（见 RFC-2026-0007「待后端跟进」）。
   track("research", [symbol]);
 
   // 单分析师模式：直接调 stock-research（不走 orchestrator）
   if (options.agent) {
-    return runSingleAgent(symbol, options.agent, options.full, featureKey, billingState);
+    return runSingleAgent(symbol, options.agent, options.full);
   }
 
   // 完整三层级模式：调 orchestrator SSE
-  return runOrchestrator(symbol, { ...options, mode: normalizedMode }, featureKey, billingState);
+  return runOrchestrator(symbol, { ...options, mode: normalizedMode });
 }
 
 export function normalizeResearchMode(mode?: string): "full" | "layer1-only" {
@@ -900,8 +877,6 @@ async function runSingleAgent(
   symbol: string,
   agent: string,
   full: boolean | undefined,
-  featureKey: FeatureKey,
-  billingState: BillingState,
 ): Promise<void> {
   const spinner = ora(`${AGENT_LABELS[agent] || agent} 分析 ${symbol}...`).start();
 
@@ -909,7 +884,6 @@ async function runSingleAgent(
     const context = await buildResearchStockContext(symbol);
 
     const report = await fetchResearch(symbol, agent, context.stockData);
-    const deduct = await applyDeduction(featureKey, billingState);
     spinner.stop();
 
     output({ symbol, agent, label: AGENT_LABELS[agent], technicalSource: context.technicalSource, ...report }, () => {
@@ -920,7 +894,6 @@ async function runSingleAgent(
         renderAnalystTerminalDetail(report);
       }
       console.log(divider());
-      if (deduct) printDeductResult(deduct);
     });
   } catch (err) {
     spinner.fail("分析失败");
@@ -933,8 +906,6 @@ async function runSingleAgent(
 async function runOrchestrator(
   symbol: string,
   options: { full?: boolean; mode?: string },
-  featureKey: FeatureKey,
-  billingState: BillingState,
 ): Promise<void> {
   // H6：JSON 模式下跳过所有人类可读渲染，最终只由 output(jsonData) 写一份 JSON。
   // spinner(ora)写 stderr 不污染 stdout；此 log 包装令 stdout 渲染在 JSON 模式静默。
@@ -1259,16 +1230,12 @@ async function runOrchestrator(
       synthesis,
     };
 
-    // JSON 模式下直接输出
-    const deduct = (reports.length || masterOpinions.length || synthesis)
-      ? await applyDeduction(featureKey, billingState)
-      : undefined;
+    // 计费由服务端权威处理（RFC-2026-0007），CLI 不再本地扣费/展示消耗
     output(jsonData, () => {
       // 终端模式已在 SSE 事件中实时渲染完毕
       if (!reports.length && !hasError) {
         console.log(chalk.yellow("  未获取到研报数据"));
       }
-      if (deduct) printDeductResult(deduct);
     });
   } catch (err) {
     clearInterval(timeoutChecker);

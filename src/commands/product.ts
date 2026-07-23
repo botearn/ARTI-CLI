@@ -12,7 +12,7 @@ import { title, kvLine, colorChange, sentimentBadge, sparkline } from "../format
 import { output } from "../output.js";
 import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
-import { withBilling, printDeductResult, InsufficientCreditsError } from "../billing.js";
+import { InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
 
 export async function quickScanCommand(symbol: string): Promise<void> {
@@ -23,13 +23,14 @@ export async function quickScanCommand(symbol: string): Promise<void> {
 
   symbol = symbol.toUpperCase();
 
-  let billed;
+  // 计费由服务端权威处理（RFC-2026-0007），CLI 不再本地扣费/展示消耗
+  let scan;
   try {
-    billed = await withBilling("quickScan", () => handleCommand(`快速扫描 ${symbol}...`, async () => {
+    scan = await handleCommand(`快速扫描 ${symbol}...`, async () => {
       const res = await scanStockBackend(symbol);
       track("quick-scan", [symbol]);
       return res.scan;
-    }));
+    });
   } catch (err) {
     process.exitCode = 1;
     if (err instanceof InsufficientCreditsError) {
@@ -40,14 +41,10 @@ export async function quickScanCommand(symbol: string): Promise<void> {
     return;
   }
 
-  if (!billed) return;
-
-  const { result: scan, deduct } = billed;
   if (!scan) return;
 
   output({ symbol, scan }, () => {
     renderQuickScan(symbol, scan);
-    printDeductResult(deduct);
   });
 }
 
