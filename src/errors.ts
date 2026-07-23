@@ -10,6 +10,24 @@ interface ErrorInfo {
 }
 
 export function classifyError(err: unknown): ErrorInfo {
+  // L15：Credits/套餐类错误自带完整文案，透传 message，不落入"未知错误"兜底
+  if (err instanceof Error && (err.name === "InsufficientCreditsError" || err.name === "PlanAccessError")) {
+    return {
+      title: err.name === "InsufficientCreditsError" ? "Credits 不足" : "套餐权限不足",
+      detail: err.message,
+      suggestion: "可运行 arti credits 查看余额与套餐权益",
+    };
+  }
+
+  // L14：扣费后端不可用，与"积分不足"区分
+  if (err instanceof Error && err.name === "BillingBackendError") {
+    return {
+      title: "计费服务不可用",
+      detail: err.message,
+      suggestion: "后端计费服务暂时异常，请稍后重试；若持续出现请反馈",
+    };
+  }
+
   if (err instanceof TypeError && String(err.message).includes("fetch")) {
     return {
       title: "网络请求失败",

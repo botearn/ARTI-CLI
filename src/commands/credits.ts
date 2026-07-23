@@ -9,6 +9,7 @@ import {
   FEATURE_LABELS,
   formatPlanLimit,
   getFeatureCost,
+  creditDollarValue,
   type FeatureKey,
 } from "../billing.js";
 import { output } from "../output.js";
@@ -104,7 +105,7 @@ function renderCredits(state: Awaited<ReturnType<typeof getActiveBillingState>>)
       ? chalk.yellow(`${cost} Credits`)
       : chalk.red(`${cost} Credits`);
     const canStr = affordable ? chalk.green("✓") : chalk.red("✗");
-    console.log(`  ${canStr} ${label.padEnd(10)}  ${costStr}  ≈ $${(cost * 0.04).toFixed(2)}`);
+    console.log(`  ${canStr} ${label.padEnd(10)}  ${costStr}  ≈ $${creditDollarValue(cost).toFixed(2)}`);
   }
 
   if (state.balance < 10 && state.plan === "free") {

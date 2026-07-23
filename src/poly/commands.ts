@@ -90,7 +90,7 @@ async function polySearch(keyword: string, options: PolyOptions): Promise<void> 
   }
   const limit = limitValue(options.limit, 20);
   const res = await polyGet<ApiEnvelope<PolyMarketSearchResult[]>>(`markets/search${qs({ source: "kalshi", q, limit })}`);
-  output(res, () => renderEvents(res.data.map(item => ({
+  output(res, () => renderEvents((res.data ?? []).map(item => ({
     id: item.id,
     slug: item.slug ?? item.ticker,
     source: "kalshi",

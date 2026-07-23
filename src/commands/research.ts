@@ -70,6 +70,8 @@ interface FormalReportSummary {
   scenarios: ScenarioItem[];
 }
 
+// L22：置信度量纲约定 —— 后端可能返回 0..1 小数或 0..100 百分数，此处统一归一到 0..1。
+// 边界：confidence === 1 视为“1.0（100%）”而非“1%”。若后端量纲后续统一，应删除 >1 分支的猜测逻辑。
 function normalizeConfidence(confidence: number | null | undefined): number {
   if (typeof confidence !== "number" || Number.isNaN(confidence)) return 0;
   if (confidence > 1) return Math.max(0, Math.min(confidence / 100, 1));

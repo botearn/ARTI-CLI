@@ -1,5 +1,5 @@
 import { ensureValidAccessToken } from "../auth.js";
-import { callEdge } from "../api.js";
+import { callEdge, ApiError } from "../api.js";
 
 export class PolyApiError extends Error {
   constructor(
@@ -25,6 +25,10 @@ export async function polyGet<T>(path: string): Promise<T> {
     const res = await callEdge<PolyDataResponse<T>>("poly-data", { path });
     return res.data;
   } catch (err) {
+    // L17：保留原始 HTTP status，便于上层区分 404/429/5xx
+    if (err instanceof ApiError) {
+      throw new PolyApiError(err.message, err.status);
+    }
     if (err instanceof Error) {
       throw new PolyApiError(err.message);
     }

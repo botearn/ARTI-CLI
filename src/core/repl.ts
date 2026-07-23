@@ -4,7 +4,7 @@
  * 支持命令补全、历史记录、连续查询
  */
 import * as readline from "node:readline";
-import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, appendFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
@@ -83,6 +83,20 @@ function appendHistory(line: string): void {
   try {
     if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true });
     appendFileSync(HISTORY_FILE, line + "\n");
+    trimHistoryIfNeeded();
+  } catch {
+    // 静默
+  }
+}
+
+// L12：历史文件超过 2x 上限时截断到最近 MAX_HISTORY 行（原子写），避免无限增长
+function trimHistoryIfNeeded(): void {
+  try {
+    const lines = readFileSync(HISTORY_FILE, "utf-8").split("\n").filter(Boolean);
+    if (lines.length <= MAX_HISTORY * 2) return;
+    const tmp = `${HISTORY_FILE}.${process.pid}.tmp`;
+    writeFileSync(tmp, lines.slice(-MAX_HISTORY).join("\n") + "\n");
+    renameSync(tmp, HISTORY_FILE);
   } catch {
     // 静默
   }
