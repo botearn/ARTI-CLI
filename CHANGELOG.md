@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **启动画面升级**：金→橙渐变 logo、状态区（登录身份 + 套餐/余额异步回填）、每日轮换提示；banner 秒出不阻塞，余额到位后就地刷新状态行
 - **对话优先 Slash Control Plane（RFC-2026-0008 Phase 1）**：REPL 新增 `/quick`、`/full`、`/deep`、`/credits`、`/poly` 及本地 `/help`、`/clear`、`/cls`、`/exit`，支持 `/` 补全、`//` 字面量转义和未知命令建议
+- **本地会话与 Token usage（RFC-2026-0008 Phase 2）**：新增权限收紧的 JSONL transcript、原子 Session 索引、30 天可配置保留期，以及 `/new`、`/resume`、`/status`、`/usage`
 
 ### 🔧 Changed
 
 - REPL 不再识别裸命令：非 `/` 开头输入始终作为普通对话；外层 `arti <command> --json` 保持不变
+- REPL 上下文不再固定截断为 6 轮；恢复后的完整活跃消息作为 context pack，真实 Token 与上下文容量只使用服务端 `usage` SSE
 - 窄终端（< 50 列）与非 Unicode 终端自动回退单行字标 / 纯 ASCII；非 TTY（管道）环境不再打印 banner
 - 更新检查改为回调模式：REPL 内异步插入提示、命令模式改走 stderr、`--json` 模式完全跳过（stdout 保持纯净）；定时器 unref 不再拖住进程退出
 - **计费一律服务端权威（RFC-2026-0007）**：移除 CLI 侧本地扣费（chat / quick-scan / full / deep 不再调用 `consume_credits_atomic`），消除 chat / quick-scan 的双重扣费；命令结尾不再展示"消耗 / 余额"行，`arti credits` 仍可查询余额

@@ -103,7 +103,15 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 - **普通对话**：其他输入全部作为用户消息；`deep NVDA` 和“解释 `/deep`”都不会触发命令
 - **字面量 Slash**：需要发送 `/` 开头文本时输入 `//text`
 
-当前可用快捷命令：`/help`、`/clear`、`/cls`、`/exit`、`/quick`、`/full`、`/deep`、`/credits`、`/poly`。输入 `/` 可浏览命令，输入 `/help deep` 可查看具体用法。
+当前可用快捷命令：
+
+- 会话：`/new`、`/resume`、`/clear`、`/status`、`/usage`
+- 能力：`/quick`、`/full`、`/deep`、`/credits`、`/poly`
+- 本地：`/help`、`/cls`、`/exit`
+
+输入 `/` 可浏览命令，输入 `/help deep` 可查看具体用法。
+
+对话按 append-only JSONL 保存在 `~/.config/arti/sessions/`，目录权限为 `0700`、文件为 `0600`。默认保留 30 天，可通过 `arti config set session.retentionDays <天数>` 或 `ARTI_SESSION_RETENTION_DAYS` 调整。`/resume` 无参数时列出最近会话，再用 Session ID 或唯一前缀恢复。
 
 ### CLI 模式
 
@@ -129,6 +137,8 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 ## Credit 计费
 
 各能力按对应产品函数计费，口径与 web 产品一致。`arti credits` 查看余额；积分不足会在调用前提示。
+
+Token usage 与 Credits 是两套概念：REPL 的 `/usage` 展示 `v1-chat` 服务端返回的输入、输出、缓存和上下文 Token；`/credits` 展示产品余额。后端尚未返回 usage 事件时，CLI 显示“服务端尚未返回 Token usage”，不会在本地估算。
 
 ## 架构
 

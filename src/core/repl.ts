@@ -16,9 +16,16 @@ import { getActiveBillingState } from "../billing.js";
 import { checkForUpdate, formatUpdateNotice } from "../update-check.js";
 import {
   rawChatCommand,
-  type ChatMessage,
 } from "../commands/chat.js";
 import { shutdownBackendMcp } from "../data/mcp-client.js";
+import { loadConfig } from "../config.js";
+import { ConversationSessionStore } from "./conversation-session.js";
+import { ConversationRuntime } from "./conversation-runtime.js";
+import {
+  formatSessionList,
+  formatSessionStatus,
+  formatSessionUsage,
+} from "./conversation-display.js";
 import {
   completeSlashCommands,
   parseReplInput,
@@ -160,7 +167,11 @@ interface SlashHelpCommand {
 
 const LOCAL_SLASH_COMMANDS: SlashHelpCommand[] = [
   { name: "help", description: "查看快捷命令", usage: "/help [command]", category: "session" },
-  { name: "clear", description: "清空当前对话上下文", usage: "/clear", category: "session" },
+  { name: "status", description: "查看当前会话和上下文状态", usage: "/status", category: "session" },
+  { name: "usage", description: "查看当前轮和累计 Token usage", usage: "/usage", category: "session" },
+  { name: "new", description: "新建会话", usage: "/new [title...]", category: "session" },
+  { name: "resume", description: "列出或恢复历史会话", usage: "/resume [session]", category: "session" },
+  { name: "clear", description: "保存当前会话并开始新会话", usage: "/clear", category: "session" },
   { name: "cls", description: "清空终端屏幕", usage: "/cls", category: "session" },
   { name: "exit", description: "保存并退出", usage: "/exit", category: "session" },
 ];
@@ -367,46 +378,6 @@ function findSlashCommand(name: string): ReplCommand | undefined {
   return commands.find(command => command.slashName === name);
 }
 
-const MAX_CHAT_MESSAGES = 12;
-
-type RawChatRunner = (
-  message: string,
-  options?: { history?: ChatMessage[] },
-) => Promise<string | undefined>;
-
-export function appendChatTurn(
-  history: ChatMessage[],
-  userText: string,
-  assistantText: string,
-): void {
-  history.push(
-    { role: "user", content: userText },
-    { role: "assistant", content: assistantText },
-  );
-  if (history.length > MAX_CHAT_MESSAGES) {
-    history.splice(0, history.length - MAX_CHAT_MESSAGES);
-  }
-}
-
-export function clearChatHistory(history: ChatMessage[]): void {
-  history.splice(0, history.length);
-}
-
-/** 非 Slash 输入始终作为用户消息直接进入对话 */
-export async function dispatchReplConversationText(
-  text: string,
-  history: ChatMessage[],
-  runRawChat: RawChatRunner = rawChatCommand,
-): Promise<void> {
-  if (!text) return;
-  try {
-    const assistantText = await runRawChat(text, { history: [...history] });
-    if (assistantText) appendChatTurn(history, text, assistantText);
-  } catch (err) {
-    console.error(chalk.red(`  处理失败: ${err instanceof Error ? err.message : String(err)}`));
-  }
-}
-
 /** 启动 REPL */
 export async function startRepl(): Promise<void> {
   // 仅交互终端打印 banner；管道输入/输出时保持安静
@@ -415,7 +386,19 @@ export async function startRepl(): Promise<void> {
   const banner = interactive ? printBanner({ who }) : null;
 
   const history = loadHistory();
-  const chatHistory: ChatMessage[] = [];
+  const config = loadConfig();
+  const conversation = new ConversationRuntime(new ConversationSessionStore(
+    undefined,
+    {
+      onWarning: message => console.error(chalk.yellow(`  ⚠ ${message}`)),
+    },
+  ));
+  const cleanup = conversation.initialize(config.session.retentionDays);
+  if (cleanup.removedSessionIds.length) {
+    console.error(chalk.gray(
+      `  已清理 ${cleanup.removedSessionIds.length} 个超过 ${config.session.retentionDays} 天的本地会话`,
+    ));
+  }
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -459,7 +442,13 @@ export async function startRepl(): Promise<void> {
     trackCommand(line.trim());
 
     if (input.type === "conversation") {
-      await dispatchReplConversationText(input.text, chatHistory);
+      try {
+        await conversation.runTurn(input.text, (text, options) =>
+          rawChatCommand(text, options)
+        );
+      } catch (err) {
+        console.error(chalk.red(`  处理失败: ${err instanceof Error ? err.message : String(err)}`));
+      }
       console.log();
       return false;
     }
@@ -491,13 +480,64 @@ export async function startRepl(): Promise<void> {
       return false;
     }
 
+    if (name === "status") {
+      if (args.length) {
+        console.error(chalk.red("  用法: /status"));
+        return false;
+      }
+      for (const line of formatSessionStatus(conversation.snapshot())) {
+        console.log(`  ${line}`);
+      }
+      return false;
+    }
+
+    if (name === "usage") {
+      if (args.length) {
+        console.error(chalk.red("  用法: /usage"));
+        return false;
+      }
+      for (const line of formatSessionUsage(conversation.snapshot())) {
+        console.log(`  ${line}`);
+      }
+      return false;
+    }
+
+    if (name === "new") {
+      const session = conversation.newSession(args.join(" "));
+      console.log(chalk.gray(`  已新建会话 ${session.id}`));
+      return false;
+    }
+
+    if (name === "resume") {
+      if (args.length > 1) {
+        console.error(chalk.red("  用法: /resume [session]"));
+        return false;
+      }
+      if (!args.length) {
+        for (const line of formatSessionList(
+          conversation.listSessions(),
+          conversation.activeSessionId,
+        )) {
+          console.log(`  ${line}`);
+        }
+        return false;
+      }
+      try {
+        const session = conversation.resume(args[0]);
+        console.log(chalk.gray(`  已恢复会话 ${session.id} · ${session.title}`));
+      } catch (err) {
+        console.error(chalk.red(`  恢复失败: ${err instanceof Error ? err.message : String(err)}`));
+      }
+      return false;
+    }
+
     if (name === "clear") {
       if (args.length) {
         console.error(chalk.red("  用法: /clear"));
         return false;
       }
-      clearChatHistory(chatHistory);
-      console.log(chalk.gray("  当前对话上下文已清空"));
+      const session = conversation.newSession();
+      console.log(chalk.gray(`  已清空上下文并开始新会话 ${session.id}`));
       return false;
     }
 
@@ -518,6 +558,9 @@ export async function startRepl(): Promise<void> {
 
     try {
       await cmd.handler(args);
+      if (["quick", "full", "deep"].includes(name) && args[0]) {
+        conversation.trackSymbol(args[0]);
+      }
     } catch (err) {
       console.error(chalk.red(`  命令执行失败: ${err instanceof Error ? err.message : String(err)}`));
     }

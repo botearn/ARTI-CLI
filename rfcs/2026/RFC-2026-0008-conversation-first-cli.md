@@ -223,11 +223,11 @@ trimmed.startsWith("/") ? dispatchSlashCommand() : dispatchConversationTurn()
 
 ### Phase 2：Session 与 Usage
 
-- [ ] 增加本地 JSONL session store 和 index。
-- [ ] 实现 `/new`、`/resume`、`/clear`、`/status`、`/usage`。
-- [ ] 扩展 `v1-chat` usage SSE 契约。
-- [ ] 把固定 12 条历史替换为 context pack。
-- [ ] 保证非 TTY 和 `--json` 不输出交互状态。
+- [x] 增加本地 JSONL session store 和 index。
+- [x] 实现 `/new`、`/resume`、`/clear`、`/status`、`/usage`。
+- [x] 扩展 `v1-chat` usage SSE 客户端契约；服务端未发送时明确显示未知。
+- [x] 把固定 12 条历史替换为 context pack。
+- [x] 保证非 TTY 和 `--json` 不输出交互状态。
 
 ### Phase 3：Compact 与 Artifact
 
@@ -458,11 +458,10 @@ arti deep TSLA --json
 
 ## 开放问题
 
-1. **本地会话默认保留期**：推荐 30 天并允许配置；还是默认永久保留、仅手动删除？
-2. **`/compact` 的 Credits 策略**：摘要调用使用现有 chat 计费，还是作为内部上下文维护不单独收费？需要单独确认，不能由 CLI 决定。
-3. **自动 compact**：默认启用并可关闭，还是第一版只提供手动 `/compact`？
-4. **Artifact 清理**：跟随 session 删除，还是允许跨 session 固定引用？
-5. **Phase 4 的运行位置**：tool call 编排放在 Edge `v1-chat`，还是独立 conversation orchestrator？需要结合后端现状另行设计。
+1. **`/compact` 的 Credits 策略**：摘要调用使用现有 chat 计费，还是作为内部上下文维护不单独收费？需要单独确认，不能由 CLI 决定。
+2. **自动 compact**：默认启用并可关闭，还是第一版只提供手动 `/compact`？
+3. **Artifact 清理**：跟随 session 删除，还是允许跨 session 固定引用？
+4. **Phase 4 的运行位置**：tool call 编排放在 Edge `v1-chat`，还是独立 conversation orchestrator？需要结合后端现状另行设计。
 
 ## 参考资料
 
@@ -493,6 +492,10 @@ arti deep TSLA --json
 ### 2026-07-24 - zhe
 
 确认 Phase 1 采用严格切换：REPL 裸命令立即作为普通对话，不设置迁移窗口；只有行首 Slash Command 调用显式能力。外层 Commander 命令保持兼容。
+
+### 2026-07-24 - zhe（Phase 2）
+
+确认本地 Session 默认保留 30 天并允许配置；`/resume` 无参数时列出最近会话，不自动选择。服务端未发送真实 Token usage 时，CLI 显示未知且不做本地估算。
 
 ---
 

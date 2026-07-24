@@ -75,6 +75,50 @@ describe("Edge v1 API", () => {
     expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ Authorization: "Bearer fresh-jwt" });
   });
 
+  it("chat 可发送 conversation context 并消费服务端 usage 事件", async () => {
+    const onUsage = vi.fn();
+    const fetchMock = vi.fn(async () => sseResponse([
+      "event: message.delta\ndata: {\"content\":\"风险上升\"}\n\n",
+      "event: usage\ndata: {\"requestId\":\"req-usage\",\"model\":\"claude-sonnet\",\"inputTokens\":1200,\"outputTokens\":320,\"cachedInputTokens\":400,\"totalTokens\":1520,\"contextWindow\":128000}\n\n",
+      "event: message.done\ndata: {\"requestId\":\"req-usage\",\"model\":\"claude-sonnet\"}\n\n",
+    ]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { streamChat } = await import("../src/api.js");
+    await expect(collect(streamChat(
+      [{ role: "user", content: "主要风险是什么？" }],
+      {
+        conversation: {
+          sessionId: "session_12345678",
+          activeSymbols: ["NVDA"],
+          artifacts: [],
+        },
+        clientCapabilities: { usageEvents: true },
+        onUsage,
+      },
+    ))).resolves.toEqual(["风险上升"]);
+
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toEqual({
+      messages: [{ role: "user", content: "主要风险是什么？" }],
+      conversation: {
+        sessionId: "session_12345678",
+        activeSymbols: ["NVDA"],
+        artifacts: [],
+      },
+      clientCapabilities: { usageEvents: true },
+    });
+    expect(onUsage).toHaveBeenCalledWith({
+      requestId: "req-usage",
+      model: "claude-sonnet",
+      inputTokens: 1_200,
+      outputTokens: 320,
+      cachedInputTokens: 400,
+      totalTokens: 1_520,
+      contextWindow: 128_000,
+    });
+  });
+
   it("chat 将 error 事件转为 ApiError", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
       "event: error\ndata: {\"code\":\"INSUFFICIENT_CREDITS\",\"message\":\"余额不足\",\"status\":402}\n\n",

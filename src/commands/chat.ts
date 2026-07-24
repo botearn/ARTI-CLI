@@ -9,20 +9,29 @@ import { printError } from "../errors.js";
 import { track } from "../tracker.js";
 import { dispatchNaturalText } from "../core/natural-dispatch.js";
 import { isJsonMode, output } from "../output.js";
+import type {
+  ChatUsageEvent,
+  ConversationContext,
+} from "../core/conversation-types.js";
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-export interface ChatCommandOptions {
-  raw?: boolean;
+export interface ChatRuntimeOptions {
   history?: ChatMessage[];
+  conversation?: ConversationContext;
+  onUsage?: (usage: ChatUsageEvent) => void;
+}
+
+export interface ChatCommandOptions extends ChatRuntimeOptions {
+  raw?: boolean;
 }
 
 export async function rawChatCommand(
   message: string,
-  options?: Pick<ChatCommandOptions, "history">,
+  options?: ChatRuntimeOptions,
 ): Promise<string | undefined> {
   const text = message?.trim();
   if (!text) {
@@ -38,7 +47,17 @@ export async function rawChatCommand(
     // JSON 模式下不流式打印（避免污染 stdout），收集全文后由末尾统一输出
     if (!jsonMode) process.stdout.write("\n  ");
     const messages = [...(options?.history ?? []), { role: "user" as const, content: text }];
-    for await (const delta of streamChat(messages)) {
+    const streamOptions = options?.conversation || options?.onUsage
+      ? {
+          ...(options.conversation ? { conversation: options.conversation } : {}),
+          clientCapabilities: { usageEvents: true },
+          ...(options.onUsage ? { onUsage: options.onUsage } : {}),
+        }
+      : undefined;
+    const stream = streamOptions
+      ? streamChat(messages, streamOptions)
+      : streamChat(messages);
+    for await (const delta of stream) {
       if (!jsonMode) process.stdout.write(delta);
       assistantText += delta;
     }
@@ -70,14 +89,22 @@ export async function chatCommand(
   }
 
   if (options?.raw) {
-    return rawChatCommand(text, { history: options.history });
+    return rawChatCommand(text, {
+      history: options.history,
+      conversation: options.conversation,
+      onUsage: options.onUsage,
+    });
   }
 
   try {
     let assistantText: string | undefined;
     await dispatchNaturalText(text, {
       onGeneralChat: async (chatText) => {
-        assistantText = await rawChatCommand(chatText, { history: options?.history });
+        assistantText = await rawChatCommand(chatText, {
+          history: options?.history,
+          conversation: options?.conversation,
+          onUsage: options?.onUsage,
+        });
       },
     });
     return assistantText;
