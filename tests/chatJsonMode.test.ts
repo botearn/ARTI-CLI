@@ -22,7 +22,18 @@ describe("rawChatCommand JSON 模式", () => {
     }
     const streamChat = vi.fn(() => fakeStream());
     const outputSpy = vi.fn();
+    const ora = vi.fn();
 
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+
+    vi.doMock("ora", () => ({ default: ora }));
     vi.doMock("../src/api.js", () => ({ streamChat }));
     vi.doMock("../src/output.js", () => ({
       isJsonMode: () => true,
@@ -35,8 +46,14 @@ describe("rawChatCommand JSON 模式", () => {
     vi.doMock("../src/tracker.js", () => ({ track: vi.fn() }));
     vi.doMock("../src/core/natural-dispatch.js", () => ({ dispatchNaturalText: vi.fn() }));
 
-    const { rawChatCommand } = await import("../src/commands/chat.js");
-    const result = await rawChatCommand("美股怎么样");
+    let result: string | undefined;
+    try {
+      const { rawChatCommand } = await import("../src/commands/chat.js");
+      result = await rawChatCommand("美股怎么样");
+    } finally {
+      delete (process.stdout as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+      delete (process.stderr as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+    }
 
     // 流式增量不应写入 stdout
     const streamed = stdoutSpy.mock.calls.map(c => String(c[0])).join("");
@@ -48,5 +65,6 @@ describe("rawChatCommand JSON 模式", () => {
     const payload = outputSpy.mock.calls[0][0] as { answer: string };
     expect(payload.answer).toBe("美股今天上涨");
     expect(result).toBe("美股今天上涨");
+    expect(ora).not.toHaveBeenCalled();
   });
 });

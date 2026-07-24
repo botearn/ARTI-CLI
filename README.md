@@ -112,6 +112,10 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 
 输入 `/` 可浏览命令，输入 `/help deep` 可查看具体用法。
 
+普通对话在首个回答片段到达前会显示等待状态和耗时；新 Session
+第一次成功回答后会说明 `/quick`、`/full`、`/deep` 的研究深度。分析师和大师均为
+AI 角色，大师观点是投资框架模拟，并非真人意见。
+
 对话按 append-only JSONL 保存在 `~/.config/arti/sessions/`，目录权限为 `0700`、文件为 `0600`。默认保留 30 天，可通过 `arti config set session.retentionDays <天数>` 或 `ARTI_SESSION_RETENTION_DAYS` 调整。`/resume` 无参数时列出最近会话，再用 Session ID 或唯一前缀恢复。
 
 `/compact [重点]` 会通过普通 `v1-chat` 调用生成结构化摘要，因此按现有聊天规则计费；空会话会在请求前拒绝。第一版只允许手动触发；压缩只缩小活跃上下文，不删除原始 transcript。交互终端中的 `/quick`、`/full`、`/deep`、`/poly` 会把完整结构化结果保存到当前 Session 的 `artifacts/`，后续上下文只注入短摘要和 Artifact 引用。Artifact 不跨 Session 引用，并随所属 Session 按同一保留期清理。

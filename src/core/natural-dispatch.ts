@@ -16,6 +16,7 @@ export type NaturalDispatchResult =
 
 export interface NaturalDispatchOptions {
   onGeneralChat: (text: string) => Promise<void>;
+  onClassified?: (result: IntentResult) => void;
 }
 
 export async function dispatchNaturalText(
@@ -26,6 +27,7 @@ export async function dispatchNaturalText(
   if (!trimmed) return undefined;
 
   const res = await classifyIntent(trimmed);
+  options.onClassified?.(res);
   if (res.needs_symbol) {
     console.log(chalk.yellow("  请带上股票代码，例如：茅台 / AAPL / 600519.SS"));
     return "needs-symbol";

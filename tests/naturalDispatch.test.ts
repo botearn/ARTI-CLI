@@ -74,6 +74,7 @@ describe("dispatchNaturalText", () => {
       needs_symbol: false,
     });
     const onGeneralChat = vi.fn().mockResolvedValue(undefined);
+    const onClassified = vi.fn();
 
     vi.doMock("../src/api.js", () => ({
       classifyIntent,
@@ -86,7 +87,15 @@ describe("dispatchNaturalText", () => {
 
     const { dispatchNaturalText } = await import("../src/core/natural-dispatch.js");
 
-    await expect(dispatchNaturalText("今天大盘怎么看", { onGeneralChat })).resolves.toBe("general-chat");
+    await expect(dispatchNaturalText("今天大盘怎么看", {
+      onGeneralChat,
+      onClassified,
+    })).resolves.toBe("general-chat");
+    expect(onClassified).toHaveBeenCalledWith({
+      intent: "general-chat",
+      symbol: null,
+      needs_symbol: false,
+    });
     expect(onGeneralChat).toHaveBeenCalledWith("今天大盘怎么看");
   });
 });
