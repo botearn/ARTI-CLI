@@ -231,10 +231,10 @@ trimmed.startsWith("/") ? dispatchSlashCommand() : dispatchConversationTurn()
 
 ### Phase 3：Compact 与 Artifact
 
-- [ ] 实现结构化 `ConversationSummary`。
-- [ ] 实现 `/compact [focus]` 和自动压缩信号。
-- [ ] 将 quick/full/deep/poly 结果保存为 Artifact。
-- [ ] 上下文只注入 digest，按需读取原始 Artifact。
+- [x] 实现结构化 `ConversationSummary`。
+- [x] 实现手动 `/compact [focus]`；第一版不自动压缩。
+- [x] 将 Slash quick/full/deep/poly 结果保存为 Artifact。
+- [x] 上下文只注入 digest，并提供原始 Artifact 读取能力。
 
 ### Phase 4：Conversation Tool Calling
 
@@ -417,7 +417,7 @@ arti deep TSLA --json
 
 - `/status`：sessionId、模型、最近 context ratio、活动标的、Artifact 数量。
 - `/usage`：最近一轮和当前会话累计 Token。
-- `/compact`：压缩前后 Token、保留的 summary boundary。
+- `/compact`：本次压缩的活跃消息数；summary boundary 保存在 transcript。
 
 ### 服务端指标
 
@@ -448,20 +448,17 @@ arti deep TSLA --json
 
 实施时需要更新：
 
-- [ ] `README.md`：交互模式、Slash、session 和自动化边界。
-- [ ] `AGENTS.md`：agent 继续使用外层命令和 `--json`，不模拟 Slash。
-- [ ] `CLAUDE.md`：架构与项目结构。
-- [ ] `docs/README.md`：新增会话设计入口。
-- [ ] `docs/BILLING_FLOW.md`：Token usage 与 Credits 区分。
-- [ ] 命令帮助和补全脚本。
-- [ ] `CHANGELOG.md`：REPL 裸命令迁移说明。
+- [x] `README.md`：交互模式、Slash、session 和自动化边界。
+- [x] `AGENTS.md`：agent 继续使用外层命令和 `--json`，不模拟 Slash。
+- [x] `CLAUDE.md`：架构与项目结构。
+- [x] `docs/README.md`：新增会话设计入口。
+- [x] `docs/BILLING_FLOW.md`：Token usage 与 Credits 区分。
+- [x] 命令帮助和 Slash 补全。
+- [x] `CHANGELOG.md`：REPL 裸命令迁移说明。
 
 ## 开放问题
 
-1. **`/compact` 的 Credits 策略**：摘要调用使用现有 chat 计费，还是作为内部上下文维护不单独收费？需要单独确认，不能由 CLI 决定。
-2. **自动 compact**：默认启用并可关闭，还是第一版只提供手动 `/compact`？
-3. **Artifact 清理**：跟随 session 删除，还是允许跨 session 固定引用？
-4. **Phase 4 的运行位置**：tool call 编排放在 Edge `v1-chat`，还是独立 conversation orchestrator？需要结合后端现状另行设计。
+1. **Phase 4 的运行位置**：tool call 编排放在 Edge `v1-chat`，还是独立 conversation orchestrator？需要结合后端现状另行设计。
 
 ## 参考资料
 
@@ -497,6 +494,10 @@ arti deep TSLA --json
 
 确认本地 Session 默认保留 30 天并允许配置；`/resume` 无参数时列出最近会话，不自动选择。服务端未发送真实 Token usage 时，CLI 显示未知且不做本地估算。
 
+### 2026-07-24 - zhe（Phase 3）
+
+确认 Compact 采用方案 A：只通过显式 `/compact [focus]` 调用普通 `v1-chat`，按现有聊天规则计费，第一版不自动压缩。确认 Artifact 采用方案 A：仅属于当前 Session，不跨 Session 引用，并随 Session 使用相同的 30 天可配置保留期清理。
+
 ---
 
 ## 变更历史
@@ -504,3 +505,4 @@ arti deep TSLA --json
 | 日期 | 作者 | 变更内容 |
 |---|---|---|
 | 2026-07-24 | zhe | 创建 RFC，定义对话优先、Slash、Session、Token 和 Artifact 方案 |
+| 2026-07-24 | zhe / Codex | 实施 Phase 3，并记录 Compact A、Artifact A 决策 |

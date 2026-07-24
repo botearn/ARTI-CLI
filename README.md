@@ -105,13 +105,15 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 
 当前可用快捷命令：
 
-- 会话：`/new`、`/resume`、`/clear`、`/status`、`/usage`
+- 会话：`/new`、`/resume`、`/clear`、`/status`、`/usage`、`/compact [重点]`
 - 能力：`/quick`、`/full`、`/deep`、`/credits`、`/poly`
 - 本地：`/help`、`/cls`、`/exit`
 
 输入 `/` 可浏览命令，输入 `/help deep` 可查看具体用法。
 
 对话按 append-only JSONL 保存在 `~/.config/arti/sessions/`，目录权限为 `0700`、文件为 `0600`。默认保留 30 天，可通过 `arti config set session.retentionDays <天数>` 或 `ARTI_SESSION_RETENTION_DAYS` 调整。`/resume` 无参数时列出最近会话，再用 Session ID 或唯一前缀恢复。
+
+`/compact [重点]` 会通过普通 `v1-chat` 调用生成结构化摘要，因此按现有聊天规则计费；空会话会在请求前拒绝。第一版只允许手动触发；压缩只缩小活跃上下文，不删除原始 transcript。交互终端中的 `/quick`、`/full`、`/deep`、`/poly` 会把完整结构化结果保存到当前 Session 的 `artifacts/`，后续上下文只注入短摘要和 Artifact 引用。Artifact 不跨 Session 引用，并随所属 Session 按同一保留期清理。
 
 ### CLI 模式
 
@@ -138,7 +140,7 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 
 各能力按对应产品函数计费，口径与 web 产品一致。`arti credits` 查看余额；积分不足会在调用前提示。
 
-Token usage 与 Credits 是两套概念：REPL 的 `/usage` 展示 `v1-chat` 服务端返回的输入、输出、缓存和上下文 Token；`/credits` 展示产品余额。后端尚未返回 usage 事件时，CLI 显示“服务端尚未返回 Token usage”，不会在本地估算。
+Token usage 与 Credits 是两套概念：REPL 的 `/usage` 展示 `v1-chat` 服务端返回的输入、输出、缓存和上下文 Token；`/credits` 展示产品余额。`/compact` 是一次普通聊天请求。后端尚未返回 usage 事件时，CLI 显示“服务端尚未返回 Token usage”，不会在本地估算。
 
 ## 架构
 

@@ -27,6 +27,8 @@ function snapshot(
     },
     events: [],
     messages: [],
+    contextMessages: [],
+    artifacts: [],
     lastUsage: {
       requestId: "req-1",
       model: "claude-sonnet",
@@ -48,6 +50,7 @@ describe("Session 状态与 Token usage 展示", () => {
       "模型: claude-sonnet",
       "上下文: 1,200 / 128,000 tokens (0.9%)",
       "活动标的: NVDA",
+      "Artifacts: 0",
     ]);
   });
 

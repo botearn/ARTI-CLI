@@ -14,8 +14,24 @@ import { track } from "../tracker.js";
 import { handleCommand } from "../core/handler.js";
 import { InsufficientCreditsError } from "../billing.js";
 import { printError } from "../errors.js";
+import type { CapabilityExecutionResult } from "../core/conversation-types.js";
 
-export async function quickScanCommand(symbol: string): Promise<void> {
+function buildQuickScanDigest(symbol: string, scan: BackendStockData): string {
+  const parts = [
+    `${symbol} 快速扫描`,
+    Number.isFinite(scan.price) ? `价格 ${scan.price}` : "",
+    Number.isFinite(scan.pct) ? `涨跌 ${scan.pct}%` : "",
+    scan.overall_signal ? `综合研判 ${scan.overall_signal}` : "",
+    scan.tech?.support != null ? `支撑 ${scan.tech.support}` : "",
+    scan.tech?.resist != null ? `压力 ${scan.tech.resist}` : "",
+    scan.data_as_of ? `数据截至 ${scan.data_as_of}` : "",
+  ].filter(Boolean);
+  return parts.join("；");
+}
+
+export async function quickScanCommand(
+  symbol: string,
+): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
     console.log(chalk.red("请提供股票代码，例如：arti quick-scan AAPL"));
     return;
@@ -46,6 +62,17 @@ export async function quickScanCommand(symbol: string): Promise<void> {
   output({ symbol, scan }, () => {
     renderQuickScan(symbol, scan);
   });
+  const json = { symbol, scan };
+  return {
+    json,
+    artifact: {
+      type: "quick_scan",
+      symbol,
+      ...(scan.data_as_of ? { dataAsOf: scan.data_as_of } : {}),
+      digest: buildQuickScanDigest(symbol, scan),
+      payload: json,
+    },
+  };
 }
 
 /** 市值（绝对金额）换算为「亿」并附币种；流通/总由调用方标注 */
@@ -150,7 +177,7 @@ function renderQuickScan(symbol: string, d: BackendStockData): void {
 export async function fullReportCommand(
   symbol: string,
   options?: { full?: boolean },
-): Promise<void> {
+): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
     console.log(chalk.red("请提供股票代码，例如：arti full AAPL"));
     return;
@@ -165,7 +192,7 @@ export async function fullReportCommand(
 export async function deepReportCommand(
   symbol: string,
   options?: { full?: boolean },
-): Promise<void> {
+): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
     console.log(chalk.red("请提供股票代码，例如：arti deep AAPL"));
     return;

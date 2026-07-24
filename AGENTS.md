@@ -74,6 +74,7 @@ export ARTI_AUTH_EXPIRES_AT=<unix-seconds>
 加 `--json` 输出结构化数据，供程序解析。
 
 > `/quick`、`/full` 等 Slash Command 仅供 `arti` 交互终端使用。agent、脚本和 CI 必须继续调用下面的外层 `arti <command> --json`，不要模拟交互输入。
+> `/compact` 和本地 Session Artifact 也只属于交互终端；外层命令不会创建或读取这些会话文件。
 
 | 能力 | 命令 | 说明 |
 |---|---|---|

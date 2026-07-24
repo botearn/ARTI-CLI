@@ -4,6 +4,7 @@ import { printError } from "../errors.js";
 import { polyGet } from "./api.js";
 import { renderEvent, renderEvents, renderPicks, renderSummary } from "./format.js";
 import type { ApiEnvelope, ArtiPickData, PolyEvent, SummaryData } from "./types.js";
+import type { CapabilityExecutionResult } from "../core/conversation-types.js";
 
 interface PolyOptions {
   limit?: string | boolean;
@@ -30,7 +31,53 @@ function qs(params: Record<string, string | number | undefined>): string {
   return query ? `?${query}` : "";
 }
 
-export async function polyCommand(args: string[], options: PolyOptions): Promise<void> {
+function collectTitles(value: unknown, titles: string[] = []): string[] {
+  if (titles.length >= 3 || value == null) return titles;
+  if (Array.isArray(value)) {
+    for (const item of value) collectTitles(item, titles);
+    return titles;
+  }
+  if (typeof value !== "object") return titles;
+  const record = value as Record<string, unknown>;
+  const title = typeof record.title === "string"
+    ? record.title
+    : typeof record.question === "string"
+      ? record.question
+      : undefined;
+  if (title && !titles.includes(title)) titles.push(title);
+  for (const key of [
+    "data",
+    "topEvents",
+    "artiPick",
+    "high",
+    "moderate",
+    "canonicalEvent",
+    "polymarket",
+    "kalshi",
+  ]) {
+    collectTitles(record[key], titles);
+  }
+  return titles;
+}
+
+function polyResult(action: string, json: unknown): CapabilityExecutionResult {
+  const titles = collectTitles(json);
+  return {
+    json,
+    artifact: {
+      type: "poly_result",
+      digest: titles.length
+        ? `预测市场 ${action}：${titles.join("；")}`
+        : `预测市场 ${action} 查询完成`,
+      payload: json,
+    },
+  };
+}
+
+export async function polyCommand(
+  args: string[],
+  options: PolyOptions,
+): Promise<CapabilityExecutionResult | undefined> {
   const action = args[0] ?? "events";
   try {
     switch (action) {
@@ -53,15 +100,19 @@ export async function polyCommand(args: string[], options: PolyOptions): Promise
   }
 }
 
-async function polyEvents(options: PolyOptions): Promise<void> {
+async function polyEvents(options: PolyOptions): Promise<CapabilityExecutionResult> {
   const limit = limitValue(options.limit, 24);
   const source = stringValue(options.source) ?? "polymarket";
   const category = stringValue(options.category);
   const res = await polyGet<ApiEnvelope<PolyEvent[]>>(`events${qs({ limit, source, category })}`);
   output(res, () => renderEvents(res.data ?? []));
+  return polyResult("events", res);
 }
 
-async function polyEvent(slug: string | undefined, options: PolyOptions): Promise<void> {
+async function polyEvent(
+  slug: string | undefined,
+  options: PolyOptions,
+): Promise<CapabilityExecutionResult | undefined> {
   if (!slug) {
     console.log(chalk.red("请提供事件 slug，例如：arti poly event will-trump-win-2026"));
     return;
@@ -69,20 +120,26 @@ async function polyEvent(slug: string | undefined, options: PolyOptions): Promis
   const source = stringValue(options.source) ?? "polymarket";
   const res = await polyGet<ApiEnvelope<PolyEvent>>(`events/${encodeURIComponent(slug)}${qs({ source })}`);
   output(res, () => renderEvent(res.data));
+  return polyResult("event", res);
 }
 
-async function polySummary(options: PolyOptions): Promise<void> {
+async function polySummary(options: PolyOptions): Promise<CapabilityExecutionResult> {
   const limit = limitValue(options.limit, 10);
   const res = await polyGet<ApiEnvelope<SummaryData>>(`summary${qs({ limit })}`);
   output(res, () => renderSummary(res.data));
+  return polyResult("summary", res);
 }
 
-async function polyCompare(): Promise<void> {
+async function polyCompare(): Promise<CapabilityExecutionResult> {
   const res = await polyGet<ApiEnvelope<ArtiPickData>>("market-comparison");
   output(res, () => renderPicks(res.data));
+  return polyResult("compare", res);
 }
 
-async function polySearch(keyword: string, options: PolyOptions): Promise<void> {
+async function polySearch(
+  keyword: string,
+  options: PolyOptions,
+): Promise<CapabilityExecutionResult | undefined> {
   const q = keyword.trim();
   if (!q) {
     console.log(chalk.red("请提供搜索关键词，例如：arti poly search fed"));
@@ -99,6 +156,7 @@ async function polySearch(keyword: string, options: PolyOptions): Promise<void> 
     volume: item.volume,
     markets: [item],
   }))));
+  return polyResult("search", res);
 }
 
 interface PolyMarketSearchResult {

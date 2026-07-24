@@ -1,9 +1,13 @@
 import type { ChatMessage } from "../commands/chat.js";
 import type {
   ChatUsageEvent,
+  ConversationArtifact,
+  ConversationArtifactDraft,
   ConversationContext,
+  ConversationSummary,
   SessionIndexEntry,
 } from "./conversation-types.js";
+import type { ConversationCompactInput } from "./conversation-compact.js";
 import {
   ConversationSessionStore,
   type ConversationSessionSnapshot,
@@ -20,6 +24,11 @@ type ConversationTurnRunner = (
   text: string,
   options: ConversationTurnOptions,
 ) => Promise<string | undefined>;
+
+type ConversationCompactRunner = (
+  input: ConversationCompactInput,
+  options: { onUsage: (usage: ChatUsageEvent) => void },
+) => Promise<ConversationSummary>;
 
 export class ConversationRuntime {
   private activeId: string | null = null;
@@ -51,7 +60,7 @@ export class ConversationRuntime {
     const session = this.store.resolveSession(reference);
     const snapshot = this.store.readSession(session.id);
     this.activeId = session.id;
-    this.activeHistory = [...snapshot.messages];
+    this.activeHistory = [...snapshot.contextMessages];
     return snapshot.entry;
   }
 
@@ -72,17 +81,84 @@ export class ConversationRuntime {
   }
 
   conversationContext(): ConversationContext {
-    const entry = this.ensureSession();
+    const snapshot = this.snapshot();
     return {
-      sessionId: entry.id,
-      activeSymbols: [...entry.activeSymbols],
-      artifacts: [],
+      sessionId: snapshot.entry.id,
+      activeSymbols: [...snapshot.entry.activeSymbols],
+      artifacts: snapshot.artifacts.map(artifact => ({
+        id: artifact.id,
+        type: artifact.type,
+        digest: artifact.digest,
+      })),
+      ...(snapshot.lastSummary ? { summary: snapshot.lastSummary } : {}),
     };
   }
 
   trackSymbol(symbol: string): void {
     const session = this.ensureSession();
     this.store.addActiveSymbol(session.id, symbol);
+  }
+
+  beginToolCall(capability: string, args: unknown): string {
+    const session = this.ensureSession();
+    return this.store.appendToolCall(session.id, capability, args);
+  }
+
+  completeToolCall(
+    callId: string,
+    draft: ConversationArtifactDraft,
+  ): ConversationArtifact {
+    const session = this.ensureSession();
+    const artifact = this.store.createArtifact(session.id, draft);
+    this.store.appendToolResult(session.id, callId, artifact.digest, artifact.id);
+    if (artifact.symbol) this.store.addActiveSymbol(session.id, artifact.symbol);
+    return artifact;
+  }
+
+  async compact(
+    focus: string | undefined,
+    runner: ConversationCompactRunner,
+  ): Promise<{ compactedMessages: number; summary: ConversationSummary }> {
+    const session = this.ensureSession();
+    const snapshot = this.store.readSession(session.id);
+    const messages = this.history();
+    if (!messages.length
+      && !snapshot.lastSummary
+      && !snapshot.artifacts.length
+      && !snapshot.entry.activeSymbols.length) {
+      throw new Error("当前会话没有可压缩内容");
+    }
+    const summary = await runner({
+      ...(focus?.trim() ? { focus: focus.trim() } : {}),
+      previousSummary: snapshot.lastSummary,
+      messages,
+      activeSymbols: [...snapshot.entry.activeSymbols],
+      artifacts: snapshot.artifacts.map(artifact => ({
+        id: artifact.id,
+        type: artifact.type,
+        digest: artifact.digest,
+      })),
+    }, {
+      onUsage: usage => this.store.appendUsage(session.id, usage),
+    });
+    const mergedSummary: ConversationSummary = {
+      ...summary,
+      activeSymbols: [...new Set([
+        ...summary.activeSymbols,
+        ...snapshot.entry.activeSymbols,
+      ])],
+      artifactIds: [...new Set([
+        ...summary.artifactIds,
+        ...snapshot.artifacts.map(artifact => artifact.id),
+      ])],
+    };
+    const throughEvent = this.store.readSession(session.id).events.length;
+    this.store.appendSummary(session.id, mergedSummary, throughEvent);
+    this.activeHistory = [];
+    return {
+      compactedMessages: messages.length,
+      summary: mergedSummary,
+    };
   }
 
   async runTurn(

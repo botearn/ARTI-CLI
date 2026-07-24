@@ -6,6 +6,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { registerCommand } from "./repl.js";
+import type { CapabilityExecutionResult } from "./conversation-types.js";
 
 // ── 类型定义 ──
 
@@ -42,7 +43,7 @@ export interface CommandDef {
   args: ArgSpec[];         // Commander 参数
   options: OptionDef[];
   examples: string[];      // 帮助文本示例行
-  invoke: (parsed: ParsedArgs) => Promise<void>;
+  invoke: (parsed: ParsedArgs) => Promise<CapabilityExecutionResult | void>;
 }
 
 // ── REPL 参数解析 ──

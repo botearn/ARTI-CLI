@@ -23,6 +23,7 @@ import { printError } from "../errors.js";
 import { output, isJsonMode } from "../output.js";
 import { track } from "../tracker.js";
 import { buildResearchStockContext } from "../data/research-context.js";
+import type { CapabilityExecutionResult } from "../core/conversation-types.js";
 
 interface BackendSnapshot {
   quote?: {
@@ -834,7 +835,7 @@ function renderDeepReportDocument(
 export async function researchCommand(
   symbol: string,
   options: { full?: boolean; mode?: string },
-): Promise<void> {
+): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
     console.log(chalk.red("请提供股票代码，例如：arti full AAPL"));
     return;
@@ -869,7 +870,7 @@ export function normalizeResearchMode(mode?: string): "full" | "layer1-only" {
 async function runOrchestrator(
   symbol: string,
   options: { full?: boolean; mode?: string },
-): Promise<void> {
+): Promise<CapabilityExecutionResult | undefined> {
   // H6：JSON 模式下跳过所有人类可读渲染，最终只由 output(jsonData) 写一份 JSON。
   // spinner(ora)写 stderr 不污染 stdout；此 log 包装令 stdout 渲染在 JSON 模式静默。
   const jsonMode = isJsonMode();
@@ -1200,6 +1201,26 @@ async function runOrchestrator(
         console.log(chalk.yellow("  未获取到研报数据"));
       }
     });
+    const validReports = reports.filter(({ report }) => isUsableResearchReport(report));
+    const supportPoints = extractSupportPoints(validReports).slice(0, 3);
+    const riskPoints = extractRiskPoints(validReports).slice(0, 3);
+    const actionable = buildActionableSummary(validReports, backendStockData);
+    const digest = [
+      `${symbol} ${options.mode === "layer1-only" ? "全景研报" : "深度研报"}`,
+      actionable.action ? `建议 ${actionable.action}` : "",
+      actionable.oneLiner ?? "",
+      supportPoints.length ? `核心驱动：${supportPoints.join("、")}` : "",
+      riskPoints.length ? `关键风险：${riskPoints.join("、")}` : "",
+    ].filter(Boolean).join("；");
+    return {
+      json: jsonData,
+      artifact: {
+        type: options.mode === "layer1-only" ? "full_report" : "deep_report",
+        symbol,
+        digest,
+        payload: jsonData,
+      },
+    };
   } catch (err) {
     clearInterval(timeoutChecker);
     spinner.fail("研报生成失败");

@@ -16,6 +16,7 @@
 
 - REPL `/usage`：展示 `v1-chat` 服务端 SSE 返回的输入、输出、缓存和上下文 Token。
 - REPL `/status`：展示最近模型与上下文窗口占用。
+- REPL `/compact`：使用普通 `v1-chat` 生成结构化摘要，按现有聊天规则计费；第一版不会自动触发，空会话不会发起请求。
 - `/credits` 或 `arti credits`：查询产品套餐、余额和动作定价。
 
 CLI 不使用字符数或本地 tokenizer 猜测真实 Token，也不从 Token 推导 Credits。服务端尚未发送 `usage` 事件时，`/usage` 和 `/status` 明确显示数据尚未返回。
