@@ -64,7 +64,7 @@ const defs: CommandDef[] = [
   {
     name: "quick-scan", aliases: ["quick", "qs"],
     slashName: "quick",
-    description: "快速研判",
+    description: "行情、技术面和基本面快速扫描",
     usage: "quick-scan <symbol>",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [],
@@ -78,7 +78,7 @@ const defs: CommandDef[] = [
   {
     name: "full", aliases: ["panorama", "fr"],
     slashName: "full",
-    description: "全景研报",
+    description: "8 个 AI 分析角色交叉验证",
     usage: "full <symbol> [--full]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [
@@ -97,7 +97,7 @@ const defs: CommandDef[] = [
   {
     name: "deep", aliases: ["dr"],
     slashName: "deep",
-    description: "深度研报",
+    description: "AI 分析角色、大师投资框架与综合裁定",
     usage: "deep <symbol> [--full]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
     options: [
