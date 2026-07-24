@@ -3,8 +3,7 @@ import type { ChatMessage } from "../src/commands/chat.js";
 import {
   appendChatTurn,
   clearChatHistory,
-  dispatchReplChat,
-  dispatchReplFreeText,
+  dispatchReplConversationText,
 } from "../src/core/repl.js";
 
 describe("REPL chat 会话历史", () => {
@@ -31,47 +30,37 @@ describe("REPL chat 会话历史", () => {
     expect(history).toEqual([]);
   });
 
-  it("REPL chat 命令传入完整历史并追加完整 assistant 文本", async () => {
+  it("REPL 普通对话传入完整历史并追加完整 assistant 文本", async () => {
     const history: ChatMessage[] = [
       { role: "user", content: "上一问" },
       { role: "assistant", content: "上一答" },
     ];
-    const runChat = vi.fn().mockResolvedValue("本次完整回答");
+    const runRawChat = vi.fn().mockResolvedValue("本次完整回答");
 
-    await dispatchReplChat(["--raw", "继续", "分析"], history, runChat);
+    await dispatchReplConversationText("继续分析", history, runRawChat);
 
-    expect(runChat).toHaveBeenCalledWith("继续 分析", {
-      raw: true,
+    expect(runRawChat).toHaveBeenCalledWith("继续分析", {
       history: [
         { role: "user", content: "上一问" },
         { role: "assistant", content: "上一答" },
       ],
     });
     expect(history.slice(-2)).toEqual([
-      { role: "user", content: "继续 分析" },
+      { role: "user", content: "继续分析" },
       { role: "assistant", content: "本次完整回答" },
     ]);
   });
 
-  it("自由文本 general-chat 共用历史，quick/report 不写入历史", async () => {
+  it("裸命令文本不做意图分发，原样进入对话", async () => {
     const history: ChatMessage[] = [];
     const runRawChat = vi.fn().mockResolvedValue("聊天回答");
-    const generalDispatch = vi.fn(async (text, options) => {
-      await options.onGeneralChat(text);
-      return "general-chat" as const;
-    });
 
-    await dispatchReplFreeText("聊聊大盘", history, generalDispatch, runRawChat);
+    await dispatchReplConversationText("deep NVDA", history, runRawChat);
 
-    expect(runRawChat).toHaveBeenCalledWith("聊聊大盘", { history: [] });
+    expect(runRawChat).toHaveBeenCalledWith("deep NVDA", { history: [] });
     expect(history).toEqual([
-      { role: "user", content: "聊聊大盘" },
+      { role: "user", content: "deep NVDA" },
       { role: "assistant", content: "聊天回答" },
     ]);
-
-    const quickDispatch = vi.fn().mockResolvedValue("quick-scan" as const);
-    await dispatchReplFreeText("扫描 AAPL", history, quickDispatch, runRawChat);
-
-    expect(history).toHaveLength(2);
   });
 });

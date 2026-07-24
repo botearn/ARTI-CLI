@@ -215,11 +215,11 @@ trimmed.startsWith("/") ? dispatchSlashCommand() : dispatchConversationTurn()
 
 ### Phase 1：Slash Control Plane
 
-- [ ] 给现有能力注册表增加 `slashName`。
-- [ ] 实现仅识别行首 `/` 的解析器。
-- [ ] 增加 `/` 补全和命令列表。
-- [ ] 实现 `/help`、`/quick`、`/full`、`/deep`、`/poly`、`/credits`、`/cls`、`/exit`。
-- [ ] 保持所有外层 Commander 命令和 `--json` 输出不变。
+- [x] 给现有能力注册表增加 `slashName`。
+- [x] 实现仅识别行首 `/` 的解析器。
+- [x] 增加 `/` 补全和命令列表。
+- [x] 实现 `/help`、`/quick`、`/full`、`/deep`、`/poly`、`/credits`、`/cls`、`/exit`。
+- [x] 保持所有外层 Commander 命令和 `--json` 输出不变。
 
 ### Phase 2：Session 与 Usage
 
@@ -308,12 +308,12 @@ arti deep TSLA --json
 
 ### REPL 裸命令
 
-目标状态是：
+自 Phase 1 起直接进入目标状态：
 
 - `/full AAPL`：命令。
 - `full AAPL`：自然语言。
 
-迁移窗口尚未最终决定，见“开放问题”。推荐在一个 minor version 内对 REPL 裸命令显示迁移提示，下一 minor version 移除裸命令识别；外层 CLI 不受影响。
+不设置 REPL 裸命令迁移窗口。外层 `arti full AAPL` 等 Commander 命令不受影响。
 
 ### Session
 
@@ -458,12 +458,11 @@ arti deep TSLA --json
 
 ## 开放问题
 
-1. **REPL 裸命令迁移窗口**：推荐提示一个 minor version 后移除；是否接受？
-2. **本地会话默认保留期**：推荐 30 天并允许配置；还是默认永久保留、仅手动删除？
-3. **`/compact` 的 Credits 策略**：摘要调用使用现有 chat 计费，还是作为内部上下文维护不单独收费？需要单独确认，不能由 CLI 决定。
-4. **自动 compact**：默认启用并可关闭，还是第一版只提供手动 `/compact`？
-5. **Artifact 清理**：跟随 session 删除，还是允许跨 session 固定引用？
-6. **Phase 4 的运行位置**：tool call 编排放在 Edge `v1-chat`，还是独立 conversation orchestrator？需要结合后端现状另行设计。
+1. **本地会话默认保留期**：推荐 30 天并允许配置；还是默认永久保留、仅手动删除？
+2. **`/compact` 的 Credits 策略**：摘要调用使用现有 chat 计费，还是作为内部上下文维护不单独收费？需要单独确认，不能由 CLI 决定。
+3. **自动 compact**：默认启用并可关闭，还是第一版只提供手动 `/compact`？
+4. **Artifact 清理**：跟随 session 删除，还是允许跨 session 固定引用？
+5. **Phase 4 的运行位置**：tool call 编排放在 Edge `v1-chat`，还是独立 conversation orchestrator？需要结合后端现状另行设计。
 
 ## 参考资料
 
@@ -490,6 +489,10 @@ arti deep TSLA --json
 同时确认第一阶段采用本地 JSONL 会话、服务端权威 Token usage、Artifact 摘要进入上下文，不新增 SQLite 或 TUI 框架依赖。
 
 **决策**：采用方案 B“会话内核优先，再逐步工具化”；RFC 保持 Draft，开放问题评审后再进入 Accepted。
+
+### 2026-07-24 - zhe
+
+确认 Phase 1 采用严格切换：REPL 裸命令立即作为普通对话，不设置迁移窗口；只有行首 Slash Command 调用显式能力。外层 Commander 命令保持兼容。
 
 ---
 
