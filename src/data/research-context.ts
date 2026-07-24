@@ -4,7 +4,7 @@ import { canUseBackendMcp, fetchStockContextFromBackendMcp, fetchStockFundFlowFr
 export interface ResearchStockContext {
   stockData: string;
   backendStockData: string;
-  technicalSource: "backend_mcp" | "backend_http" | "arti-data" | "openbb" | null;
+  technicalSource: "backend_mcp" | "backend_http" | "arti-data" | null;
 }
 
 export function formatResearchStockData(
