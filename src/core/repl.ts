@@ -15,17 +15,22 @@ import { printBanner, renderStatusContent, type PrintedBanner } from "./banner.j
 import { getActiveBillingState } from "../billing.js";
 import { checkForUpdate, formatUpdateNotice } from "../update-check.js";
 import {
-  chatCommand,
   rawChatCommand,
-  type ChatCommandOptions,
-  type ChatMessage,
 } from "../commands/chat.js";
-import {
-  dispatchNaturalText,
-  type NaturalDispatchOptions,
-  type NaturalDispatchResult,
-} from "./natural-dispatch.js";
 import { shutdownBackendMcp } from "../data/mcp-client.js";
+import { loadConfig } from "../config.js";
+import { ConversationSessionStore } from "./conversation-session.js";
+import { ConversationRuntime } from "./conversation-runtime.js";
+import {
+  formatSessionList,
+  formatSessionStatus,
+  formatSessionUsage,
+} from "./conversation-display.js";
+import {
+  completeSlashCommands,
+  parseReplInput,
+  suggestSlashCommands,
+} from "./slash.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const HISTORY_FILE = join(CONFIG_DIR, "repl_history");
@@ -34,6 +39,7 @@ const MAX_HISTORY = 500;
 /** 已注册的 REPL 命令 */
 interface ReplCommand {
   name: string;
+  slashName?: string;
   aliases: string[];
   description: string;
   usage: string;
@@ -46,16 +52,6 @@ const commands: ReplCommand[] = [];
 /** 注册一个 REPL 命令 */
 export function registerCommand(cmd: ReplCommand): void {
   commands.push(cmd);
-}
-
-/** 获取所有命令名（含别名），用于补全 */
-function getAllCommandNames(): string[] {
-  const names: string[] = [];
-  for (const cmd of commands) {
-    names.push(cmd.name);
-    names.push(...cmd.aliases);
-  }
-  return names;
 }
 
 /** 加载历史记录（文件为旧→新顺序，readline 期望 history[0] 为最新，故 reverse） */
@@ -157,10 +153,28 @@ function wireBannerAsyncInfo(
 }
 
 /** 命令分组 */
-const CATEGORY_ORDER = ["research", "market", "data", "tools", "account"] as const;
+const CATEGORY_ORDER = ["session", "research", "market", "data", "tools", "account"] as const;
 const CATEGORY_LABELS: Record<string, string> = {
-  research: "研报", market: "行情", data: "数据", tools: "工具", account: "账户",
+  session: "会话", research: "研报", market: "行情", data: "数据", tools: "工具", account: "账户",
 };
+
+interface SlashHelpCommand {
+  name: string;
+  description: string;
+  usage: string;
+  category: string;
+}
+
+const LOCAL_SLASH_COMMANDS: SlashHelpCommand[] = [
+  { name: "help", description: "查看快捷命令", usage: "/help [command]", category: "session" },
+  { name: "status", description: "查看当前会话和上下文状态", usage: "/status", category: "session" },
+  { name: "usage", description: "查看当前轮和累计 Token usage", usage: "/usage", category: "session" },
+  { name: "new", description: "新建会话", usage: "/new [title...]", category: "session" },
+  { name: "resume", description: "列出或恢复历史会话", usage: "/resume [session]", category: "session" },
+  { name: "clear", description: "保存当前会话并开始新会话", usage: "/clear", category: "session" },
+  { name: "cls", description: "清空终端屏幕", usage: "/cls", category: "session" },
+  { name: "exit", description: "保存并退出", usage: "/exit", category: "session" },
+];
 
 function getCategoryForCommand(name: string): string {
   const map: Record<string, string> = {
@@ -176,18 +190,34 @@ function getCategoryForCommand(name: string): string {
   return map[name] || "tools";
 }
 
+function getSlashHelpCommands(): SlashHelpCommand[] {
+  const capabilityCommands = commands
+    .filter(command => command.slashName)
+    .map(command => ({
+      name: command.slashName as string,
+      description: command.description,
+      usage: command.usage.replace(/^\S+/, `/${command.slashName}`),
+      category: getCategoryForCommand(command.name),
+    }));
+  return [...LOCAL_SLASH_COMMANDS, ...capabilityCommands];
+}
+
+function getAllSlashNames(): string[] {
+  return getSlashHelpCommands().map(command => command.name);
+}
+
 /** 内置选择器 — 不依赖外部库，不抢占 stdin */
 interface SelectItem { name: string; label: string; hint: string; isSep?: boolean }
 
 function buildHelpItems(): SelectItem[] {
   const items: SelectItem[] = [];
+  const slashCommands = getSlashHelpCommands();
   for (const cat of CATEGORY_ORDER) {
-    const group = commands.filter(cmd => getCategoryForCommand(cmd.name) === cat);
+    const group = slashCommands.filter(command => command.category === cat);
     if (!group.length) continue;
     items.push({ name: "", label: `── ${CATEGORY_LABELS[cat]} ──`, hint: "", isSep: true });
     for (const cmd of group) {
-      const aliases = cmd.aliases.length ? `  ${cmd.aliases.join(", ")}` : "";
-      items.push({ name: cmd.name, label: cmd.name + aliases, hint: cmd.description });
+      items.push({ name: cmd.name, label: `/${cmd.name}`, hint: cmd.description });
     }
   }
   return items;
@@ -303,98 +333,49 @@ function interactiveSelect(items: SelectItem[]): Promise<string | null> {
   });
 }
 
-/** 交互式帮助 — ↑↓ 浏览所有命令，回车查看用法 */
-async function printHelp(): Promise<void> {
+function printSlashCommandHelp(command: SlashHelpCommand): void {
+  console.log(`  ${chalk.bold(`/${command.name}`)}`);
+  console.log(chalk.dim(`  ${command.description}`));
+  console.log(`  ${chalk.dim("用法")}  ${command.usage}`);
+  console.log();
+}
+
+function printUnknownSlash(name: string): void {
+  const suggestions = suggestSlashCommands(name, getAllSlashNames());
+  console.error(chalk.red(`  未知快捷命令: /${name}`));
+  if (suggestions.length) {
+    console.error(chalk.gray(`  你是否想输入: ${suggestions.map(command => `/${command}`).join("、")}`));
+  } else {
+    console.error(chalk.gray("  输入 / 查看可用快捷命令"));
+  }
+}
+
+/** 交互式帮助 — ↑↓ 浏览所有 Slash Command，回车查看用法 */
+async function printHelp(commandName?: string): Promise<void> {
+  if (commandName) {
+    const normalized = commandName.replace(/^\//, "").toLowerCase();
+    const command = getSlashHelpCommands().find(item => item.name === normalized);
+    if (!command) {
+      printUnknownSlash(normalized);
+      return;
+    }
+    printSlashCommandHelp(command);
+    return;
+  }
+
   const items = buildHelpItems();
   const selected = await interactiveSelect(items);
   if (!selected) return;
 
-  const cmd = commands.find(c => c.name === selected);
+  const cmd = getSlashHelpCommands().find(command => command.name === selected);
   if (!cmd) return;
 
-  console.log(`  ${chalk.bold(cmd.name)}${cmd.aliases.length ? chalk.dim(`  (${cmd.aliases.join(", ")})`) : ""}`);
-  console.log(chalk.dim(`  ${cmd.description}`));
-  console.log(`  ${chalk.dim("用法")}  ${cmd.usage}`);
-  console.log();
+  printSlashCommandHelp(cmd);
 }
 
-/** 解析输入行为命令和参数 */
-function parseLine(line: string): { cmdName: string; args: string[] } | null {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
-  const parts = trimmed.split(/\s+/);
-  return { cmdName: parts[0].toLowerCase(), args: parts.slice(1) };
-}
-
-/** 查找命令 */
-function findCommand(name: string): ReplCommand | undefined {
-  return commands.find(c => c.name === name || c.aliases.includes(name));
-}
-
-const MAX_CHAT_MESSAGES = 12;
-
-type NaturalDispatcher = (
-  text: string,
-  options: NaturalDispatchOptions,
-) => Promise<NaturalDispatchResult | undefined>;
-type RawChatRunner = (
-  message: string,
-  options?: Pick<ChatCommandOptions, "history">,
-) => Promise<string | undefined>;
-type ChatRunner = (
-  message: string,
-  options?: ChatCommandOptions,
-) => Promise<string | undefined>;
-
-export function appendChatTurn(
-  history: ChatMessage[],
-  userText: string,
-  assistantText: string,
-): void {
-  history.push(
-    { role: "user", content: userText },
-    { role: "assistant", content: assistantText },
-  );
-  if (history.length > MAX_CHAT_MESSAGES) {
-    history.splice(0, history.length - MAX_CHAT_MESSAGES);
-  }
-}
-
-export function clearChatHistory(history: ChatMessage[]): void {
-  history.splice(0, history.length);
-}
-
-export async function dispatchReplChat(
-  args: string[],
-  history: ChatMessage[],
-  runChat: ChatRunner = chatCommand,
-): Promise<void> {
-  const raw = args.includes("--raw");
-  const text = args.filter(arg => arg !== "--raw").join(" ").trim();
-  const assistantText = await runChat(text, { raw, history: [...history] });
-  if (assistantText) appendChatTurn(history, text, assistantText);
-}
-
-/** 自由文本 → 复用产品意图识别 → 派发到对应能力 */
-export async function dispatchReplFreeText(
-  text: string,
-  history: ChatMessage[],
-  dispatch: NaturalDispatcher = dispatchNaturalText,
-  runRawChat: RawChatRunner = rawChatCommand,
-): Promise<void> {
-  if (!text) return;
-  appendHistory(text);
-  trackCommand(text);
-  try {
-    await dispatch(text, {
-      onGeneralChat: async (chatText) => {
-        const assistantText = await runRawChat(chatText, { history: [...history] });
-        if (assistantText) appendChatTurn(history, chatText, assistantText);
-      },
-    });
-  } catch (err) {
-    console.error(chalk.red(`  处理失败: ${err instanceof Error ? err.message : String(err)}`));
-  }
+/** 查找 Slash 对应的统一能力 */
+function findSlashCommand(name: string): ReplCommand | undefined {
+  return commands.find(command => command.slashName === name);
 }
 
 /** 启动 REPL */
@@ -405,16 +386,26 @@ export async function startRepl(): Promise<void> {
   const banner = interactive ? printBanner({ who }) : null;
 
   const history = loadHistory();
-  const chatHistory: ChatMessage[] = [];
+  const config = loadConfig();
+  const conversation = new ConversationRuntime(new ConversationSessionStore(
+    undefined,
+    {
+      onWarning: message => console.error(chalk.yellow(`  ⚠ ${message}`)),
+    },
+  ));
+  const cleanup = conversation.initialize(config.session.retentionDays);
+  if (cleanup.removedSessionIds.length) {
+    console.error(chalk.gray(
+      `  已清理 ${cleanup.removedSessionIds.length} 个超过 ${config.session.retentionDays} 天的本地会话`,
+    ));
+  }
 
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
     prompt: chalk.cyan("arti> "),
     completer: (line: string) => {
-      const allNames = getAllCommandNames();
-      const hits = allNames.filter(n => n.startsWith(line.toLowerCase()));
-      return [hits.length ? hits : allNames, line];
+      return [completeSlashCommands(line, getAllSlashNames()), line];
     },
     history,
     historySize: MAX_HISTORY,
@@ -444,50 +435,132 @@ export async function startRepl(): Promise<void> {
   // 处理单行输入。返回 true 表示已触发退出（调用方不应再 prompt）。
   const processLine = async (line: string): Promise<boolean> => {
     bannerFresh = false;
-    const parsed = parseLine(line);
-    if (!parsed) return false;
+    const input = parseReplInput(line);
+    if (!input) return false;
 
-    const { cmdName, args } = parsed;
-    const wholeLine = args.length === 0; // L11：无参内置命令仅在整行匹配时触发
+    appendHistory(line.trim());
+    trackCommand(line.trim());
 
-    // 内置命令（仅整行匹配，避免 "exit 仓位" / "help 分析茅台" 误触发）
-    if (wholeLine && (cmdName === "exit" || cmdName === "quit")) {
+    if (input.type === "conversation") {
+      try {
+        await conversation.runTurn(input.text, (text, options) =>
+          rawChatCommand(text, options)
+        );
+      } catch (err) {
+        console.error(chalk.red(`  处理失败: ${err instanceof Error ? err.message : String(err)}`));
+      }
+      console.log();
+      return false;
+    }
+
+    const { name, args } = input;
+
+    if (!name) {
+      await printHelp();
+      return false;
+    }
+
+    if (name === "exit") {
+      if (args.length) {
+        console.error(chalk.red("  用法: /exit"));
+        return false;
+      }
       console.log(chalk.gray("  再见 👋"));
       rl.close();
       await gracefulExit(0);
       return true;
     }
-    if (wholeLine && (cmdName === "help" || cmdName === "?" || cmdName === "/")) {
-      await printHelp();
+
+    if (name === "help") {
+      if (args.length > 1) {
+        console.error(chalk.red("  用法: /help [command]"));
+        return false;
+      }
+      await printHelp(args[0]);
       return false;
     }
-    if (wholeLine && ["clear", "cls", "/clear", "reset"].includes(cmdName)) {
-      clearChatHistory(chatHistory);
+
+    if (name === "status") {
+      if (args.length) {
+        console.error(chalk.red("  用法: /status"));
+        return false;
+      }
+      for (const line of formatSessionStatus(conversation.snapshot())) {
+        console.log(`  ${line}`);
+      }
+      return false;
+    }
+
+    if (name === "usage") {
+      if (args.length) {
+        console.error(chalk.red("  用法: /usage"));
+        return false;
+      }
+      for (const line of formatSessionUsage(conversation.snapshot())) {
+        console.log(`  ${line}`);
+      }
+      return false;
+    }
+
+    if (name === "new") {
+      const session = conversation.newSession(args.join(" "));
+      console.log(chalk.gray(`  已新建会话 ${session.id}`));
+      return false;
+    }
+
+    if (name === "resume") {
+      if (args.length > 1) {
+        console.error(chalk.red("  用法: /resume [session]"));
+        return false;
+      }
+      if (!args.length) {
+        for (const line of formatSessionList(
+          conversation.listSessions(),
+          conversation.activeSessionId,
+        )) {
+          console.log(`  ${line}`);
+        }
+        return false;
+      }
+      try {
+        const session = conversation.resume(args[0]);
+        console.log(chalk.gray(`  已恢复会话 ${session.id} · ${session.title}`));
+      } catch (err) {
+        console.error(chalk.red(`  恢复失败: ${err instanceof Error ? err.message : String(err)}`));
+      }
+      return false;
+    }
+
+    if (name === "clear") {
+      if (args.length) {
+        console.error(chalk.red("  用法: /clear"));
+        return false;
+      }
+      const session = conversation.newSession();
+      console.log(chalk.gray(`  已清空上下文并开始新会话 ${session.id}`));
+      return false;
+    }
+
+    if (name === "cls") {
+      if (args.length) {
+        console.error(chalk.red("  用法: /cls"));
+        return false;
+      }
       console.clear();
       return false;
     }
 
-    if (["chat", "c", "ask"].includes(cmdName)) {
-      appendHistory(line.trim());
-      trackCommand(line.trim());
-      await dispatchReplChat(args, chatHistory);
-      console.log();
-      return false;
-    }
-
-    // 查找注册命令；非命令则当作自由文本走意图识别
-    const cmd = findCommand(cmdName);
+    const cmd = findSlashCommand(name);
     if (!cmd) {
-      await dispatchReplFreeText(line.trim(), chatHistory);
-      console.log();
+      printUnknownSlash(name);
       return false;
     }
 
-    // 执行命令
-    appendHistory(line.trim());
-    trackCommand(line.trim());
     try {
       await cmd.handler(args);
+      if (["quick", "full", "deep"].includes(name) && args[0]) {
+        conversation.trackSymbol(args[0]);
+      }
     } catch (err) {
       console.error(chalk.red(`  命令执行失败: ${err instanceof Error ? err.message : String(err)}`));
     }

@@ -52,6 +52,9 @@ export interface ArtiConfig {
   poly: {
     apiBaseUrl: string;
   };
+  session: {
+    retentionDays: number;
+  };
   watchlist: string[];
 }
 
@@ -91,6 +94,9 @@ const DEFAULT_CONFIG: ArtiConfig = {
   poly: {
     apiBaseUrl: DEFAULT_POLY_BASE_URL,
   },
+  session: {
+    retentionDays: 30,
+  },
   watchlist: [],
 };
 
@@ -124,6 +130,7 @@ export function loadConfig(): ArtiConfig {
         data: { ...DEFAULT_CONFIG.data, ...saved.data },
         display: { ...DEFAULT_CONFIG.display, ...saved.display },
         poly: { ...DEFAULT_CONFIG.poly, ...saved.poly },
+        session: { ...DEFAULT_CONFIG.session, ...saved.session },
         watchlist: saved.watchlist ?? DEFAULT_CONFIG.watchlist,
       };
 
@@ -202,6 +209,12 @@ export function loadConfig(): ArtiConfig {
   if (process.env.ARTI_DATA_API_URL) config.data.artiDataBaseUrl = process.env.ARTI_DATA_API_URL;
   if (process.env.ARTI_DATA_INTERNAL_KEY) config.data.artiDataInternalKey = process.env.ARTI_DATA_INTERNAL_KEY;
   if (process.env.ARTI_POLY_API_URL) config.poly.apiBaseUrl = process.env.ARTI_POLY_API_URL;
+  if (process.env.ARTI_SESSION_RETENTION_DAYS) {
+    const retentionDays = Number(process.env.ARTI_SESSION_RETENTION_DAYS);
+    if (Number.isInteger(retentionDays) && retentionDays > 0) {
+      config.session.retentionDays = retentionDays;
+    }
+  }
   if (process.env.ARTI_DATA_TIMEOUT) {
     const t = Number(process.env.ARTI_DATA_TIMEOUT);
     if (!isNaN(t) && t > 0) config.data.artiDataTimeout = t;
@@ -240,6 +253,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   "data.provider", "data.artiDataBaseUrl", "data.artiDataTimeout", "data.artiDataInternalKey",
   "display.market", "display.lang",
   "poly.apiBaseUrl",
+  "session.retentionDays",
   "watchlist",
 ]);
 
@@ -285,6 +299,12 @@ export function setConfigValue(key: string, value: string): void {
   }
   if (URL_CONFIG_KEYS.has(key)) {
     assertSafeUrl(key, value);
+  }
+  if (key === "session.retentionDays") {
+    const retentionDays = Number(value);
+    if (!Number.isInteger(retentionDays) || retentionDays <= 0) {
+      throw new Error("session.retentionDays 必须是正整数");
+    }
   }
 
   const config = loadConfig();

@@ -1,6 +1,6 @@
 # ARTI CLI Billing Flow
 
-> 更新于 2026-05-14：
+> 更新于 2026-07-24：
 > 当前 CLI 已切换到 **服务端 Credits 真源**，`credits` 与扣费不再以本地 `~/.config/arti/billing.json` 为准。
 > 本文档以下大部分内容描述的是 **旧的本地模拟计费方案**，保留仅用于历史对照，不能再作为当前行为说明。
 
@@ -9,6 +9,16 @@
 - `arti credits`：显示服务端真实套餐、周包剩余、永久余额、5h 窗口、动作定价
 - `arti login`：支持邮箱密码或 access token + refresh token
 - README 的 “Credit 计费” 章节
+
+## Token usage 与 Credits
+
+两者必须分开理解：
+
+- REPL `/usage`：展示 `v1-chat` 服务端 SSE 返回的输入、输出、缓存和上下文 Token。
+- REPL `/status`：展示最近模型与上下文窗口占用。
+- `/credits` 或 `arti credits`：查询产品套餐、余额和动作定价。
+
+CLI 不使用字符数或本地 tokenizer 猜测真实 Token，也不从 Token 推导 Credits。服务端尚未发送 `usage` 事件时，`/usage` 和 `/status` 明确显示数据尚未返回。
 
 ---
 

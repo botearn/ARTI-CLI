@@ -35,6 +35,7 @@ export interface ParsedArgs {
 /** 统一命令定义 — 一次定义，驱动 CLI + REPL */
 export interface CommandDef {
   name: string;
+  slashName?: string;
   aliases: string[];
   description: string;
   usage: string;           // REPL 帮助行
@@ -120,6 +121,7 @@ export function buildRepl(defs: CommandDef[]): void {
   for (const def of defs) {
     registerCommand({
       name: def.name,
+      slashName: def.slashName,
       aliases: def.aliases,
       description: def.description,
       usage: def.usage,

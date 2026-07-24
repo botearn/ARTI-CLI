@@ -17,7 +17,7 @@ ARTI CLI 是 ARTI 投研产品的命令行客户端。它是生产后端的**瘦
 
 ```
 $ arti
-  智能投研终端 > 茅台现在怎么样？
+  arti> /quick 600519.SS
 
   贵州茅台 快速扫描 · 600519.SS …
 ```
@@ -32,7 +32,7 @@ $ arti
 | 深度研报 | `arti deep <代码>` | 三层级深度研报（分析师 + 大师辩论 + 综合裁定） |
 | 预测市场 | `arti poly events` | ARTi Poly 公开 API：事件、摘要、跨平台价差 |
 
-支持美股、港股、A 股。无参运行 `arti` 进入交互终端，**直接打字即可**——内置意图识别会自动判断该聊天还是出报告。
+支持美股、港股、A 股。无参运行 `arti` 进入交互终端：普通文本进入连续对话，行首 `/command` 确定性调用投研能力。
 
 ## Quick Start
 
@@ -80,10 +80,10 @@ arti login --token <access-token> --refresh-token <refresh-token>
 ### 3. 上手
 
 ```bash
-# 交互终端（推荐）：直接打字，意图自动识别
+# 交互终端（推荐）：普通文本对话，Slash Command 调用能力
 $ arti
-  智能投研终端 > 帮我深度分析英伟达
-  智能投研终端 > 今天大盘怎么样
+  arti> /deep NVDA
+  arti> 这份研报的主要风险是什么？
 
 # 或用显式命令
 arti quick-scan AAPL
@@ -99,12 +99,25 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 
 无参运行 `arti` 进入终端。输入分两类：
 
-- **命令**：`quick-scan AAPL`、`full NVDA`、`help`、`exit` 等
-- **自由文本**：任意问题 → 复用产品意图识别（`classify-intent`）→ 自动派发到快速扫描 / 全景 / 深度 / 聊天；缺股票代码时会回问
+- **Slash Command**：仅行首 `/command` 触发，例如 `/quick AAPL`、`/full NVDA`、`/help`、`/exit`
+- **普通对话**：其他输入全部作为用户消息；`deep NVDA` 和“解释 `/deep`”都不会触发命令
+- **字面量 Slash**：需要发送 `/` 开头文本时输入 `//text`
+
+当前可用快捷命令：
+
+- 会话：`/new`、`/resume`、`/clear`、`/status`、`/usage`
+- 能力：`/quick`、`/full`、`/deep`、`/credits`、`/poly`
+- 本地：`/help`、`/cls`、`/exit`
+
+输入 `/` 可浏览命令，输入 `/help deep` 可查看具体用法。
+
+对话按 append-only JSONL 保存在 `~/.config/arti/sessions/`，目录权限为 `0700`、文件为 `0600`。默认保留 30 天，可通过 `arti config set session.retentionDays <天数>` 或 `ARTI_SESSION_RETENTION_DAYS` 调整。`/resume` 无参数时列出最近会话，再用 Session ID 或唯一前缀恢复。
 
 ### CLI 模式
 
 每个能力都有显式命令，适合脚本与一次性调用。`arti chat <问题>` 默认复用产品意图识别，可能自动派发到快速扫描、全景研报、深度研报或聊天；需要强制纯聊天时使用 `arti chat --raw <问题>`。所有命令支持 `--json` 输出结构化 JSON。
+
+> Slash Command 只属于交互终端。agent、脚本和 CI 应继续使用 `arti <command> --json`。
 
 ## 命令一览
 
@@ -124,6 +137,8 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 ## Credit 计费
 
 各能力按对应产品函数计费，口径与 web 产品一致。`arti credits` 查看余额；积分不足会在调用前提示。
+
+Token usage 与 Credits 是两套概念：REPL 的 `/usage` 展示 `v1-chat` 服务端返回的输入、输出、缓存和上下文 Token；`/credits` 展示产品余额。后端尚未返回 usage 事件时，CLI 显示“服务端尚未返回 Token usage”，不会在本地估算。
 
 ## 架构
 

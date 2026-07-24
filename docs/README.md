@@ -15,6 +15,7 @@ ARTI CLI 的技术文档与设计资料。
   - Layer 3：综合裁定与分歧点分析
 - [**ARTI_DATA_INTEGRATION_PLAN.md**](ARTI_DATA_INTEGRATION_PLAN.md) — arti-data 上游数据平台接入计划
 - [**BILLING_FLOW.md**](BILLING_FLOW.md) — Credit 计费流程与套餐说明
+- [**RFC-2026-0008**](../rfcs/2026/RFC-2026-0008-conversation-first-cli.md) — 对话优先、Slash、Session、Token 与 Artifact 设计
 - [**REPORT_STYLES.md**](REPORT_STYLES.md) — 研报输出样式
 - [**ROADMAP.md**](ROADMAP.md) — 规划
 

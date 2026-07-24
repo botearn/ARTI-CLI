@@ -5,6 +5,11 @@
  */
 import { loadConfig } from "./config.js";
 import { ensureValidAccessToken } from "./auth.js";
+import type {
+  ChatClientCapabilities,
+  ChatUsageEvent,
+  ConversationContext,
+} from "./core/conversation-types.js";
 
 export class ApiError extends Error {
   constructor(
@@ -464,8 +469,15 @@ type ChatSseEvent =
   | { type: "message.delta"; data: { content?: string } }
   | { type: "message.done"; data: { requestId?: string; model?: string } }
   | { type: "billing"; data: Record<string, unknown> }
+  | { type: "usage"; data: Record<string, unknown> }
   | { type: "error"; data: { code?: string; message?: string; status?: number } }
   | { type: string; data: Record<string, unknown> };
+
+export interface ChatStreamOptions {
+  conversation?: ConversationContext;
+  clientCapabilities?: ChatClientCapabilities;
+  onUsage?: (usage: ChatUsageEvent) => void;
+}
 
 function parseChatSseEvent(frame: string): ChatSseEvent | null {
   let type = "";
@@ -486,9 +498,45 @@ function parseChatSseEvent(frame: string): ChatSseEvent | null {
   }
 }
 
+function parseChatUsage(data: Record<string, unknown>): ChatUsageEvent | null {
+  const requiredNumbers = ["inputTokens", "outputTokens", "totalTokens"] as const;
+  if (typeof data.requestId !== "string") return null;
+  if (requiredNumbers.some(key =>
+    typeof data[key] !== "number" || !Number.isFinite(data[key]) || data[key] < 0
+  )) return null;
+
+  const optionalNumbers = [
+    "cachedInputTokens",
+    "reasoningTokens",
+    "contextWindow",
+  ] as const;
+  if (optionalNumbers.some(key =>
+    data[key] !== undefined
+    && (typeof data[key] !== "number" || !Number.isFinite(data[key]) || data[key] < 0)
+  )) return null;
+
+  return {
+    requestId: data.requestId,
+    ...(typeof data.model === "string" ? { model: data.model } : {}),
+    inputTokens: data.inputTokens as number,
+    outputTokens: data.outputTokens as number,
+    ...(typeof data.cachedInputTokens === "number"
+      ? { cachedInputTokens: data.cachedInputTokens }
+      : {}),
+    ...(typeof data.reasoningTokens === "number"
+      ? { reasoningTokens: data.reasoningTokens }
+      : {}),
+    totalTokens: data.totalTokens as number,
+    ...(typeof data.contextWindow === "number"
+      ? { contextWindow: data.contextWindow }
+      : {}),
+  };
+}
+
 /** 调用产品 v1-chat 函数，流式返回文本增量 */
 export async function* streamChat(
   messages: Array<{ role: string; content: string }>,
+  options?: ChatStreamOptions,
 ): AsyncGenerator<string> {
   const config = loadConfig();
   const controller = new AbortController();
@@ -503,7 +551,13 @@ export async function* streamChat(
         "Content-Type": "application/json",
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({
+        messages,
+        ...(options?.conversation ? { conversation: options.conversation } : {}),
+        ...(options?.clientCapabilities
+          ? { clientCapabilities: options.clientCapabilities }
+          : {}),
+      }),
       signal: controller.signal,
     });
   };
@@ -536,6 +590,9 @@ export async function* streamChat(
           yield event.data.content;
         } else if (event?.type === "message.done") {
           done = true;
+        } else if (event?.type === "usage") {
+          const usage = parseChatUsage(event.data);
+          if (usage) options?.onUsage?.(usage);
         } else if (event?.type === "error") {
           const error = event.data as { code?: string; message?: string; status?: number };
           throw new ApiError("v1-chat", error.status ?? 500, error.message ?? error.code ?? "聊天失败");
@@ -564,4 +621,3 @@ export interface IntentResult {
 export async function classifyIntent(text: string, lastSymbol?: string | null): Promise<IntentResult> {
   return callEdge<IntentResult>("classify-intent", { text, last_symbol: lastSymbol ?? null });
 }
-

@@ -63,6 +63,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "quick-scan", aliases: ["quick", "qs"],
+    slashName: "quick",
     description: "快速研判",
     usage: "quick-scan <symbol>",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
@@ -76,6 +77,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "full", aliases: ["panorama", "fr"],
+    slashName: "full",
     description: "全景研报",
     usage: "full <symbol> [--full]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
@@ -94,6 +96,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "deep", aliases: ["dr"],
+    slashName: "deep",
     description: "深度研报",
     usage: "deep <symbol> [--full]",
     args: [{ spec: "<symbol>", desc: "股票代码" }],
@@ -216,6 +219,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "credits", aliases: ["cred"],
+    slashName: "credits",
     description: "余额套餐",
     usage: "credits",
     args: [],
@@ -228,6 +232,7 @@ const defs: CommandDef[] = [
   },
   {
     name: "poly", aliases: [],
+    slashName: "poly",
     description: "预测市场数据（ARTi Poly）",
     usage: "poly events|event|summary|compare|search [...args]",
     args: [{ spec: "[args...]", desc: "子命令和参数" }],
