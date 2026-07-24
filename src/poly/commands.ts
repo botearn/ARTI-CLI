@@ -114,7 +114,9 @@ async function polyEvent(
   options: PolyOptions,
 ): Promise<CapabilityExecutionResult | undefined> {
   if (!slug) {
-    console.log(chalk.red("请提供事件 slug，例如：arti poly event will-trump-win-2026"));
+    console.log(chalk.red(
+      "请提供事件 slug。会话内：/poly event will-trump-win-2026；外层：arti poly event will-trump-win-2026",
+    ));
     return;
   }
   const source = stringValue(options.source) ?? "polymarket";
@@ -142,7 +144,7 @@ async function polySearch(
 ): Promise<CapabilityExecutionResult | undefined> {
   const q = keyword.trim();
   if (!q) {
-    console.log(chalk.red("请提供搜索关键词，例如：arti poly search fed"));
+    console.log(chalk.red("请提供搜索关键词。会话内：/poly search fed；外层：arti poly search fed"));
     return;
   }
   const limit = limitValue(options.limit, 20);

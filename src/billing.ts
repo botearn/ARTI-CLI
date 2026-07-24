@@ -237,7 +237,7 @@ export async function getActiveBillingState(): Promise<BillingState> {
   const auth = getAuthState();
   const token = await ensureValidAccessToken();
   if (!token) {
-    throw new Error("未登录，无法读取 Credits。请先执行 arti login");
+    throw new Error("未登录，无法读取 Credits。交互终端输入 /login，外层运行 arti login");
   }
 
   const userId = auth.userId || getJwtUserId(token);

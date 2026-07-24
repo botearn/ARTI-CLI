@@ -54,11 +54,17 @@ describe("启动 banner", () => {
     expect(text).toContain("ARTI");
   });
 
-  it("未登录显示 login 引导，状态行下标为 -1（不做余额回填）", () => {
+  it("未登录显示 /login 引导，状态行下标为 -1（不做余额回填）", () => {
     const { lines, statusLineIndex } = renderBanner({ version: "0.4.0", who: null, columns: 80 });
 
-    expect(lines.join("\n")).toContain("login");
+    expect(lines.join("\n")).toContain("/login");
     expect(statusLineIndex).toBe(-1);
+  });
+
+  it("始终说明 Slash 与普通对话边界", () => {
+    const { lines } = renderBanner({ version: "0.4.0", who: "u", columns: 80 });
+
+    expect(lines.join("\n")).toContain("输入 / 浏览快捷命令 · 普通文本直接对话");
   });
 
   it("supportsUnicode：win32 无现代终端变量时回退，TERM=dumb 一律回退", () => {
@@ -95,6 +101,23 @@ describe("每日提示", () => {
 
     expect(tipOfTheDay(new Date("2026-07-19T23:59:59"))).toBe(tip);
     expect(tip.length).toBeGreaterThan(0);
+  });
+
+  it("轮播提示不再引导已失效的 REPL 裸命令", () => {
+    const tips = Array.from({ length: 6 }, (_, offset) =>
+      tipOfTheDay(new Date(2026, 6, 19 + offset))
+    );
+    const text = tips.join("\n");
+
+    expect(text).toContain("/quick");
+    expect(text).toContain("/help");
+    expect(text).toContain("/deep");
+    expect(text).toContain("/credits");
+    expect(text).toContain("arti <command> --json");
+    expect(tips).not.toContain("输入 help 可交互浏览全部命令");
+    expect(tips).not.toContain("deep <代码> 生成深度研报（约 1–2 分钟）");
+    expect(tips).not.toContain("credits 查看余额与套餐用量");
+    expect(tips).not.toContain("直接输入股票代码（如 AAPL）即可快速扫描");
   });
 });
 

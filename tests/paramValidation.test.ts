@@ -29,7 +29,8 @@ describe("参数验证 — 空 symbol 提示", () => {
     expect(logSpy).toHaveBeenCalled();
     const msg = logSpy.mock.calls[0][0] as string;
     expect(msg).toContain("请提供股票代码");
-    expect(msg).toContain("quick-scan");
+    expect(msg).toContain("/quick AAPL");
+    expect(msg).toContain("arti quick-scan AAPL");
   });
 
   it("fullReportCommand 无参数时提示用法", async () => {
@@ -38,7 +39,8 @@ describe("参数验证 — 空 symbol 提示", () => {
     expect(logSpy).toHaveBeenCalled();
     const msg = logSpy.mock.calls[0][0] as string;
     expect(msg).toContain("请提供股票代码");
-    expect(msg).toContain("arti full");
+    expect(msg).toContain("/full AAPL");
+    expect(msg).toContain("arti full AAPL");
   });
 
   it("deepReportCommand 无参数时提示用法", async () => {
@@ -47,6 +49,7 @@ describe("参数验证 — 空 symbol 提示", () => {
     expect(logSpy).toHaveBeenCalled();
     const msg = logSpy.mock.calls[0][0] as string;
     expect(msg).toContain("请提供股票代码");
-    expect(msg).toContain("arti deep");
+    expect(msg).toContain("/deep AAPL");
+    expect(msg).toContain("arti deep AAPL");
   });
 });

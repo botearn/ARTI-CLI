@@ -33,7 +33,7 @@ export async function quickScanCommand(
   symbol: string,
 ): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
-    console.log(chalk.red("请提供股票代码，例如：arti quick-scan AAPL"));
+    console.log(chalk.red("请提供股票代码。会话内：/quick AAPL；外层：arti quick-scan AAPL"));
     return;
   }
 
@@ -179,7 +179,7 @@ export async function fullReportCommand(
   options?: { full?: boolean },
 ): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
-    console.log(chalk.red("请提供股票代码，例如：arti full AAPL"));
+    console.log(chalk.red("请提供股票代码。会话内：/full AAPL；外层：arti full AAPL"));
     return;
   }
 
@@ -194,7 +194,7 @@ export async function deepReportCommand(
   options?: { full?: boolean },
 ): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
-    console.log(chalk.red("请提供股票代码，例如：arti deep AAPL"));
+    console.log(chalk.red("请提供股票代码。会话内：/deep AAPL；外层：arti deep AAPL"));
     return;
   }
 

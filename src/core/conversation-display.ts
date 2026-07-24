@@ -26,7 +26,9 @@ export function formatSessionStatus(snapshot: ConversationSessionSnapshot): stri
     ? `${formatNumber(lastUsage.inputTokens)} / ${formatNumber(lastUsage.contextWindow)} tokens (${(
         lastUsage.inputTokens / lastUsage.contextWindow * 100
       ).toFixed(1)}%)`
-    : "服务端尚未返回 Token usage";
+    : snapshot.messages.length
+      ? "服务端尚未返回 Token usage"
+      : "尚无（完成一次对话后由服务端返回）";
 
   return [
     `Session: ${entry.id}`,
@@ -39,8 +41,17 @@ export function formatSessionStatus(snapshot: ConversationSessionSnapshot): stri
 }
 
 export function formatSessionUsage(snapshot: ConversationSessionSnapshot): string[] {
-  if (!snapshot.lastUsage) return ["服务端尚未返回 Token usage"];
+  const title = "Token usage（不等于 Credits）:";
+  if (!snapshot.lastUsage) {
+    return [
+      title,
+      snapshot.messages.length
+        ? "服务端尚未返回 Token usage"
+        : "尚无记录；完成一次对话后再查看",
+    ];
+  }
   return [
+    title,
     `最近一轮: ${formatUsage(snapshot.lastUsage)}`,
     `会话累计: ${formatUsage(snapshot.entry.totalUsage)}`,
   ];
