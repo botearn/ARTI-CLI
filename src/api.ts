@@ -504,6 +504,9 @@ function parseChatUsage(data: Record<string, unknown>): ChatUsageEvent | null {
   if (requiredNumbers.some(key =>
     typeof data[key] !== "number" || !Number.isFinite(data[key]) || data[key] < 0
   )) return null;
+  if (data.totalTokens !== (data.inputTokens as number) + (data.outputTokens as number)) {
+    return null;
+  }
 
   const optionalNumbers = [
     "cachedInputTokens",

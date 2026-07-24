@@ -64,6 +64,8 @@ export interface ConversationArtifactReference {
 }
 
 export interface ConversationContext {
+  schemaVersion: 1;
+  mode: "client-managed";
   sessionId: string;
   activeSymbols: string[];
   artifacts: ConversationArtifactReference[];

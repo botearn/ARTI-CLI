@@ -82,6 +82,10 @@ describe("ConversationRuntime", () => {
 
     expect(runtime.snapshot().entry.activeSymbols).toEqual(["NVDA"]);
     expect(runtime.conversationContext().activeSymbols).toEqual(["NVDA"]);
+    expect(runtime.conversationContext()).toMatchObject({
+      schemaVersion: 1,
+      mode: "client-managed",
+    });
   });
 
   it("/compact 写入 summary boundary，保留原 transcript 并缩小活跃上下文", async () => {

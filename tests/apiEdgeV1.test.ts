@@ -89,6 +89,8 @@ describe("Edge v1 API", () => {
       [{ role: "user", content: "主要风险是什么？" }],
       {
         conversation: {
+          schemaVersion: 1,
+          mode: "client-managed",
           sessionId: "session_12345678",
           activeSymbols: ["NVDA"],
           artifacts: [],
@@ -102,6 +104,8 @@ describe("Edge v1 API", () => {
     expect(JSON.parse(String(request.body))).toEqual({
       messages: [{ role: "user", content: "主要风险是什么？" }],
       conversation: {
+        schemaVersion: 1,
+        mode: "client-managed",
         sessionId: "session_12345678",
         activeSymbols: ["NVDA"],
         artifacts: [],
@@ -131,6 +135,21 @@ describe("Edge v1 API", () => {
       status: 402,
       message: "[v1-chat] 余额不足",
     });
+  });
+
+  it("chat 忽略 total 与 input/output 不一致的 usage", async () => {
+    const onUsage = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
+      "event: usage\ndata: {\"requestId\":\"req-invalid\",\"inputTokens\":100,\"outputTokens\":20,\"totalTokens\":999}\n\n",
+      "event: message.done\ndata: {\"requestId\":\"req-invalid\"}\n\n",
+    ])));
+
+    const { streamChat } = await import("../src/api.js");
+    await expect(collect(streamChat(
+      [{ role: "user", content: "test" }],
+      { onUsage },
+    ))).resolves.toEqual([]);
+    expect(onUsage).not.toHaveBeenCalled();
   });
 
   it("quick-scan 只请求 Edge 并解开 v1 envelope", async () => {

@@ -156,6 +156,8 @@ interface CapabilityResult {
     { "role": "user", "content": "那主要风险是什么？" }
   ],
   "conversation": {
+    "schemaVersion": 1,
+    "mode": "client-managed",
     "sessionId": "session_...",
     "summary": {},
     "activeSymbols": ["NVDA"],
