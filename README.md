@@ -107,6 +107,7 @@ arti chat --raw 美股今天怎么样  # 跳过意图识别，纯聊天
 
 - 会话：`/new`、`/resume`、`/clear`、`/status`、`/usage`、`/compact [重点]`
 - 能力：`/quick`、`/full`、`/deep`、`/credits`、`/poly`
+- 账户：`/login`
 - 本地：`/help`、`/cls`、`/exit`
 
 输入 `/` 可浏览命令，输入 `/help deep` 可查看具体用法。

@@ -51,6 +51,8 @@ describe("poly api", () => {
     vi.stubEnv("ARTI_AUTH_EXPIRES_AT", "");
 
     const { polyGet } = await import("../src/poly/api.js");
-    await expect(polyGet("events")).rejects.toThrow("未登录");
+    await expect(polyGet("events")).rejects.toThrow(
+      "未登录。交互终端输入 /login，外层运行 arti login",
+    );
   });
 });

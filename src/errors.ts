@@ -15,7 +15,7 @@ export function classifyError(err: unknown): ErrorInfo {
     return {
       title: err.name === "InsufficientCreditsError" ? "Credits 不足" : "套餐权限不足",
       detail: err.message,
-      suggestion: "可运行 arti credits 查看余额与套餐权益",
+      suggestion: "交互终端输入 /credits，外层运行 arti credits 查看余额与套餐权益",
     };
   }
 
@@ -34,7 +34,7 @@ export function classifyError(err: unknown): ErrorInfo {
       return {
         title: "登录态不可用",
         detail: err.message,
-        suggestion: "运行 arti login 后重试",
+        suggestion: "交互终端输入 /login，外层运行 arti login 后重试",
       };
     }
 

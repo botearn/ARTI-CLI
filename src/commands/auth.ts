@@ -196,9 +196,9 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
       console.log(chalk.yellow("  💡 提示:"));
       console.log(chalk.gray("  • 确认浏览器已打开正确的登录页面"));
       console.log(chalk.gray("  • 检查网络连接是否正常"));
-      console.log(chalk.gray("  • 重新执行 arti login"));
+      console.log(chalk.gray("  • 重新登录（交互终端 /login；外层 arti login）"));
     } else if (message.includes("过期")) {
-      console.log(chalk.yellow("  💡 提示: 请重新执行 arti login"));
+      console.log(chalk.yellow("  💡 提示: 请重新登录（交互终端 /login；外层 arti login）"));
     }
     console.log();
   }

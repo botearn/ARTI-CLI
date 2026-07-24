@@ -56,6 +56,7 @@ describe("Session 状态与 Token usage 展示", () => {
 
   it("/usage 分开展示最近一轮与会话累计 Token", () => {
     expect(formatSessionUsage(snapshot())).toEqual([
+      "Token usage（不等于 Credits）:",
       "最近一轮: 输入 1,200 · 输出 320 · 缓存 400 · 总计 1,520",
       "会话累计: 输入 2,000 · 输出 400 · 缓存 500 · 总计 2,400",
     ]);
@@ -72,11 +73,30 @@ describe("Session 状态与 Token usage 展示", () => {
           totalTokens: 0,
         },
       },
+      messages: [{ role: "user", content: "分析 NVDA" }],
       lastUsage: undefined,
     });
 
     expect(formatSessionStatus(noUsage)).toContain("上下文: 服务端尚未返回 Token usage");
-    expect(formatSessionUsage(noUsage)).toEqual(["服务端尚未返回 Token usage"]);
+    expect(formatSessionUsage(noUsage)).toEqual([
+      "Token usage（不等于 Credits）:",
+      "服务端尚未返回 Token usage",
+    ]);
+  });
+
+  it("新会话把尚无 usage 与服务端缺失区分开", () => {
+    const empty = snapshot({
+      messages: [],
+      lastUsage: undefined,
+    });
+
+    expect(formatSessionStatus(empty)).toContain(
+      "上下文: 尚无（完成一次对话后由服务端返回）",
+    );
+    expect(formatSessionUsage(empty)).toEqual([
+      "Token usage（不等于 Credits）:",
+      "尚无记录；完成一次对话后再查看",
+    ]);
   });
 
   it("/resume 无参数按最近更新时间列出 Session", () => {

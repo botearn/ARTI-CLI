@@ -63,7 +63,7 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
       return saveApprovedSession(polled.session);
     }
     if (polled.status === "expired") {
-      throw new Error("网页登录已过期（5 分钟未操作）。请重新执行 arti login");
+      throw new Error("网页登录已过期（5 分钟未操作）。请重新登录（交互终端 /login；外层 arti login）");
     }
     // L4：钳制轮询间隔下限，防止服务端返回极小值导致高频轮询
     await delay(Math.max(polled.poll_after_ms || pollIntervalMs, MIN_POLL_INTERVAL_MS));
@@ -73,7 +73,7 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
     "浏览器登录超时（5 分钟未收到确认）。\n" +
     "  • 请确认浏览器已打开并显示验证码页面\n" +
     "  • 检查您的网络连接\n" +
-    "  • 重新执行 arti login 重试"
+    "  • 重新登录（交互终端 /login；外层 arti login）"
   );
 }
 

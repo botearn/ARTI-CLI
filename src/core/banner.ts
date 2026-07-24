@@ -23,12 +23,12 @@ const MIN_LOGO_COLUMNS = 50;
 const DIVIDER_WIDTH = 38;
 
 const TIPS = [
-  "直接输入股票代码（如 AAPL）即可快速扫描",
-  "输入 help 可交互浏览全部命令",
-  "chat 支持自然语言，如：帮我看看英伟达",
-  "deep <代码> 生成深度研报（约 1–2 分钟）",
-  "命令加 --json 输出结构化数据，适合脚本与 agent",
-  "credits 查看余额与套餐用量",
+  "用 /quick AAPL 快速扫描；普通文本直接对话",
+  "输入 /help 可交互浏览全部快捷命令",
+  "直接问：帮我看看英伟达",
+  "用 /deep <代码> 生成深度研报（约 1–2 分钟）",
+  "外层 arti <command> --json 适合脚本与 agent",
+  "用 /credits 查看余额与套餐用量",
 ] as const;
 
 /** 终端是否支持 Unicode 方块/框线字符（老 Windows cmd 等环境回退纯文本） */
@@ -77,7 +77,7 @@ export function renderStatusContent(who: string, fill: StatusFill): string {
 }
 
 export function renderLoginHint(): string {
-  return `  ${chalk.yellow("○")} ${chalk.dim("未登录 — 输入")} ${chalk.cyan("login")} ${chalk.dim("开始（浏览器登录）")}`;
+  return `  ${chalk.yellow("○")} ${chalk.dim("未登录 — 输入")} ${chalk.cyan("/login")} ${chalk.dim("开始（浏览器登录）")}`;
 }
 
 export function renderBanner(input: BannerInput = {}): RenderedBanner {
@@ -108,6 +108,7 @@ export function renderBanner(input: BannerInput = {}): RenderedBanner {
   }
 
   lines.push(chalk.dim("  " + rule));
+  lines.push(chalk.dim("  输入 / 浏览快捷命令 · 普通文本直接对话"));
   lines.push(chalk.dim(`  提示：${tipOfTheDay(input.now)}`));
   lines.push("");
 

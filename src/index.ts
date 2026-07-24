@@ -114,8 +114,9 @@ const defs: CommandDef[] = [
   },
   {
     name: "login", aliases: [],
+    slashName: "login",
     description: "登录",
-    usage: "login | login --email <email> --password <password> | login --token <token> [--refresh-token <token>]",
+    usage: "login [options]",
     args: [],
     options: [
       { short: "", long: "--token", key: "token", type: "string", desc: "ARTI access token（⚠️ 会留在 shell 历史/ps，建议用无参 arti login 走浏览器授权）", hint: "<token>" },
