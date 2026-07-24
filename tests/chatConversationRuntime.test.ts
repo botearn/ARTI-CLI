@@ -34,6 +34,8 @@ describe("rawChatCommand conversation runtime", () => {
     await rawChatCommand("继续", {
       history: [{ role: "assistant", content: "上一轮" }],
       conversation: {
+        schemaVersion: 1,
+        mode: "client-managed",
         sessionId: "session_12345678",
         activeSymbols: ["NVDA"],
         artifacts: [],
@@ -48,6 +50,8 @@ describe("rawChatCommand conversation runtime", () => {
       ],
       {
         conversation: {
+          schemaVersion: 1,
+          mode: "client-managed",
           sessionId: "session_12345678",
           activeSymbols: ["NVDA"],
           artifacts: [],

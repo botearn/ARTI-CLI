@@ -83,6 +83,8 @@ export class ConversationRuntime {
   conversationContext(): ConversationContext {
     const snapshot = this.snapshot();
     return {
+      schemaVersion: 1,
+      mode: "client-managed",
       sessionId: snapshot.entry.id,
       activeSymbols: [...snapshot.entry.activeSymbols],
       artifacts: snapshot.artifacts.map(artifact => ({

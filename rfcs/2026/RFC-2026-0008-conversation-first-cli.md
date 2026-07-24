@@ -498,6 +498,10 @@ arti deep TSLA --json
 
 确认 Compact 采用方案 A：只通过显式 `/compact [focus]` 调用普通 `v1-chat`，按现有聊天规则计费，第一版不自动压缩。确认 Artifact 采用方案 A：仅属于当前 Session，不跨 Session 引用，并随 Session 使用相同的 30 天可配置保留期清理。
 
+### 2026-07-24 - zhe（Phase 4 / 服务端 Phase 1）
+
+确认 `/v1/chat` 作为唯一对话编排边界：CLI 固定发送 `schemaVersion: 1`、`mode: client-managed`，只消费服务端真实 usage。Credits 定价与扣费继续由后端决定，CLI 不估算 Token、不计算价格。
+
 ---
 
 ## 变更历史
@@ -506,3 +510,4 @@ arti deep TSLA --json
 |---|---|---|
 | 2026-07-24 | zhe | 创建 RFC，定义对话优先、Slash、Session、Token 和 Artifact 方案 |
 | 2026-07-24 | zhe / Codex | 实施 Phase 3，并记录 Compact A、Artifact A 决策 |
+| 2026-07-24 | zhe / Codex | 对齐服务端 Context Pack 与 Usage 契约（[#43](https://github.com/botearn/ARTI-CLI/pull/43)） |
