@@ -83,4 +83,120 @@ describe("ConversationRuntime", () => {
     expect(runtime.snapshot().entry.activeSymbols).toEqual(["NVDA"]);
     expect(runtime.conversationContext().activeSymbols).toEqual(["NVDA"]);
   });
+
+  it("/compact 写入 summary boundary，保留原 transcript 并缩小活跃上下文", async () => {
+    const runtime = createRuntime();
+    runtime.initialize(30);
+    await runtime.runTurn("分析 NVDA", vi.fn().mockResolvedValue("基本面稳健"));
+    await runtime.runTurn("主要风险呢", vi.fn().mockResolvedValue("估值偏高"));
+    const compactRunner = vi.fn().mockResolvedValue({
+      goal: "评估 NVDA",
+      activeSymbols: ["NVDA"],
+      facts: [{ text: "估值处于高位", asOf: "2026-07-24" }],
+      conclusions: ["基本面稳健"],
+      risks: ["估值偏高"],
+      assumptions: [],
+      unresolvedQuestions: [],
+      artifactIds: [],
+    });
+
+    const result = await runtime.compact("保留风险", compactRunner);
+
+    expect(compactRunner.mock.calls[0][0]).toMatchObject({
+      focus: "保留风险",
+      messages: [
+        { role: "user", content: "分析 NVDA" },
+        { role: "assistant", content: "基本面稳健" },
+        { role: "user", content: "主要风险呢" },
+        { role: "assistant", content: "估值偏高" },
+      ],
+    });
+    expect(result.compactedMessages).toBe(4);
+    expect(runtime.snapshot().messages).toHaveLength(4);
+    expect(runtime.snapshot().contextMessages).toEqual([]);
+    expect(runtime.conversationContext().summary?.risks).toEqual(["估值偏高"]);
+  });
+
+  it("重启恢复 compact 后的 summary，只加载 boundary 后的消息", async () => {
+    const runtime = createRuntime();
+    runtime.initialize(30);
+    await runtime.runTurn("分析 NVDA", vi.fn().mockResolvedValue("基本面稳健"));
+    const sessionId = runtime.activeSessionId as string;
+    await runtime.compact(undefined, vi.fn().mockResolvedValue({
+      goal: "评估 NVDA",
+      activeSymbols: ["NVDA"],
+      facts: [],
+      conclusions: ["基本面稳健"],
+      risks: [],
+      assumptions: [],
+      unresolvedQuestions: [],
+      artifactIds: [],
+    }));
+
+    const restarted = new ConversationRuntime(
+      new ConversationSessionStore(testDir as string),
+    );
+    restarted.initialize(30);
+    restarted.resume(sessionId);
+
+    expect(restarted.history()).toEqual([]);
+    expect(restarted.conversationContext().summary?.goal).toBe("评估 NVDA");
+    const runner = vi.fn().mockResolvedValue("继续回答");
+    await restarted.runTurn("继续", runner);
+    expect(runner.mock.calls[0][1].history).toEqual([]);
+    expect(runner.mock.calls[0][1].conversation.summary?.conclusions).toEqual([
+      "基本面稳健",
+    ]);
+  });
+
+  it("/compact 失败时不写 summary、不改变活跃上下文", async () => {
+    const runtime = createRuntime();
+    runtime.initialize(30);
+    await runtime.runTurn("保留这句话", vi.fn().mockResolvedValue("会保留"));
+    const before = runtime.history();
+
+    await expect(runtime.compact(
+      undefined,
+      vi.fn().mockRejectedValue(new Error("结构化摘要无效")),
+    )).rejects.toThrow("结构化摘要无效");
+
+    expect(runtime.history()).toEqual(before);
+    expect(runtime.snapshot().lastSummary).toBeUndefined();
+  });
+
+  it("空会话不发起可能计费的 compact 请求", async () => {
+    const runtime = createRuntime();
+    runtime.initialize(30);
+    runtime.newSession();
+    const runner = vi.fn();
+
+    await expect(runtime.compact(undefined, runner)).rejects.toThrow(
+      "没有可压缩内容",
+    );
+    expect(runner).not.toHaveBeenCalled();
+  });
+
+  it("能力原文进入 Artifact，conversation context 只包含 digest", () => {
+    const runtime = createRuntime();
+    runtime.initialize(30);
+    runtime.newSession();
+    const callId = runtime.beginToolCall("quick", { symbol: "NVDA" });
+
+    const artifact = runtime.completeToolCall(callId, {
+      type: "quick_scan",
+      symbol: "NVDA",
+      digest: "NVDA 快速扫描摘要",
+      payload: { privateLargePayload: "完整原文" },
+    });
+
+    expect(runtime.snapshot().artifacts[0].payload).toEqual({
+      privateLargePayload: "完整原文",
+    });
+    expect(runtime.conversationContext().artifacts).toEqual([{
+      id: artifact.id,
+      type: "quick_scan",
+      digest: "NVDA 快速扫描摘要",
+    }]);
+    expect(JSON.stringify(runtime.conversationContext())).not.toContain("完整原文");
+  });
 });

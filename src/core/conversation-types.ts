@@ -12,14 +12,62 @@ export interface ChatUsageEvent extends TokenUsage {
   model?: string;
 }
 
+export interface ConversationSummary {
+  goal?: string;
+  activeSymbols: string[];
+  facts: Array<{
+    text: string;
+    asOf?: string;
+    source?: string;
+  }>;
+  conclusions: string[];
+  risks: string[];
+  assumptions: string[];
+  unresolvedQuestions: string[];
+  artifactIds: string[];
+}
+
+export type ConversationArtifactType =
+  | "quick_scan"
+  | "full_report"
+  | "deep_report"
+  | "poly_result";
+
+export interface ConversationArtifact {
+  id: string;
+  sessionId: string;
+  type: ConversationArtifactType;
+  symbol?: string;
+  createdAt: string;
+  dataAsOf?: string;
+  digest: string;
+  payload: unknown;
+}
+
+export interface ConversationArtifactDraft {
+  type: ConversationArtifactType;
+  symbol?: string;
+  dataAsOf?: string;
+  digest: string;
+  payload: unknown;
+}
+
+export interface CapabilityExecutionResult {
+  json: unknown;
+  artifact?: ConversationArtifactDraft;
+}
+
+export interface ConversationArtifactReference {
+  id: string;
+  type: string;
+  digest: string;
+}
+
 export interface ConversationContext {
   sessionId: string;
   activeSymbols: string[];
-  artifacts: Array<{
-    id: string;
-    type: string;
-    digest: string;
-  }>;
+  artifacts: ConversationArtifactReference[];
+  summary?: ConversationSummary;
 }
 
 export interface ChatClientCapabilities {
@@ -45,12 +93,58 @@ export type ConversationSessionEvent =
       at: string;
     }
   | {
+      type: "tool_call";
+      callId: string;
+      capability: string;
+      args: unknown;
+      at: string;
+    }
+  | {
+      type: "tool_result";
+      callId: string;
+      digest: string;
+      artifactId?: string;
+      at: string;
+    }
+  | {
       type: "usage";
       requestId: string;
       model?: string;
       usage: TokenUsage;
       at: string;
+    }
+  | {
+      type: "summary";
+      summary: ConversationSummary;
+      throughEvent: number;
+      at: string;
     };
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(item => typeof item === "string");
+}
+
+export function isConversationSummary(value: unknown): value is ConversationSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const summary = value as Record<string, unknown>;
+  if (summary.goal !== undefined && typeof summary.goal !== "string") return false;
+  if (!isStringArray(summary.activeSymbols)
+    || !isStringArray(summary.conclusions)
+    || !isStringArray(summary.risks)
+    || !isStringArray(summary.assumptions)
+    || !isStringArray(summary.unresolvedQuestions)
+    || !isStringArray(summary.artifactIds)
+    || !Array.isArray(summary.facts)) {
+    return false;
+  }
+  return summary.facts.every((fact) => {
+    if (!fact || typeof fact !== "object" || Array.isArray(fact)) return false;
+    const item = fact as Record<string, unknown>;
+    return typeof item.text === "string"
+      && (item.asOf === undefined || typeof item.asOf === "string")
+      && (item.source === undefined || typeof item.source === "string");
+  });
+}
 
 export function emptyTokenUsage(): TokenUsage {
   return {

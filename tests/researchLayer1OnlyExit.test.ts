@@ -111,12 +111,26 @@ describe("researchCommand layer1-only", () => {
 
     const { researchCommand } = await import("../src/commands/research.js");
 
-    await expect(Promise.race([
+    const result = await Promise.race([
       researchCommand("AAPL", { mode: "layer1-only", full: true }),
       new Promise((_, reject) => setTimeout(() => reject(new Error("researchCommand timed out")), 200)),
-    ])).resolves.toBeUndefined();
+    ]);
 
     expect(generatorClosed).toBe(true);
+    expect(result).toMatchObject({
+      json: {
+        symbol: "AAPL",
+        layer1: {
+          reports: [expect.objectContaining({ agent: "tony" })],
+        },
+      },
+      artifact: {
+        type: "full_report",
+        symbol: "AAPL",
+        digest: expect.stringContaining("AAPL"),
+        payload: expect.objectContaining({ symbol: "AAPL" }),
+      },
+    });
   });
 
   it("在 layer1-only --full 时输出报告结构化章节", async () => {

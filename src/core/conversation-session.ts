@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   renameSync,
   unlinkSync,
   writeFileSync,
@@ -16,8 +17,12 @@ import {
   addTokenUsage,
   emptyTokenUsage,
   type ChatUsageEvent,
+  type ConversationArtifact,
+  type ConversationArtifactDraft,
   type ConversationSessionEvent,
+  type ConversationSummary,
   type SessionIndexEntry,
+  isConversationSummary,
 } from "./conversation-types.js";
 
 interface SessionIndexFile {
@@ -34,7 +39,10 @@ export interface ConversationSessionSnapshot {
   entry: SessionIndexEntry;
   events: ConversationSessionEvent[];
   messages: ChatMessage[];
+  contextMessages: ChatMessage[];
+  artifacts: ConversationArtifact[];
   lastUsage?: ChatUsageEvent;
+  lastSummary?: ConversationSummary;
 }
 
 export interface SessionCleanupResult {
@@ -43,6 +51,13 @@ export interface SessionCleanupResult {
 
 const DEFAULT_SESSION_TITLE = "新会话";
 const SESSION_ID_PATTERN = /^session_[a-z0-9-]+$/;
+const ARTIFACT_ID_PATTERN = /^artifact_[a-z0-9-]+$/;
+const ARTIFACT_TYPES = new Set([
+  "quick_scan",
+  "full_report",
+  "deep_report",
+  "poly_result",
+]);
 
 function cloneEntry(entry: SessionIndexEntry): SessionIndexEntry {
   return {
@@ -100,11 +115,60 @@ function isSessionEvent(value: unknown): value is ConversationSessionEvent {
       && isTokenUsage(event.usage)
       && typeof event.at === "string";
   }
+  if (event.type === "tool_call") {
+    return typeof event.callId === "string"
+      && typeof event.capability === "string"
+      && typeof event.at === "string";
+  }
+  if (event.type === "tool_result") {
+    return typeof event.callId === "string"
+      && typeof event.digest === "string"
+      && (event.artifactId === undefined || typeof event.artifactId === "string")
+      && typeof event.at === "string";
+  }
+  if (event.type === "summary") {
+    return isConversationSummary(event.summary)
+      && Number.isInteger(event.throughEvent)
+      && (event.throughEvent as number) >= 0
+      && typeof event.at === "string";
+  }
   return false;
+}
+
+function isConversationArtifact(value: unknown): value is ConversationArtifact {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const artifact = value as Record<string, unknown>;
+  return typeof artifact.id === "string"
+    && ARTIFACT_ID_PATTERN.test(artifact.id)
+    && typeof artifact.sessionId === "string"
+    && SESSION_ID_PATTERN.test(artifact.sessionId)
+    && typeof artifact.type === "string"
+    && ARTIFACT_TYPES.has(artifact.type)
+    && (artifact.symbol === undefined || typeof artifact.symbol === "string")
+    && typeof artifact.createdAt === "string"
+    && (artifact.dataAsOf === undefined || typeof artifact.dataAsOf === "string")
+    && typeof artifact.digest === "string"
+    && Object.prototype.hasOwnProperty.call(artifact, "payload");
+}
+
+function sanitizeJsonValue(value: unknown): unknown {
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(value, (_key, item) =>
+      typeof item === "string" ? sanitizeConversationContent(item) : item
+    );
+  } catch (err) {
+    throw new Error(`Artifact payload 无法序列化: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (serialized === undefined) {
+    throw new Error("Artifact payload 必须是可序列化的 JSON 值");
+  }
+  return JSON.parse(serialized);
 }
 
 export class ConversationSessionStore {
   private readonly indexPath: string;
+  private readonly artifactsDir: string;
   private readonly now: () => Date;
   private readonly onWarning: (message: string) => void;
 
@@ -113,6 +177,7 @@ export class ConversationSessionStore {
     options: ConversationSessionStoreOptions = {},
   ) {
     this.indexPath = join(sessionsDir, "index.json");
+    this.artifactsDir = join(sessionsDir, "artifacts");
     this.now = options.now ?? (() => new Date());
     this.onWarning = options.onWarning ?? (() => undefined);
   }
@@ -225,6 +290,102 @@ export class ConversationSessionStore {
     });
   }
 
+  appendToolCall(sessionId: string, capability: string, args: unknown): string {
+    const callId = `call_${randomUUID().slice(0, 12)}`;
+    const event: ConversationSessionEvent = {
+      type: "tool_call",
+      callId,
+      capability,
+      args: sanitizeJsonValue(args),
+      at: this.now().toISOString(),
+    };
+    this.appendEvent(sessionId, event, () => undefined);
+    return callId;
+  }
+
+  appendToolResult(
+    sessionId: string,
+    callId: string,
+    digest: string,
+    artifactId?: string,
+  ): void {
+    const event: ConversationSessionEvent = {
+      type: "tool_result",
+      callId,
+      digest: sanitizeConversationContent(digest),
+      ...(artifactId ? { artifactId } : {}),
+      at: this.now().toISOString(),
+    };
+    this.appendEvent(sessionId, event, () => undefined);
+  }
+
+  appendSummary(
+    sessionId: string,
+    summary: ConversationSummary,
+    throughEvent: number,
+  ): void {
+    if (!isConversationSummary(summary)) throw new Error("结构化摘要格式无效");
+    if (!Number.isInteger(throughEvent) || throughEvent < 0) {
+      throw new Error("summary boundary 必须是非负整数");
+    }
+    const event: ConversationSessionEvent = {
+      type: "summary",
+      summary: sanitizeJsonValue(summary) as ConversationSummary,
+      throughEvent,
+      at: this.now().toISOString(),
+    };
+    this.appendEvent(sessionId, event, () => undefined);
+  }
+
+  createArtifact(
+    sessionId: string,
+    draft: ConversationArtifactDraft,
+  ): ConversationArtifact {
+    this.getEntry(sessionId);
+    this.ensureArtifactsDir();
+    let id = "";
+    do {
+      id = `artifact_${randomUUID().slice(0, 12)}`;
+    } while (existsSync(this.artifactPath(id)));
+
+    const artifact: ConversationArtifact = {
+      id,
+      sessionId,
+      type: draft.type,
+      ...(draft.symbol ? { symbol: draft.symbol.trim().toUpperCase() } : {}),
+      createdAt: this.now().toISOString(),
+      ...(draft.dataAsOf ? { dataAsOf: draft.dataAsOf } : {}),
+      digest: sanitizeConversationContent(draft.digest),
+      payload: sanitizeJsonValue(draft.payload),
+    };
+    if (!isConversationArtifact(artifact)) throw new Error("Artifact 格式无效");
+
+    const path = this.artifactPath(id);
+    const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
+    writeFileSync(tempPath, `${JSON.stringify(artifact, null, 2)}\n`, {
+      encoding: "utf-8",
+      mode: 0o600,
+    });
+    this.tightenFilePermissions(tempPath);
+    renameSync(tempPath, path);
+    this.tightenFilePermissions(path);
+    return artifact;
+  }
+
+  readArtifact(artifactId: string): ConversationArtifact {
+    const path = this.artifactPath(artifactId);
+    if (!existsSync(path)) throw new Error(`找不到 Artifact: ${artifactId}`);
+    try {
+      const artifact = JSON.parse(readFileSync(path, "utf-8"));
+      if (!isConversationArtifact(artifact)) throw new Error("Artifact 格式无效");
+      return artifact;
+    } catch (err) {
+      throw new Error(
+        `无法读取 Artifact ${artifactId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   addActiveSymbol(sessionId: string, symbol: string): void {
     const normalized = symbol.trim().toUpperCase();
     if (!normalized) return;
@@ -244,6 +405,36 @@ export class ConversationSessionStore {
         event.type === "message"
       )
       .map(event => ({ role: event.role, content: event.content }));
+    const lastSummaryEvent = [...events]
+      .reverse()
+      .find((event): event is Extract<ConversationSessionEvent, { type: "summary" }> =>
+        event.type === "summary"
+      );
+    const contextEvents = lastSummaryEvent
+      ? events.slice(Math.min(lastSummaryEvent.throughEvent, events.length))
+      : events;
+    const contextMessages = contextEvents
+      .filter((event): event is Extract<ConversationSessionEvent, { type: "message" }> =>
+        event.type === "message"
+      )
+      .map(event => ({ role: event.role, content: event.content }));
+    const artifactIds = events
+      .filter((event): event is Extract<ConversationSessionEvent, { type: "tool_result" }> =>
+        event.type === "tool_result" && typeof event.artifactId === "string"
+      )
+      .map(event => event.artifactId as string);
+    const artifacts = [...new Set(artifactIds)]
+      .map((artifactId) => {
+        try {
+          return this.readArtifact(artifactId);
+        } catch (err) {
+          this.onWarning(err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      })
+      .filter((artifact): artifact is ConversationArtifact =>
+        artifact !== null && artifact.sessionId === sessionId
+      );
     const lastUsageEvent = [...events]
       .reverse()
       .find((event): event is Extract<ConversationSessionEvent, { type: "usage" }> =>
@@ -261,7 +452,10 @@ export class ConversationSessionStore {
       entry,
       events,
       messages,
+      contextMessages,
+      artifacts,
       ...(lastUsage ? { lastUsage } : {}),
+      ...(lastSummaryEvent ? { lastSummary: lastSummaryEvent.summary } : {}),
     };
   }
 
@@ -281,9 +475,17 @@ export class ConversationSessionStore {
       const path = this.transcriptPath(session.id);
       if (existsSync(path)) unlinkSync(path);
     }
+    const expiredIds = new Set(expired.map(session => session.id));
+    if (expiredIds.size) {
+      for (const artifact of this.listArtifacts()) {
+        if (expiredIds.has(artifact.sessionId)) {
+          const path = this.artifactPath(artifact.id);
+          if (existsSync(path)) unlinkSync(path);
+        }
+      }
+    }
 
     if (expired.length) {
-      const expiredIds = new Set(expired.map(session => session.id));
       index.sessions = index.sessions.filter(session => !expiredIds.has(session.id));
       this.saveIndex(index);
     }
@@ -351,11 +553,41 @@ export class ConversationSessionStore {
     return join(this.sessionsDir, `${sessionId}.jsonl`);
   }
 
+  private artifactPath(artifactId: string): string {
+    if (!ARTIFACT_ID_PATTERN.test(artifactId)) {
+      throw new Error(`非法 Artifact ID: ${artifactId}`);
+    }
+    return join(this.artifactsDir, `${artifactId}.json`);
+  }
+
   private ensureSessionsDir(): void {
     if (!existsSync(this.sessionsDir)) {
       mkdirSync(this.sessionsDir, { recursive: true, mode: 0o700 });
     }
     try { chmodSync(this.sessionsDir, 0o700); } catch { /* 部分平台不支持 chmod */ }
+  }
+
+  private ensureArtifactsDir(): void {
+    this.ensureSessionsDir();
+    if (!existsSync(this.artifactsDir)) {
+      mkdirSync(this.artifactsDir, { recursive: true, mode: 0o700 });
+    }
+    try { chmodSync(this.artifactsDir, 0o700); } catch { /* 部分平台不支持 chmod */ }
+  }
+
+  private listArtifacts(): ConversationArtifact[] {
+    if (!existsSync(this.artifactsDir)) return [];
+    const artifacts: ConversationArtifact[] = [];
+    for (const file of readdirSync(this.artifactsDir)) {
+      const match = /^(artifact_[a-z0-9-]+)\.json$/.exec(file);
+      if (!match) continue;
+      try {
+        artifacts.push(this.readArtifact(match[1]));
+      } catch (err) {
+        this.onWarning(err instanceof Error ? err.message : String(err));
+      }
+    }
+    return artifacts;
   }
 
   private tightenFilePermissions(path: string): void {

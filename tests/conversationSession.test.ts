@@ -113,6 +113,12 @@ describe("ConversationSessionStore", () => {
     const store = createStore({ now: () => now });
     store.initialize(30);
     const expired = store.createSession("旧会话");
+    const expiredArtifact = store.createArtifact(expired.id, {
+      type: "quick_scan",
+      symbol: "NVDA",
+      digest: "NVDA 快速扫描摘要",
+      payload: { price: 180 },
+    });
 
     now = new Date("2026-02-15T00:00:00.000Z");
     const active = store.createSession("新会话");
@@ -121,6 +127,9 @@ describe("ConversationSessionStore", () => {
     expect(result.removedSessionIds).toEqual([expired.id]);
     expect(store.listSessions().map(session => session.id)).toEqual([active.id]);
     expect(existsSync(join(testDir as string, `${expired.id}.jsonl`))).toBe(false);
+    expect(existsSync(
+      join(testDir as string, "artifacts", `${expiredArtifact.id}.json`),
+    )).toBe(false);
   });
 
   it("无参数场景可按更新时间列出会话", () => {
@@ -153,5 +162,42 @@ describe("ConversationSessionStore", () => {
     expect(rawTranscript).not.toContain(secret);
     expect(rawTranscript).not.toContain("super-secret");
     expect(store.readSession(session.id).messages[0].content).toContain("[REDACTED]");
+  });
+
+  it("Artifact 使用 0600 原子落盘，并通过 tool_result 关联 Session", () => {
+    const store = createStore();
+    store.initialize(30);
+    const session = store.createSession("Artifact");
+    const callId = store.appendToolCall(session.id, "quick", { symbol: "NVDA" });
+    const artifact = store.createArtifact(session.id, {
+      type: "quick_scan",
+      symbol: "NVDA",
+      dataAsOf: "2026-07-24",
+      digest: "NVDA 当前 180 美元，主要风险是估值偏高",
+      payload: {
+        symbol: "NVDA",
+        scan: { price: 180 },
+        authorization: "Authorization: Bearer secret-token",
+      },
+    });
+    store.appendToolResult(session.id, callId, artifact.digest, artifact.id);
+
+    const artifactPath = join(
+      testDir as string,
+      "artifacts",
+      `${artifact.id}.json`,
+    );
+    expect(mode(join(testDir as string, "artifacts"))).toBe(0o700);
+    expect(mode(artifactPath)).toBe(0o600);
+    expect(store.readArtifact(artifact.id)).toEqual(artifact);
+    expect(JSON.stringify(artifact.payload)).not.toContain("secret-token");
+    expect(() => store.readArtifact("../index")).toThrow("非法 Artifact ID");
+
+    const snapshot = store.readSession(session.id);
+    expect(snapshot.artifacts).toEqual([artifact]);
+    expect(snapshot.events.slice(-2).map(event => event.type)).toEqual([
+      "tool_call",
+      "tool_result",
+    ]);
   });
 });

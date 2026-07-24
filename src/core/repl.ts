@@ -31,6 +31,8 @@ import {
   parseReplInput,
   suggestSlashCommands,
 } from "./slash.js";
+import { requestConversationSummary } from "./conversation-compact.js";
+import type { CapabilityExecutionResult } from "./conversation-types.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "arti");
 const HISTORY_FILE = join(CONFIG_DIR, "repl_history");
@@ -44,7 +46,7 @@ interface ReplCommand {
   description: string;
   usage: string;
   category?: string;
-  handler: (args: string[]) => Promise<void>;
+  handler: (args: string[]) => Promise<CapabilityExecutionResult | void>;
 }
 
 const commands: ReplCommand[] = [];
@@ -169,6 +171,7 @@ const LOCAL_SLASH_COMMANDS: SlashHelpCommand[] = [
   { name: "help", description: "查看快捷命令", usage: "/help [command]", category: "session" },
   { name: "status", description: "查看当前会话和上下文状态", usage: "/status", category: "session" },
   { name: "usage", description: "查看当前轮和累计 Token usage", usage: "/usage", category: "session" },
+  { name: "compact", description: "压缩活跃上下文并保留原始会话", usage: "/compact [focus...]", category: "session" },
   { name: "new", description: "新建会话", usage: "/new [title...]", category: "session" },
   { name: "resume", description: "列出或恢复历史会话", usage: "/resume [session]", category: "session" },
   { name: "clear", description: "保存当前会话并开始新会话", usage: "/clear", category: "session" },
@@ -508,6 +511,23 @@ export async function startRepl(): Promise<void> {
       return false;
     }
 
+    if (name === "compact") {
+      try {
+        const result = await conversation.compact(
+          args.length ? args.join(" ") : undefined,
+          requestConversationSummary,
+        );
+        console.log(chalk.gray(
+          `  已压缩 ${result.compactedMessages} 条活跃消息，原始 transcript 保持不变`,
+        ));
+      } catch (err) {
+        console.error(chalk.red(
+          `  压缩失败: ${err instanceof Error ? err.message : String(err)}`,
+        ));
+      }
+      return false;
+    }
+
     if (name === "resume") {
       if (args.length > 1) {
         console.error(chalk.red("  用法: /resume [session]"));
@@ -557,9 +577,13 @@ export async function startRepl(): Promise<void> {
     }
 
     try {
-      await cmd.handler(args);
-      if (["quick", "full", "deep"].includes(name) && args[0]) {
-        conversation.trackSymbol(args[0]);
+      const writesArtifact = ["quick", "full", "deep", "poly"].includes(name);
+      const callId = writesArtifact
+        ? conversation.beginToolCall(name, { args })
+        : undefined;
+      const result = await cmd.handler(args);
+      if (callId && result?.artifact) {
+        conversation.completeToolCall(callId, result.artifact);
       }
     } catch (err) {
       console.error(chalk.red(`  命令执行失败: ${err instanceof Error ? err.message : String(err)}`));

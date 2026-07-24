@@ -86,7 +86,7 @@ CLI 负责：
 
 - 展示最近一次和会话累计 usage。
 - 达到软阈值时提示 `/compact`。
-- 根据服务端信号触发自动 compact，且在 `/status` 中可见。
+- 第一版只响应用户显式 `/compact`，不根据服务端信号自动执行。
 - 保留原始 transcript；compact 只改变活跃 context pack。
 
 初始建议：
@@ -118,6 +118,8 @@ interface ConversationArtifact {
 2. 终端继续按现有方式渲染。
 3. transcript 只追加 `tool_result.digest + artifactId`。
 4. 后续问题需要细节时按需读取 Artifact。
+
+第一版仅为交互终端内显式 Slash 能力创建 Artifact；外层 `arti <command> --json` 不创建本地会话文件。Artifact 只允许由所属 Session 引用，并随该 Session 使用相同的保留期清理。
 
 ## 统一能力执行器
 

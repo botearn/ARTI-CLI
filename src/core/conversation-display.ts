@@ -34,6 +34,7 @@ export function formatSessionStatus(snapshot: ConversationSessionSnapshot): stri
     `模型: ${entry.lastModel ?? "未知"}`,
     `上下文: ${context}`,
     `活动标的: ${entry.activeSymbols.length ? entry.activeSymbols.join("、") : "无"}`,
+    `Artifacts: ${snapshot.artifacts.length}`,
   ];
 }
 
