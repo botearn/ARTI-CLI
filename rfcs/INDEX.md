@@ -6,6 +6,7 @@
 
 | RFC | 标题 | 创建日期 |
 |---|---|---|
+| [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) | 对话优先 CLI、Slash Command 与 Token 感知会话 | 2026-07-24 |
 | [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) | 新用户上手 — 一行安装 + REPL 登录态 Onboarding | 2026-06-01 |
 | [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) | CLI 数据链收敛到生产产品函数，下线 OpenBB 第二套处理 | 2026-06-24 |
 | [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) | ARTi Poly CLI 集成 — `arti poly` 子命令接入 ARTi-poly 公开 API | 2026-07-08 |
@@ -57,7 +58,7 @@
 
 ### 🏗️ 架构 & 基础设施
 
-- *待添加*
+- [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 对话优先 CLI、Slash Command 与 Token 感知会话
 
 ### 💰 计费 & Credits
 
@@ -72,10 +73,11 @@
 ### 🔧 CLI 命令
 
 - [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成（`arti poly` 子命令组）
+- [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 会话内 Slash Command 与外层自动化接口分层
 
 ### 🤖 AI & Research
 
-- *待添加*
+- [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - Token 感知会话、Artifact 与对话工具调用
 
 ### 🔌 MCP Server
 
@@ -84,6 +86,7 @@
 ### 📱 用户体验
 
 - [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) - 新用户上手（一行安装 + REPL onboarding）
+- [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 对话优先 REPL、Slash、Session 与 Compact
 
 ### 🔐 安全 & 认证
 
@@ -95,6 +98,7 @@
 
 ### 2026
 
+- **2026-07-24** - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 对话优先 CLI、Slash Command 与 Token 感知会话 (Draft)
 - **2026-07-23** - [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) - CLI 加固与审计缺陷修复计划 (Draft, 取代 BACKLOG.md)
 - **2026-07-14** - [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) - chat / quick-scan 切换 Edge /v1 (Draft, arti#0055 姊妹篇)
 - **2026-07-08** - [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成 (Draft)
@@ -112,13 +116,13 @@
 
 | 状态 | 数量 |
 |---|---|
-| Draft | 6 |
+| Draft | 7 |
 | Proposed | 0 |
 | Accepted | 0 |
 | Implementing | 0 |
 | Implemented | 1 |
 | Rejected | 0 |
 | Deprecated | 0 |
-| **总计** | **7** |
+| **总计** | **8** |
 
-**最后更新**: 2026-07-23
+**最后更新**: 2026-07-24
