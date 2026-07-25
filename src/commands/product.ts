@@ -17,14 +17,15 @@ import { printError } from "../errors.js";
 import type { CapabilityExecutionResult } from "../core/conversation-types.js";
 
 function buildQuickScanDigest(symbol: string, scan: BackendStockData): string {
+  const dataAsOf = scan.quote_as_of ?? scan.data_as_of;
   const parts = [
     `${symbol} 快速扫描`,
     Number.isFinite(scan.price) ? `价格 ${scan.price}` : "",
     Number.isFinite(scan.pct) ? `涨跌 ${scan.pct}%` : "",
     scan.overall_signal ? `综合研判 ${scan.overall_signal}` : "",
-    scan.tech?.support != null ? `支撑 ${scan.tech.support}` : "",
-    scan.tech?.resist != null ? `压力 ${scan.tech.resist}` : "",
-    scan.data_as_of ? `数据截至 ${scan.data_as_of}` : "",
+    (scan.tech?.support ?? scan.support) != null ? `支撑 ${scan.tech?.support ?? scan.support}` : "",
+    (scan.tech?.resist ?? scan.resist) != null ? `压力 ${scan.tech?.resist ?? scan.resist}` : "",
+    dataAsOf ? `数据截至 ${dataAsOf}` : "",
   ].filter(Boolean);
   return parts.join("；");
 }
@@ -59,6 +60,7 @@ export async function quickScanCommand(
 
   if (!scan) return;
 
+  const dataAsOf = scan.quote_as_of ?? scan.data_as_of;
   output({ symbol, scan }, () => {
     renderQuickScan(symbol, scan);
   });
@@ -68,7 +70,7 @@ export async function quickScanCommand(
     artifact: {
       type: "quick_scan",
       symbol,
-      ...(scan.data_as_of ? { dataAsOf: scan.data_as_of } : {}),
+      ...(dataAsOf ? { dataAsOf } : {}),
       digest: buildQuickScanDigest(symbol, scan),
       payload: json,
     },
@@ -170,7 +172,50 @@ function renderQuickScan(symbol: string, d: BackendStockData): void {
     }
   }
 
-  if (d.data_as_of) console.log(chalk.gray(`\n  数据截至 ${d.data_as_of}${d.market_status ? ` · ${d.market_status}` : ""}`));
+  const diagnosis = d.diagnosis;
+  const hasAnalysis = Boolean(
+    diagnosis && (
+      diagnosis.company || diagnosis.natasha || diagnosis.tony || diagnosis.steve
+      || diagnosis.master_view || diagnosis.verdict || diagnosis.risk
+    ),
+  );
+  if (hasAnalysis && diagnosis) {
+    console.log(chalk.bold.cyan("\n  【分析判断】"));
+    if (diagnosis.company) console.log(kvLine("    公司速写", diagnosis.company, 18));
+    if (diagnosis.natasha) {
+      const score = diagnosis.natasha_score != null ? `（${diagnosis.natasha_score}/10）` : "";
+      console.log(kvLine("    宏观环境", `${diagnosis.natasha}${score}`, 18));
+    }
+    if (diagnosis.tony) console.log(kvLine("    技术判断", diagnosis.tony, 18));
+    const technicalPlan = [
+      diagnosis.tony_entry ? `入场 ${diagnosis.tony_entry}` : "",
+      diagnosis.tony_target ? `目标 ${diagnosis.tony_target}` : "",
+      diagnosis.tony_stop ? `止损 ${diagnosis.tony_stop}` : "",
+    ].filter(Boolean).join(" · ");
+    if (technicalPlan) console.log(kvLine("    技术区间", technicalPlan, 18));
+    if (diagnosis.steve) console.log(kvLine("    资金流", diagnosis.steve, 18));
+    if (diagnosis.master_view) {
+      const master = [diagnosis.master_name, diagnosis.master_role].filter(Boolean).join(" · ") || "大师点评";
+      console.log(kvLine(`    ${master}`, diagnosis.master_view, 18));
+    }
+  }
+
+  const verdictText = diagnosis?.verdict_tone || d.interpretation;
+  if (diagnosis?.verdict || verdictText || diagnosis?.risk) {
+    console.log(chalk.bold.cyan("\n  【综合结论】"));
+    if (diagnosis?.verdict) console.log(kvLine("    当前判断", chalk.bold(diagnosis.verdict), 18));
+    if (verdictText) console.log(kvLine("    判断依据", verdictText, 18));
+    if (diagnosis?.divergence) console.log(kvLine("    核心分歧", diagnosis.divergence, 18));
+    if (diagnosis?.trigger) console.log(kvLine("    观察条件", diagnosis.trigger, 18));
+    if (diagnosis?.risk) console.log(kvLine("    风险提示", chalk.yellow(diagnosis.risk), 18));
+  }
+
+  const dataAsOf = d.quote_as_of ?? d.data_as_of;
+  const sourceDetails = [d.data_source, d.quote_mode, d.market_status].filter(Boolean).join(" · ");
+  if (dataAsOf || sourceDetails) {
+    const timestamp = dataAsOf ? `数据截至 ${dataAsOf}` : "行情信息";
+    console.log(chalk.gray(`\n  ${timestamp}${sourceDetails ? ` · ${sourceDetails}` : ""}`));
+  }
   console.log();
 }
 
