@@ -8,15 +8,89 @@ interface ResearchGuideInput {
   conversation?: ConversationContext;
 }
 
+export interface ChatLoadingContext {
+  historyMessages: number;
+  hasSummary: boolean;
+  artifactCount: number;
+  activeSymbols: string[];
+}
+
+const CONTEXT_REVEAL_MS = 2_000;
+const PRINCIPLE_REVEAL_MS = 8_000;
+const PRINCIPLE_ROTATION_MS = 6_000;
+const CANCEL_HINT_MS = 20_000;
+
+const INVESTMENT_PRINCIPLES = [
+  "先定义风险，再讨论收益。",
+  "事实、推断和行动要分开。",
+  "仓位是对不确定性的回答。",
+  "没有失效条件的观点，无法被验证。",
+  "价格在变化，结论也应该允许更新。",
+  "真正的优势不是每次正确，而是错误时损失可控。",
+  "分歧不是噪声，而是需要解释的信息。",
+  "看不懂的时候，等待也是一种仓位。",
+] as const;
+
 function formatElapsed(elapsedMs: number): string {
   return `${(Math.max(0, elapsedMs) / 1000).toFixed(1)}s`;
 }
 
-export function buildChatLoadingText(elapsedMs: number): string {
-  if (elapsedMs >= 8_000) {
-    return `普通对话 · 已等待 ${Math.floor(elapsedMs / 1000)}s，可按 Ctrl+C 取消`;
+function formatLoadingContext(context: ChatLoadingContext): string {
+  const visibleSymbols = context.activeSymbols.slice(0, 3);
+  const symbolSummary = visibleSymbols.length
+    ? `${visibleSymbols.join("、")}${context.activeSymbols.length > visibleSymbols.length
+      ? ` 等 ${context.activeSymbols.length} 个`
+      : ""}`
+    : "";
+  const parts = [
+    "当前问题",
+    `历史 ${context.historyMessages}`,
+    ...(context.hasSummary ? ["摘要 1"] : []),
+    ...(context.artifactCount ? [`Artifact ${context.artifactCount} 个`] : []),
+    ...(symbolSummary ? [`标的 ${symbolSummary}`] : []),
+  ];
+  return `发送：${parts.join(" · ")}`;
+}
+
+function investmentPrincipleAt(elapsedMs: number): string {
+  const index = Math.floor(
+    Math.max(0, elapsedMs - PRINCIPLE_REVEAL_MS) / PRINCIPLE_ROTATION_MS,
+  ) % INVESTMENT_PRINCIPLES.length;
+  return INVESTMENT_PRINCIPLES[index];
+}
+
+export function buildChatLoadingLines(
+  elapsedMs: number,
+  context: ChatLoadingContext,
+): string[] {
+  if (elapsedMs < CONTEXT_REVEAL_MS) {
+    return [`普通对话 · 正在整理会话上下文… ${formatElapsed(elapsedMs)}`];
   }
-  return `普通对话 · 正在生成回答… ${formatElapsed(elapsedMs)}`;
+
+  const status = elapsedMs >= PRINCIPLE_REVEAL_MS
+    ? `普通对话 · 等待 ARTI 返回首个回答… ${formatElapsed(elapsedMs)}`
+    : `普通对话 · 正在连接 ARTI… ${formatElapsed(elapsedMs)}`;
+  const lines = [
+    elapsedMs >= CANCEL_HINT_MS ? `${status} · Ctrl+C 可取消` : status,
+    "本轮路径：普通对话 · general",
+    formatLoadingContext(context),
+  ];
+
+  if (elapsedMs >= PRINCIPLE_REVEAL_MS) {
+    lines.push(`投资原则：${investmentPrincipleAt(elapsedMs)}`);
+  }
+  return lines;
+}
+
+export function buildChatLoadingText(
+  elapsedMs: number,
+  context: ChatLoadingContext,
+): string {
+  return buildChatLoadingLines(elapsedMs, context).join("\n  ");
+}
+
+export function buildChatFailureText(elapsedMs: number): string {
+  return `普通对话未完成 · ${formatElapsed(elapsedMs)}`;
 }
 
 export function buildChatCompletionText(

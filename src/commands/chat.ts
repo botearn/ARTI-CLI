@@ -16,9 +16,11 @@ import type {
 } from "../core/conversation-types.js";
 import {
   buildChatCompletionText,
-  buildChatLoadingText,
+  buildChatFailureText,
+  buildChatLoadingLines,
   buildResearchGuideLines,
   shouldShowResearchGuide,
+  type ChatLoadingContext,
 } from "../core/chat-display.js";
 
 export interface ChatMessage {
@@ -45,14 +47,28 @@ function canRenderInteractiveStatus(jsonMode: boolean): boolean {
   return !jsonMode && Boolean(process.stdout.isTTY && process.stderr.isTTY);
 }
 
-function startChatLoading(startedAt: number): ActiveChatLoading {
+function renderChatLoadingText(
+  elapsedMs: number,
+  context: ChatLoadingContext,
+): string {
+  const [status, ...details] = buildChatLoadingLines(elapsedMs, context);
+  return [
+    status,
+    ...details.map(line => chalk.dim(line)),
+  ].join("\n  ");
+}
+
+function startChatLoading(
+  startedAt: number,
+  context: ChatLoadingContext,
+): ActiveChatLoading {
   const spinner = ora({
-    text: "普通对话 · 正在生成回答…",
+    text: renderChatLoadingText(0, context),
     indent: 2,
   }).start();
   let active = true;
   const timer = setInterval(() => {
-    spinner.text = buildChatLoadingText(Date.now() - startedAt);
+    spinner.text = renderChatLoadingText(Date.now() - startedAt, context);
   }, 1_000);
 
   const stop = () => {
@@ -66,10 +82,29 @@ function startChatLoading(startedAt: number): ActiveChatLoading {
     if (!active) return;
     active = false;
     clearInterval(timer);
-    spinner.fail("普通对话失败");
+    spinner.fail(buildChatFailureText(Date.now() - startedAt));
   };
 
   return { stop, fail };
+}
+
+function buildLoadingContext(options?: ChatRuntimeOptions): ChatLoadingContext {
+  return {
+    historyMessages: options?.history?.length ?? 0,
+    hasSummary: Boolean(options?.conversation?.summary),
+    artifactCount: options?.conversation?.artifacts.length ?? 0,
+    activeSymbols: [...(options?.conversation?.activeSymbols ?? [])],
+  };
+}
+
+function printStoredQuestionHint(
+  interactive: boolean,
+  options?: ChatRuntimeOptions,
+): void {
+  if (!interactive || !options?.conversation) return;
+  console.log(chalk.gray(
+    "  本轮问题已保存在当前 Session，但没有收到回答；处理后请重新发送。",
+  ));
 }
 
 function printResearchGuide(): void {
@@ -101,7 +136,9 @@ export async function rawChatCommand(
   const jsonMode = isJsonMode();
   const startedAt = Date.now();
   const interactive = canRenderInteractiveStatus(jsonMode);
-  const loading = interactive ? startChatLoading(startedAt) : undefined;
+  const loading = interactive
+    ? startChatLoading(startedAt, buildLoadingContext(options))
+    : undefined;
   let bodyStarted = false;
   let lastUsage: ChatUsageEvent | undefined;
   try {
@@ -153,9 +190,11 @@ export async function rawChatCommand(
     process.exitCode = 1;
     if (err instanceof InsufficientCreditsError) {
       console.log(chalk.red(`\n  ✗ ${err.message}\n`));
+      printStoredQuestionHint(interactive, options);
       return;
     }
     printError(err);
+    printStoredQuestionHint(interactive, options);
   }
 }
 
