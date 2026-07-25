@@ -1,16 +1,88 @@
-name: Notify Feishu on Push
+name: 飞书 PR 通知
 
+# 对齐主 arti 仓库：新建/重开 PR 时提醒，只有真正合并时才发送合并通知。
+# 不监听 synchronize，避免每次 push 都在群里刷屏。
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    types: [opened, reopened, closed]
+
+permissions:
+  contents: read
 
 jobs:
   notify:
+    if: github.event.action != 'closed' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Send Feishu notification
+      - name: 发送飞书通知
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_GIT_WEBHOOK_URL }}
+          EVENT_ACTION: ${{ github.event.action }}
+          REPOSITORY: ${{ github.repository }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
+          PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
+          MERGED_AT: ${{ github.event.pull_request.merged_at }}
         run: |
-          curl -s -X POST "https://open.feishu.cn/open-apis/bot/v2/hook/b6a871a8-0488-4e11-8519-743ae458a452" \
+          if [ -z "$FEISHU_WEBHOOK_URL" ]; then
+            echo "::warning::FEISHU_GIT_WEBHOOK_URL 未配置，跳过飞书通知"
+            exit 0
+          fi
+
+          if [ "$EVENT_ACTION" = "closed" ]; then
+            HEADER="📦 🎉 ARTI-CLI · PR #${PR_NUMBER} 已合并"
+            TEMPLATE="green"
+            OPERATOR="${MERGED_BY:-$PR_AUTHOR}"
+            EVENT_TIME=$(TZ=Asia/Shanghai date -d "$MERGED_AT" '+%Y/%m/%d %H:%M:%S')
+            DETAILS=$(printf '**标题**: %s\n**合并人**: %s\n\n**目标分支**: %s\n**来源分支**: %s\n\n**时间**: %s\n**仓库**: %s' \
+              "$PR_TITLE" "$OPERATOR" "$BASE_BRANCH" "$HEAD_BRANCH" "$EVENT_TIME" "$REPOSITORY")
+          else
+            HEADER="📦 ARTI-CLI · 新 PR #${PR_NUMBER}"
+            TEMPLATE="blue"
+            EVENT_TIME=$(TZ=Asia/Shanghai date -d "$PR_CREATED_AT" '+%Y/%m/%d %H:%M:%S')
+            DETAILS=$(printf '**标题**: %s\n**发起人**: %s\n\n**目标分支**: %s\n**来源分支**: %s\n\n**时间**: %s\n**仓库**: %s' \
+              "$PR_TITLE" "$PR_AUTHOR" "$BASE_BRANCH" "$HEAD_BRANCH" "$EVENT_TIME" "$REPOSITORY")
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg header "$HEADER" \
+            --arg template "$TEMPLATE" \
+            --arg details "$DETAILS" \
+            --arg url "$PR_URL" \
+            '{
+              msg_type: "interactive",
+              card: {
+                header: {
+                  title: { tag: "plain_text", content: $header },
+                  template: $template
+                },
+                elements: [
+                  { tag: "div", text: { tag: "lark_md", content: $details } },
+                  {
+                    tag: "action",
+                    actions: [{
+                      tag: "button",
+                      text: { tag: "plain_text", content: "查看 PR" },
+                      type: "primary",
+                      url: $url
+                    }]
+                  }
+                ]
+              }
+            }')
+
+          RESPONSE=$(curl --silent --show-error --fail-with-body \
+            -X POST "$FEISHU_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"msg_type\":\"text\",\"content\":{\"text\":\"📦 ARTI-CLI 新提交\n分支：${{ github.ref_name }}\n提交者：${{ github.actor }}\n消息：${{ github.event.head_commit.message }}\nhttps://github.com/${{ github.repository }}/commit/${{ github.sha }}\"}}"
+            -d "$PAYLOAD")
+          CODE=$(echo "$RESPONSE" | jq -r '.code // .StatusCode // 0')
+          if [ "$CODE" != "0" ]; then
+            echo "飞书通知失败: $RESPONSE"
+            exit 1
+          fi
+          echo "飞书通知发送成功"
