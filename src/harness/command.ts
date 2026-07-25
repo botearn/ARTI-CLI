@@ -22,6 +22,7 @@ export async function harnessCommand(
       symbol: value,
       reportType,
       idempotencyKey: String(options.idempotencyKey || randomUUID()),
+      deliveryMode: options.detach ? "poll" : "stream",
     });
     output(created, () => {
       console.log(chalk.cyan(`Run ${created.runId} queued for task ${created.taskId}`));

@@ -68,4 +68,31 @@ describe("Agent Harness streaming client", () => {
 
     await expect(collectSequences()).resolves.toEqual([1, 2, 5]);
   });
+
+  it("creates detached runs in poll delivery mode", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      runId,
+      taskId: "6d02a989-f2df-4457-8057-83595320dd9f",
+      status: "queued",
+      eventsUrl: null,
+      resultUrl: `/v1/agent-runs/${runId}/result`,
+      reused: false,
+    }), {
+      status: 202,
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { createAgentRun } = await import("../src/harness/client.js");
+
+    const created = await createAgentRun({
+      symbol: "AAPL",
+      reportType: "panorama",
+      idempotencyKey: "poll-key",
+      deliveryMode: "poll",
+    });
+
+    expect(created.eventsUrl).toBeNull();
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({ deliveryMode: "poll" });
+  });
 });

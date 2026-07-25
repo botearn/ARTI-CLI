@@ -50,6 +50,7 @@ export async function createAgentRun(input: {
   symbol: string;
   reportType: "panorama" | "deep";
   idempotencyKey: string;
+  deliveryMode?: "stream" | "poll";
 }): Promise<AgentRunCreateResponse> {
   const response = await request("/v1/agent-runs", {
     method: "POST",
@@ -57,6 +58,7 @@ export async function createAgentRun(input: {
     body: JSON.stringify({
       symbol: input.symbol,
       reportType: input.reportType,
+      deliveryMode: input.deliveryMode ?? "stream",
     }),
   });
   return await response.json() as AgentRunCreateResponse;
