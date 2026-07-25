@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-07-25
+
 ### ✨ Added
 
 - 普通对话新增流式终端排版：渲染 Markdown 层级与引用，将表格转换为纵向信息块，并把建议标签收敛成编号列表；Session、JSON 和非 TTY 输出继续保留原文
