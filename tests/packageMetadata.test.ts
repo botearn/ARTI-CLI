@@ -5,6 +5,15 @@ import { describe, expect, it } from "vitest";
 const root = join(__dirname, "..");
 
 describe("package and public documentation metadata", () => {
+  it("keeps package and lockfile versions aligned", () => {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
+    const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf-8"));
+
+    expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(lock.version).toBe(pkg.version);
+    expect(lock.packages[""].version).toBe(pkg.version);
+  });
+
   it("points npm metadata at the canonical ARTI-CLI repository", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
 

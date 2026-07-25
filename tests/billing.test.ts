@@ -5,6 +5,7 @@ import {
   assertWatchlistCapacity,
   creditDollarValue,
   formatPlanLimit,
+  getFeatureCost,
   type BillingState,
 } from "../src/billing.js";
 
@@ -52,5 +53,13 @@ describe("billing plan rules", () => {
     expect(formatPlanLimit(5, "支")).toBe("5支");
     expect(formatPlanLimit(null, "支")).toBe("无限支");
     expect(creditDollarValue(30)).toBeCloseTo(1.2, 6);
+  });
+
+  it("功能消耗只读取服务端 pricing，不在 CLI 内写死价格", () => {
+    const pricing = makeState("free").pricing;
+
+    expect(getFeatureCost("chat", pricing)).toBe(1);
+    expect(getFeatureCost("deepReport", pricing)).toBe(5);
+    expect(getFeatureCost("preBrief", [])).toBe(0);
   });
 });

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Command } from "commander";
 
 const registerCommand = vi.fn();
 
@@ -35,6 +36,31 @@ describe("统一命令注册表的 Slash 映射", () => {
     const registered = registerCommand.mock.calls[0][0];
     await registered.handler(["AAPL"]);
 
+    expect(invoke).toHaveBeenCalledWith({
+      positional: ["AAPL"],
+      options: {},
+    });
+  });
+
+  it("Commander 等待 invoke 完成并忽略只供 REPL 使用的返回值", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      json: { symbol: "AAPL" },
+    });
+    const { buildCli } = await import("../src/core/registry.js");
+    const program = new Command();
+
+    buildCli(program, [{
+      name: "quick-scan",
+      aliases: ["quick"],
+      description: "快速研判",
+      usage: "quick-scan <symbol>",
+      args: [{ spec: "<symbol>", desc: "股票代码" }],
+      options: [],
+      examples: [],
+      invoke,
+    }]);
+
+    await expect(program.parseAsync(["node", "arti", "quick-scan", "AAPL"])).resolves.toBe(program);
     expect(invoke).toHaveBeenCalledWith({
       positional: ["AAPL"],
       options: {},

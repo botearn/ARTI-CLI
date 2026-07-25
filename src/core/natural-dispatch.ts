@@ -2,7 +2,7 @@
  * 自然语言入口分发：复用产品意图识别，把自由文本派发到对应能力。
  */
 import chalk from "chalk";
-import { classifyIntent } from "../api.js";
+import { classifyIntent, type IntentResult } from "../api.js";
 import { quickScanCommand, fullReportCommand, deepReportCommand } from "../commands/product.js";
 
 export type NaturalDispatchResult =

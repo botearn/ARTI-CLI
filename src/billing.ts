@@ -103,6 +103,16 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   postRecap: "盘后复盘",
 };
 
+// 只用于把服务端 pricing 行展示为 CLI 功能消耗，不参与本地扣费。
+const FEATURE_PRICING_ACTIONS: Record<FeatureKey, CreditAction> = {
+  chat: "chat_general",
+  quickScan: "analysis_light",
+  panorama: "analysis_light",
+  deepReport: "debate_council",
+  preBrief: "report_stock",
+  postRecap: "report_stock",
+};
+
 const FEATURE_RECOMMENDED_PLAN: Record<FeatureKey, PlanId> = {
   chat: "basic",
   quickScan: "basic",
@@ -317,7 +327,7 @@ export function getBillingPath(): string {
 }
 
 export function getFeatureCost(feature: FeatureKey, pricing: CreditPricingRow[]): number {
-  const action = FEATURE_ACTIONS[feature];
+  const action = FEATURE_PRICING_ACTIONS[feature];
   const row = pricing.find((item) => item.action === action);
   if (!row) return 0;
   return Math.ceil(row.cost * (row.cost_multiplier ?? 1));
