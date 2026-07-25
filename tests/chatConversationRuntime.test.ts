@@ -74,7 +74,7 @@ describe("rawChatCommand conversation runtime", () => {
     expect(onUsage).toHaveBeenCalledWith(usage);
   });
 
-  it("TTY 下首个 Token 前显示状态，停止 Loading 后再输出正文和能力引导", async () => {
+  it("TTY 下首个 Token 前显示状态，且 Loading 不接管 REPL stdin", async () => {
     const events: string[] = [];
     const spinner = {
       text: "",
@@ -135,6 +135,7 @@ describe("rawChatCommand conversation runtime", () => {
 
       expect(ora).toHaveBeenCalled();
       expect(ora).toHaveBeenCalledWith(expect.objectContaining({
+        discardStdin: false,
         text: expect.stringContaining("正在整理会话上下文"),
       }));
       expect(spinner.start).toHaveBeenCalledTimes(1);

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✅ Fixed
+
+- 修复普通对话 Loading 停止时暂停 stdin，导致回答后 REPL 自动退出的问题
+
 ## [0.4.2] - 2026-07-25
 
 ### ✨ Added
