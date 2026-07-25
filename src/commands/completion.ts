@@ -12,7 +12,7 @@ import { execSync } from "node:child_process";
 const BASH_COMPLETION = `###-begin-arti-completions-###
 _arti_completions() {
   local cur="\${COMP_WORDS[COMP_CWORD]}"
-  local commands="chat c ask quick-scan quick qs full panorama fr deep dr credits config poly login logout whoami token doctor diag completion"
+  local commands="chat c ask quick-scan quick qs full panorama fr deep dr credits config poly harness login logout whoami token doctor diag completion"
   local config_subs="set get list reset"
   local poly_subs="events event summary compare search"
 

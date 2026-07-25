@@ -13,6 +13,7 @@ import { completionCommand, installCompletion } from "./commands/completion.js";
 import { creditsCommand } from "./commands/credits.js";
 import { loginCommand, logoutCommand, whoamiCommand, tokenCommand } from "./commands/auth.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { harnessCommand } from "./harness/command.js";
 import { polyCommand } from "./poly/commands.js";
 import { shutdownBackendMcp } from "./data/mcp-client.js";
 import chalk from "chalk";
@@ -250,6 +251,24 @@ const defs: CommandDef[] = [
       "$ arti poly search fed",
     ],
     invoke: ({ positional, options }) => polyCommand(positional, options),
+  },
+  {
+    name: "harness", aliases: [],
+    description: "可恢复的 Agent Harness 流式参考客户端（默认关闭）",
+    usage: "harness run|attach|status|result|cancel <symbol|run-id> [options]",
+    args: [{ spec: "[args...]", desc: "动作以及股票代码或 run ID" }],
+    options: [
+      { short: "", long: "--type", key: "type", type: "string", desc: "报告类型: panorama | deep", hint: "<type>", defaultValue: "panorama" },
+      { short: "", long: "--idempotency-key", key: "idempotencyKey", type: "string", desc: "创建请求幂等键", hint: "<key>" },
+      { short: "", long: "--after", key: "after", type: "string", desc: "从指定事件序号后恢复", hint: "<sequence>", defaultValue: "0" },
+      { short: "", long: "--detach", key: "detach", type: "boolean", desc: "创建后不连接事件流" },
+    ],
+    examples: [
+      "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness run AAPL --type deep",
+      "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness attach <run-id> --after 12",
+      "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness result <run-id>",
+    ],
+    invoke: ({ positional, options }) => harnessCommand(positional, options),
   },
   {
     name: "completion", aliases: [],
