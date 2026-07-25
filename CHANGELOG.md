@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-25
+
 ### ✨ Added
 
 - 普通对话新增分阶段多行 Loading：展示真实入口与 Session 上下文，长等待时轮换原创投资原则并提供取消提示；失败时明确说明问题已保存但未获得回答
