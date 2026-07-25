@@ -104,7 +104,7 @@ export function buildCli(program: Command, defs: CommandDef[]): void {
     cmd.showHelpAfterError(true);
 
     // Commander action → ParsedArgs → invoke
-    cmd.action((...cliArgs: any[]) => {
+    cmd.action(async (...cliArgs: any[]) => {
       cliArgs.pop(); // Command instance
       const opts = cliArgs.pop(); // Commander options object
       const positional: string[] = cliArgs.flat().filter((v: any) => v != null);
@@ -112,7 +112,7 @@ export function buildCli(program: Command, defs: CommandDef[]): void {
       for (const o of def.options) {
         options[o.key] = opts[o.key] ?? o.defaultValue;
       }
-      return def.invoke({ positional, options });
+      await def.invoke({ positional, options });
     });
   }
 }

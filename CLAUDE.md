@@ -10,7 +10,7 @@ CLI 是生产后端的**瘦客户端**：所有能力直接调用与 web 产品�
 
 - **主线分支为 `main`**（GitHub 默认分支）。旧的 `master` 已弃用，不再使用。
 - 从 `main` 切分支开发：新功能 `feat/<名>`、修复 `fix/<名>`；不直接在 `main` 上提交。
-- 当前版本 `0.4.0` = v1（RFC-2026-0003）：CLI 收敛为生产瘦客户端，下线 OpenBB 与 MCP Server，命令面收敛为四能力。详见 `CHANGELOG.md` 与 `rfcs/2026/RFC-2026-0003-cli-data-chain-converge.md`。
+- 当前版本 `0.4.1` = 对话优先 v1：保留生产瘦客户端边界，并新增 Slash Control Plane、本地 Session、Compact 与 Artifact。详见 `CHANGELOG.md`、RFC-2026-0003 与 RFC-2026-0008。
 
 ## 项目结构
 

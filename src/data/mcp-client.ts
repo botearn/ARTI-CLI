@@ -1,4 +1,5 @@
 import { loadConfig } from "../config.js";
+import { VERSION } from "../version.js";
 import type { HistoricalBar, QuoteData } from "./types.js";
 
 type McpCallResult = {
@@ -105,7 +106,7 @@ async function getClient(): Promise<McpClient> {
   const promise = (async () => {
     const { Client, StreamableHTTPClientTransport } = await loadSdk();
     const client = new Client(
-      { name: "artifin-cli", version: "0.4.0" },
+      { name: "artifin-cli", version: VERSION },
       { capabilities: {} },
     );
     const transport = new StreamableHTTPClientTransport(
