@@ -65,6 +65,7 @@ function startChatLoading(
   const spinner = ora({
     text: renderChatLoadingText(0, context),
     indent: 2,
+    discardStdin: false,
   }).start();
   let active = true;
   const timer = setInterval(() => {
