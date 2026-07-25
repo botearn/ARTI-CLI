@@ -1,18 +1,69 @@
 import { describe, expect, it } from "vitest";
 import {
   buildChatCompletionText,
+  buildChatFailureText,
+  buildChatLoadingLines,
   buildChatLoadingText,
   buildResearchGuideLines,
   shouldShowResearchGuide,
 } from "../src/core/chat-display.js";
 
 describe("普通对话 Loading 与能力引导", () => {
-  it("等待超过 8 秒后显示耗时和取消提示", () => {
-    expect(buildChatLoadingText(1_200)).toBe(
-      "普通对话 · 正在生成回答… 1.2s",
+  const context = {
+    historyMessages: 4,
+    hasSummary: true,
+    artifactCount: 2,
+    activeSymbols: ["NVDA"],
+  };
+
+  it("按等待时长展示真实阶段、上下文和取消提示", () => {
+    expect(buildChatLoadingText(1_200, context)).toBe(
+      "普通对话 · 正在整理会话上下文… 1.2s",
     );
-    expect(buildChatLoadingText(8_000)).toBe(
-      "普通对话 · 已等待 8s，可按 Ctrl+C 取消",
+
+    const connected = buildChatLoadingLines(2_000, context).join("\n");
+    expect(connected).toContain("正在连接 ARTI");
+    expect(connected).toContain("普通对话 · general");
+    expect(connected).toContain("发送：当前问题");
+    expect(connected).toContain("历史 4");
+    expect(connected).toContain("摘要 1");
+    expect(connected).toContain("Artifact 2 个");
+    expect(connected).toContain("标的 NVDA");
+    expect(connected).not.toContain("投资原则");
+    expect(connected).not.toContain("Ctrl+C");
+
+    const waiting = buildChatLoadingLines(8_000, context).join("\n");
+    expect(waiting).toContain("等待 ARTI 返回首个回答");
+    expect(waiting).toContain("投资原则：");
+    expect(waiting).not.toContain("Ctrl+C");
+
+    expect(buildChatLoadingLines(20_000, context).join("\n")).toContain(
+      "Ctrl+C 可取消",
+    );
+  });
+
+  it("上下文只展示前三个活动标的，避免窄终端换行残影", () => {
+    const text = buildChatLoadingLines(2_000, {
+      ...context,
+      activeSymbols: ["AAPL", "NVDA", "TSLA", "GOOGL"],
+    }).join("\n");
+
+    expect(text).toContain("标的 AAPL、NVDA、TSLA 等 4 个");
+    expect(text).not.toContain("GOOGL");
+  });
+
+  it("等待超过 8 秒后每 6 秒轮换原创投资原则", () => {
+    const first = buildChatLoadingLines(8_000, context).at(-1);
+    const second = buildChatLoadingLines(14_000, context).at(-1);
+
+    expect(first).toBe("投资原则：先定义风险，再讨论收益。");
+    expect(second).toBe("投资原则：事实、推断和行动要分开。");
+    expect(second).not.toBe(first);
+  });
+
+  it("失败信息包含已等待时间", () => {
+    expect(buildChatFailureText(4_240)).toBe(
+      "普通对话未完成 · 4.2s",
     );
   });
 

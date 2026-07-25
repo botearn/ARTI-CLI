@@ -134,6 +134,9 @@ describe("rawChatCommand conversation runtime", () => {
       });
 
       expect(ora).toHaveBeenCalled();
+      expect(ora).toHaveBeenCalledWith(expect.objectContaining({
+        text: expect.stringContaining("正在整理会话上下文"),
+      }));
       expect(spinner.start).toHaveBeenCalledTimes(1);
       expect(spinner.stop).toHaveBeenCalledTimes(1);
       expect(events.indexOf("stop")).toBeLessThan(events.indexOf("write:回答"));
@@ -144,6 +147,73 @@ describe("rawChatCommand conversation runtime", () => {
       expect(printed).toContain("/full <代码>");
       expect(printed).toContain("/deep <代码>");
     } finally {
+      delete (process.stdout as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+      delete (process.stderr as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+    }
+  });
+
+  it("TTY 请求失败时说明问题已保存但没有收到回答", async () => {
+    const spinner = {
+      text: "",
+      start: vi.fn(function (this: unknown) {
+        return this;
+      }),
+      stop: vi.fn(),
+      fail: vi.fn(),
+    };
+    const ora = vi.fn(() => spinner);
+    async function* fakeStream() {
+      throw new Error("登录已过期");
+    }
+    const streamChat = vi.fn(() => fakeStream());
+    const printError = vi.fn();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const previousExitCode = process.exitCode;
+
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+
+    vi.doMock("ora", () => ({ default: ora }));
+    vi.doMock("../src/api.js", () => ({ streamChat }));
+    vi.doMock("../src/output.js", () => ({
+      isJsonMode: () => false,
+      output: vi.fn(),
+    }));
+    vi.doMock("../src/billing.js", () => ({
+      InsufficientCreditsError: class extends Error {},
+    }));
+    vi.doMock("../src/errors.js", () => ({ printError }));
+    vi.doMock("../src/tracker.js", () => ({ track: vi.fn() }));
+    vi.doMock("../src/core/natural-dispatch.js", () => ({ dispatchNaturalText: vi.fn() }));
+
+    try {
+      const { rawChatCommand } = await import("../src/commands/chat.js");
+      await rawChatCommand("继续分析", {
+        history: [],
+        conversation: {
+          schemaVersion: 1,
+          mode: "client-managed",
+          sessionId: "session_12345678",
+          activeSymbols: [],
+          artifacts: [],
+        },
+      });
+
+      expect(spinner.fail).toHaveBeenCalledWith(
+        expect.stringContaining("普通对话未完成"),
+      );
+      expect(printError).toHaveBeenCalledWith(expect.any(Error));
+      expect(logSpy.mock.calls.map(call => String(call[0])).join("\n")).toContain(
+        "本轮问题已保存在当前 Session，但没有收到回答",
+      );
+    } finally {
+      process.exitCode = previousExitCode;
       delete (process.stdout as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
       delete (process.stderr as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
     }
