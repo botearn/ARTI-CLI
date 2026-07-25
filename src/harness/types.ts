@@ -28,7 +28,7 @@ export interface AgentRunCreateResponse {
   runId: string;
   taskId: string;
   status: string;
-  eventsUrl: string;
+  eventsUrl: string | null;
   resultUrl: string;
   reused: boolean;
 }
