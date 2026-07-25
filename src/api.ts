@@ -305,6 +305,30 @@ export async function* streamOrchestrator(
 
 // ── Edge: scan-stock ──
 
+export interface BackendStockDiagnosis {
+  company?: string;
+  natasha_score?: number;
+  natasha?: string;
+  tony?: string;
+  tony_entry?: string;
+  tony_target?: string;
+  tony_stop?: string;
+  steve?: string;
+  master_name?: string;
+  master_role?: string;
+  master_stance?: number | string;
+  master_view?: string;
+  verdict?: string;
+  verdict_position?: number | null;
+  verdict_emoji?: string;
+  verdict_tone?: string;
+  divergence?: string;
+  trigger?: string;
+  risk?: string;
+  decision_v2?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export interface BackendStockData {
   code: string;
   name: string | null;
@@ -322,14 +346,25 @@ export interface BackendStockData {
   bb_pos?: number | null;
   bb_up?: number | null;
   bb_dn?: number | null;
-  vol_ratio: number;
-  curr_vol: number | string;
-  turnover: number | null;
+  vol_ratio: number | null;
+  curr_vol?: number | string;
+  turnover?: number | null;
   support?: number | null;
   resist?: number | null;
   overall_signal?: string | null;
   trend_signal?: string | null;
-  tech: {
+  rsi_signal?: string | null;
+  volume_signal?: string | null;
+  bb_signal?: string | null;
+  ma20_signal?: string | null;
+  theme_signal_str?: string | null;
+  interpretation?: string;
+  diagnosis?: BackendStockDiagnosis | null;
+  quote_as_of?: string | null;
+  data_source?: string | null;
+  quote_mode?: string | null;
+  cache_age_seconds?: number;
+  tech?: {
     trend: string;
     ma5: number | null;
     ma10: number | null;
@@ -346,7 +381,7 @@ export interface BackendStockData {
     support: number | null;
     resist: number | null;
   };
-  recent_5d: Array<{
+  recent_5d?: Array<{
     date: string;
     close: number;
     pct: number;
@@ -354,8 +389,8 @@ export interface BackendStockData {
   }>;
   fundamentals: Record<string, unknown> | null;
   profile: Record<string, unknown> | null;
-  data_as_of: string | null;
-  market_status: string | null;
+  data_as_of?: string | null;
+  market_status?: string | null;
 }
 
 export interface BackendScanResponse {
@@ -556,6 +591,7 @@ export async function* streamChat(
       },
       body: JSON.stringify({
         messages,
+        agentId: "general",
         ...(options?.conversation ? { conversation: options.conversation } : {}),
         ...(options?.clientCapabilities
           ? { clientCapabilities: options.clientCapabilities }

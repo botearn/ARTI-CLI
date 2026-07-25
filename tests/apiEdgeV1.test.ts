@@ -53,6 +53,11 @@ describe("Edge v1 API", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://edge.example/functions/v1/v1-chat");
     expect(fetchMock.mock.calls[0][0]).not.toContain("railway.invalid");
     expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ Authorization: "Bearer user-jwt" });
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toEqual({
+      messages: [{ role: "user", content: "你好" }],
+      agentId: "general",
+    });
   });
 
   it("chat 遇到 401 时刷新用户 JWT 后重试", async () => {
@@ -103,6 +108,7 @@ describe("Edge v1 API", () => {
     const request = fetchMock.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(String(request.body))).toEqual({
       messages: [{ role: "user", content: "主要风险是什么？" }],
+      agentId: "general",
       conversation: {
         schemaVersion: 1,
         mode: "client-managed",
