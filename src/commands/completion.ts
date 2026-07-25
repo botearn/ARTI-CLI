@@ -12,7 +12,7 @@ import { execSync } from "node:child_process";
 const BASH_COMPLETION = `###-begin-arti-completions-###
 _arti_completions() {
   local cur="\${COMP_WORDS[COMP_CWORD]}"
-  local commands="chat c ask quick-scan quick qs full panorama fr deep dr report credits config poly login logout whoami token doctor diag completion"
+  local commands="chat c ask quick-scan quick qs full panorama fr deep dr report credits config poly harness login logout whoami token doctor diag completion"
   local config_subs="set get list reset"
   local poly_subs="events event summary compare search"
 
@@ -41,6 +41,7 @@ _arti() {
     'credits:查看 Credits 与套餐'
     'config:配置管理'
     'poly:预测市场数据'
+    'harness:可恢复的 Agent Harness 流式客户端'
     'login:登录 ARTI 账户'
     'logout:退出当前账户'
     'whoami:查看当前登录状态'
