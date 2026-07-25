@@ -112,11 +112,9 @@ export async function* attachAgentRun(
           throw new Error("SSE event does not match payload type");
         }
         if (event.sequence <= lastSequence) continue;
-        if (event.sequence !== lastSequence + 1) {
-          throw new Error(
-            `Agent event sequence gap: expected ${lastSequence + 1}, received ${event.sequence}`,
-          );
-        }
+        // The durable sequence covers public, debug and internal events. Public
+        // consumers therefore see a strictly increasing, but not contiguous,
+        // cursor when non-public events are filtered by the server.
         lastSequence = event.sequence;
         yield event;
       }
