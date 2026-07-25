@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("rawChatCommand conversation runtime", () => {
@@ -15,7 +16,7 @@ describe("rawChatCommand conversation runtime", () => {
 
   it("只在会话调用时附加 conversation、usage capability 和回调", async () => {
     async function* fakeStream() {
-      yield "回答";
+      yield "### 原始回答\n";
     }
     const streamChat = vi.fn(() => fakeStream());
     const onUsage = vi.fn();
@@ -33,7 +34,7 @@ describe("rawChatCommand conversation runtime", () => {
     vi.doMock("../src/core/natural-dispatch.js", () => ({ dispatchNaturalText: vi.fn() }));
 
     const { rawChatCommand } = await import("../src/commands/chat.js");
-    await rawChatCommand("继续", {
+    const answer = await rawChatCommand("继续", {
       history: [{ role: "assistant", content: "上一轮" }],
       conversation: {
         schemaVersion: 1,
@@ -72,6 +73,10 @@ describe("rawChatCommand conversation runtime", () => {
     };
     streamOptions.onUsage(usage);
     expect(onUsage).toHaveBeenCalledWith(usage);
+    expect(answer).toBe("### 原始回答\n");
+    expect(stdoutSpy.mock.calls.map(call => String(call[0])).join("")).toContain(
+      "### 原始回答\n",
+    );
   });
 
   it("TTY 下首个 Token 前显示状态，且 Loading 不接管 REPL stdin", async () => {
@@ -89,7 +94,8 @@ describe("rawChatCommand conversation runtime", () => {
     };
     const ora = vi.fn(() => spinner);
     async function* fakeStream() {
-      yield "回答";
+      yield "### 结";
+      yield "论\n**回答** [2]";
     }
     const streamChat = vi.fn(() => fakeStream());
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -122,7 +128,7 @@ describe("rawChatCommand conversation runtime", () => {
 
     try {
       const { rawChatCommand } = await import("../src/commands/chat.js");
-      await rawChatCommand("Google 怎么样", {
+      const answer = await rawChatCommand("Google 怎么样", {
         history: [],
         conversation: {
           schemaVersion: 1,
@@ -140,7 +146,21 @@ describe("rawChatCommand conversation runtime", () => {
       }));
       expect(spinner.start).toHaveBeenCalledTimes(1);
       expect(spinner.stop).toHaveBeenCalledTimes(1);
-      expect(events.indexOf("stop")).toBeLessThan(events.indexOf("write:回答"));
+      const rendered = stripVTControlCharacters(
+        events
+          .filter(event => event.startsWith("write:"))
+          .map(event => event.slice("write:".length))
+          .join(""),
+      );
+      expect(events.indexOf("stop")).toBeLessThan(
+        events.findIndex(event => event.startsWith("write:")),
+      );
+      expect(rendered).toContain("结论");
+      expect(rendered).toContain("回答");
+      expect(rendered).toContain("来源 2");
+      expect(rendered).not.toContain("###");
+      expect(rendered).not.toContain("**");
+      expect(answer).toBe("### 结论\n**回答** [2]");
 
       const printed = logSpy.mock.calls.map(call => String(call[0])).join("\n");
       expect(printed).toContain("普通对话完成");

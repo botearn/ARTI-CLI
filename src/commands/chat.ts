@@ -22,6 +22,7 @@ import {
   shouldShowResearchGuide,
   type ChatLoadingContext,
 } from "../core/chat-display.js";
+import { TerminalAnswerRenderer } from "../core/terminal-answer-renderer.js";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -140,6 +141,9 @@ export async function rawChatCommand(
   const loading = interactive
     ? startChatLoading(startedAt, buildLoadingContext(options))
     : undefined;
+  const answerRenderer = interactive
+    ? new TerminalAnswerRenderer()
+    : undefined;
   let bodyStarted = false;
   let lastUsage: ChatUsageEvent | undefined;
   try {
@@ -164,15 +168,20 @@ export async function rawChatCommand(
       if (!jsonMode && delta) {
         if (!bodyStarted) {
           loading?.stop();
-          process.stdout.write("\n  ");
+          process.stdout.write(interactive ? "\n" : "\n  ");
           bodyStarted = true;
         }
-        process.stdout.write(delta);
+        if (answerRenderer) {
+          answerRenderer.write(delta);
+        } else {
+          process.stdout.write(delta);
+        }
       }
       assistantText += delta;
     }
     loading?.stop();
-    if (!jsonMode && bodyStarted) process.stdout.write("\n");
+    answerRenderer?.end();
+    if (!jsonMode && bodyStarted && !interactive) process.stdout.write("\n");
 
     const result = assistantText || undefined;
     if (jsonMode) {
