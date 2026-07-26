@@ -498,6 +498,135 @@ export async function* streamOrchestratorBackend(
   }
 }
 
+// ── Backend: Agent Harness 研报任务 ──
+
+export type ReportTaskStatus = "pending" | "processing" | "done" | "failed";
+export type ReportType = "panorama" | "deep";
+
+export interface CreateReportTaskInput {
+  symbol: string;
+  reportType: ReportType;
+  sessionId?: string;
+  rawUserInput?: string;
+  rawSymbolText?: string;
+  allowCache?: boolean;
+}
+
+export interface CreateReportTaskResponse {
+  taskId: string;
+  status: ReportTaskStatus;
+  cached?: boolean;
+  cacheAgeMinutes?: number | null;
+  ready?: boolean;
+}
+
+export interface ReportTaskResponse {
+  taskId: string;
+  symbol: string;
+  reportType: string;
+  analystAgents?: unknown;
+  status: ReportTaskStatus;
+  progress?: Record<string, unknown> | null;
+  error?: string | null;
+  result?: unknown;
+  createdAt?: string | null;
+  completedAt?: string | null;
+}
+
+async function readBackendError(res: Response): Promise<string> {
+  const text = await res.text().catch(() => "");
+  if (!text) return `${res.status} ${res.statusText}`;
+  try {
+    const body = JSON.parse(text) as Record<string, unknown>;
+    const detail = body.detail ?? body.message ?? body.reason ?? body.error;
+    if (typeof detail === "string") return detail;
+    if (detail && typeof detail === "object") {
+      const message = (detail as Record<string, unknown>).message;
+      if (typeof message === "string") return message;
+    }
+  } catch {
+    // 非 JSON 错误体直接使用原文
+  }
+  return text;
+}
+
+async function callBackendJson<T>(
+  path: string,
+  init: RequestInit,
+  signal?: AbortSignal,
+): Promise<T> {
+  const config = loadConfig();
+  const baseUrl = config.backend.url.replace(/\/+$/, "");
+  if (!config.backend.enabled || !baseUrl) {
+    throw new Error("Backend URL 未配置或已禁用");
+  }
+
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(abort, config.backend.timeout);
+
+  const request = async (forceRefresh = false): Promise<Response> => {
+    const authToken = await ensureValidAccessToken(
+      forceRefresh ? { forceRefresh: true } : undefined,
+    );
+    const headers = new Headers(init.headers);
+    headers.set("Content-Type", "application/json");
+    if (authToken) headers.set("Authorization", `Bearer ${authToken}`);
+    return fetch(`${baseUrl}${path}`, {
+      ...init,
+      headers,
+      signal: controller.signal,
+    });
+  };
+
+  try {
+    let res = await request();
+    if (res.status === 401 && config.auth.refreshToken) {
+      res = await request(true);
+    }
+    if (!res.ok) {
+      throw new ApiError(path, res.status, await readBackendError(res));
+    }
+    return await res.json() as T;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
+  }
+}
+
+export function createReportTaskBackend(
+  input: CreateReportTaskInput,
+  signal?: AbortSignal,
+): Promise<CreateReportTaskResponse> {
+  return callBackendJson<CreateReportTaskResponse>(
+    "/v1/generate-report",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        symbol: input.symbol,
+        reportType: input.reportType,
+        allowCache: input.allowCache ?? true,
+        ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+        ...(input.rawUserInput ? { rawUserInput: input.rawUserInput } : {}),
+        ...(input.rawSymbolText ? { rawSymbolText: input.rawSymbolText } : {}),
+      }),
+    },
+    signal,
+  );
+}
+
+export function getReportTaskBackend(
+  taskId: string,
+  signal?: AbortSignal,
+): Promise<ReportTaskResponse> {
+  return callBackendJson<ReportTaskResponse>(
+    `/v1/report/${encodeURIComponent(taskId)}`,
+    { method: "GET" },
+    signal,
+  );
+}
+
 // ── Edge: chat（SSE 流式）──
 
 type ChatSseEvent =

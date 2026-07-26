@@ -26,7 +26,7 @@ const TIPS = [
   "用 /quick AAPL 快速扫描；普通文本直接对话",
   "输入 /help 可交互浏览全部快捷命令",
   "直接问：帮我看看英伟达",
-  "用 /deep <代码> 生成深度研报（约 1–2 分钟）",
+  "用 /deep AAPL 创建深度研报；中断后用 /report <taskId> 恢复",
   "外层 arti <command> --json 适合脚本与 agent",
   "用 /credits 查看余额与套餐用量",
 ] as const;

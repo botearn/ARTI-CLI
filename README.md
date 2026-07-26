@@ -24,8 +24,9 @@ arti> 这份扫描最值得关注的风险是什么？
 |---|---|---|---|
 | 普通对话 | 直接输入问题 | `arti chat --raw <问题>` | 流式 AI 投研对话；交互终端会携带当前 Session 上下文 |
 | 快速扫描 | `/quick <代码>` | `arti quick-scan <代码>` | 行情、技术指标、基本面及后端返回的分析判断、综合结论和数据来源 |
-| 全景研报 | `/full <代码>` | `arti full <代码>` | 8 个 AI 分析角色交叉验证 |
-| 深度研报 | `/deep <代码>` | `arti deep <代码>` | AI 分析角色、大师投资框架辩论与综合裁定 |
+| 全景研报 | `/full <代码> [重点]` | `arti full <代码> [重点]` | 创建后端异步研报任务，由 Agent Harness 取证和综合 |
+| 深度研报 | `/deep <代码> [重点]` | `arti deep <代码> [重点]` | 创建后端异步深度任务，包含投资框架圆桌与综合裁定 |
+| 研报恢复 | `/report <taskId>` | `arti report <taskId>` | 恢复等待或查看已有后端研报任务，不重复创建 |
 | 预测市场 | `/poly ...` | `arti poly ...` | 查询事件、摘要、跨平台比较和市场搜索；需要登录 |
 
 股票代码格式：
@@ -106,7 +107,7 @@ arti
 - 输入 `/` 浏览全部命令；输入 `/help deep` 查看单个命令。
 - 如需发送 `/` 开头的普通文本，使用 `//text`。
 
-新 Session 第一次成功完成普通对话后，CLI 会说明当前入口以及 `/quick`、`/full`、`/deep` 的研究深度。普通对话只展示后端返回的回答正文，CLI 无法据此证明内部存在多角色过程；`/full` 和 `/deep` 才提供可见、可追踪的角色化研究流程。分析师和大师均为 AI 角色，大师观点是投资框架模拟，并非真人意见。
+新 Session 第一次成功完成普通对话后，CLI 会说明当前入口以及 `/quick`、`/full`、`/deep` 的研究深度。普通对话只展示后端返回的回答正文，CLI 无法据此证明内部存在多角色过程；`/full` 和 `/deep` 才提供可见、可追踪的角色化研究流程。参与角色由 Backend Agent Harness 根据任务选择；分析师和大师均为 AI 角色，大师观点是投资框架模拟，并非真人意见。
 
 普通对话等待首个回答片段时会分阶段显示真实入口、历史消息、摘要、Artifact 和活动标的；超过 8 秒后每 6 秒轮换一条原创投资原则，超过 20 秒提示可按 `Ctrl+C` 取消。首个回答片段到达后 Loading 会立即清除，完成时显示总耗时，以及后端实际返回的模型和 Token usage（如有）。`--json` 或非 TTY 环境不会输出动态 Loading，以保持结构化输出和管道稳定。
 
@@ -118,10 +119,18 @@ TTY 中的普通对话会把 Markdown 标题、粗体、列表、引用、分隔
 
 ```bash
 arti quick-scan AAPL
-arti full NVDA
-arti deep TSLA
+arti full NVDA 重点看估值风险
+arti deep TSLA 重点看AI供应链
 arti poly summary
 ```
+
+`full` 和 `deep` 会先创建持久化的后端任务，再轮询直到完成。CLI 会显示 task ID；按 `Ctrl+C` 只停止本地等待，不会取消后端任务，之后可运行：
+
+```bash
+arti report <taskId>
+```
+
+Harness 内部可以选择数据工具、分析角色和补充证据，但第一版不支持用户在运行中调整任务。实际使用 `agent_harness`、`legacy` 或其他 rollout 路径由后端决定，CLI 不强制选择执行路径。
 
 `arti chat <问题>` 是兼容入口，默认先调用产品意图识别，可能派发到快速扫描、全景研报、深度研报或普通对话。需要保证只进行聊天时使用：
 
@@ -151,8 +160,9 @@ arti credits --json
 | 会话 | `/cls` | 清空终端屏幕 |
 | 会话 | `/exit` | 保存并退出 |
 | 研报 | `/quick <代码>` | 快速扫描 |
-| 研报 | `/full <代码> [--full]` | 全景研报 |
-| 研报 | `/deep <代码> [--full]` | 深度研报 |
+| 研报 | `/full <代码> [重点] [--full]` | 创建全景研报任务 |
+| 研报 | `/deep <代码> [重点] [--full]` | 创建深度研报任务 |
+| 研报 | `/report <taskId> [--full]` | 恢复等待或查看已有任务 |
 | 工具 | `/credits` | 查看 Credits 余额和套餐 |
 | 工具 | `/poly ...` | 查询预测市场 |
 | 账户 | `/login` | 登录 |
@@ -171,7 +181,7 @@ arti config set session.retentionDays 60
 
 `/compact [重点]` 通过普通聊天请求生成结构化摘要，只缩小后续请求携带的活跃上下文，不删除原始 transcript。是否扣费及扣费多少仍由后端决定，CLI 不包含价格或本地扣费逻辑。
 
-交互终端中的 `/quick`、`/full`、`/deep` 和 `/poly` 会把完整结构化结果保存为当前 Session 的 Artifact。后续对话只携带摘要和 Artifact 引用，不重复发送完整结果；Artifact 不跨 Session，并随所属 Session 的保留期清理。
+交互终端中的 `/quick`、`/full`、`/deep`、`/report` 和 `/poly` 会把完整结构化结果保存为当前 Session 的 Artifact。后续对话只携带摘要和 Artifact 引用，不重复发送完整结果；Artifact 不跨 Session，并随所属 Session 的保留期清理。
 
 ## 命令一览
 
@@ -180,8 +190,9 @@ arti config set session.retentionDays 60
 | `arti` | 进入交互终端 |
 | `arti chat [--raw] <message...>` | 智能路由；`--raw` 强制普通对话 |
 | `arti quick-scan <symbol>` | 快速扫描；别名 `quick`、`qs` |
-| `arti full <symbol> [--full]` | 全景研报；别名 `panorama`、`fr` |
-| `arti deep <symbol> [--full]` | 深度研报；别名 `dr` |
+| `arti full <symbol> [focus...] [--full]` | 创建并等待全景研报任务；别名 `panorama`、`fr` |
+| `arti deep <symbol> [focus...] [--full]` | 创建并等待深度研报任务；别名 `dr` |
+| `arti report <taskId> [--full]` | 恢复等待或查看已有研报任务 |
 | `arti poly events\|event\|summary\|compare\|search` | 预测市场查询 |
 | `arti login` / `logout` / `whoami` / `token` | 登录态和凭证管理 |
 | `arti credits` | Credits 余额和套餐 |
@@ -207,7 +218,8 @@ Credits 和 Token usage 是两套概念：
 交互终端普通文本 ──────────────────────────> v1-chat
 交互终端 Slash / 外层显式命令
   ├─ quick-scan ───────────────────────────> v1-scan-stock
-  ├─ full / deep ──────────────────────────> 生产 orchestrator
+  ├─ full / deep ─> generate-report ───────> Backend Agent Harness / rollout
+  ├─ report ───────────────────────────────> report task query
   └─ poly ─────────────────────────────────> poly-data
 
 外层 arti chat（默认）─> classify-intent ──> 上述能力或 v1-chat

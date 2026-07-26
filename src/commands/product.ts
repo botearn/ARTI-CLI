@@ -2,12 +2,12 @@
  * 主产品三档能力入口
  *
  * quick-scan -> Quick Scan（产品 scan-stock 函数）
- * full       -> Full 全景研报（orchestrator layer1-only）
- * deep       -> Deep 深度研报（orchestrator full）
+ * full       -> Full 全景研报（Backend 异步 panorama task）
+ * deep       -> Deep 深度研报（Backend 异步 deep task）
  */
 import chalk from "chalk";
 import { scanStockBackend, type BackendStockData } from "../api.js";
-import { researchCommand } from "./research.js";
+import { createHarnessReportCommand } from "./report-task.js";
 import { title, kvLine, colorChange, sentimentBadge, sparkline } from "../format.js";
 import { output } from "../output.js";
 import { track } from "../tracker.js";
@@ -221,30 +221,30 @@ function renderQuickScan(symbol: string, d: BackendStockData): void {
 
 export async function fullReportCommand(
   symbol: string,
-  options?: { full?: boolean },
+  options?: { full?: boolean; rawUserInput?: string },
 ): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
     console.log(chalk.red("请提供股票代码。会话内：/full AAPL；外层：arti full AAPL"));
     return;
   }
 
-  return researchCommand(symbol, {
-    mode: "layer1-only",  // 全景报告对应后端的 layer1-only
+  return createHarnessReportCommand(symbol, "panorama", {
     full: options?.full,
+    rawUserInput: options?.rawUserInput,
   });
 }
 
 export async function deepReportCommand(
   symbol: string,
-  options?: { full?: boolean },
+  options?: { full?: boolean; rawUserInput?: string },
 ): Promise<CapabilityExecutionResult | undefined> {
   if (!symbol) {
     console.log(chalk.red("请提供股票代码。会话内：/deep AAPL；外层：arti deep AAPL"));
     return;
   }
 
-  return researchCommand(symbol, {
-    mode: "full",  // 深度报告对应后端的 full（包含 Layer 1+2+3）
+  return createHarnessReportCommand(symbol, "deep", {
     full: options?.full,
+    rawUserInput: options?.rawUserInput,
   });
 }

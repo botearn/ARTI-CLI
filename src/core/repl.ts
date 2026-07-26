@@ -181,7 +181,7 @@ const LOCAL_SLASH_COMMANDS: SlashHelpCommand[] = [
 
 function getCategoryForCommand(name: string): string {
   const map: Record<string, string> = {
-    "quick-scan": "research", full: "research", deep: "research",
+    "quick-scan": "research", full: "research", deep: "research", report: "research",
     research: "research", predict: "research", scan: "research",
     quote: "market", market: "market", watch: "market", watchlist: "market",
     history: "data", crypto: "data", fundamental: "data",
@@ -577,7 +577,7 @@ export async function startRepl(): Promise<void> {
     }
 
     try {
-      const writesArtifact = ["quick", "full", "deep", "poly"].includes(name);
+      const writesArtifact = ["quick", "full", "deep", "report", "poly"].includes(name);
       const callId = writesArtifact
         ? conversation.beginToolCall(name, { args })
         : undefined;

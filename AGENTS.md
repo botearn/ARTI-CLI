@@ -80,24 +80,28 @@ export ARTI_AUTH_EXPIRES_AT=<unix-seconds>
 |---|---|---|
 | 聊天 | `arti chat "<问题>"` | AI 投研对话（流式文本） |
 | 快速扫描 | `arti quick-scan <symbol> --json` | 行情 + 技术面 + 基本面 |
-| 全景研报 | `arti full <symbol> --json` | 多分析师 Layer 1 |
-| 深度研报 | `arti deep <symbol> --json` | 三层级 + 大师辩论 + 裁定 |
+| 全景研报 | `arti full <symbol> [重点] --json` | 后端异步研报任务 + Agent Harness |
+| 深度研报 | `arti deep <symbol> [重点] --json` | 后端异步深度任务 + 投资框架圆桌与裁定 |
+| 恢复研报 | `arti report <taskId> --json` | 恢复等待或读取已有任务，不重复创建 |
 
 代码规范：
 - 美股直接代码 `AAPL`；港股 5 位补零 `01709.HK`；A 股 `600519.SS` / `000858.SZ`。
-- `full` / `deep` 较慢（约 1–2 分钟），且按次计费；`quick-scan` / `chat` 快且便宜。
+- `full` / `deep` 是异步长任务，可能需要数分钟或更久；命令会等待最终结果后一次性输出 JSON，任务进度只写 stderr。
+- CLI 创建任务后会打印 task ID。进程中断不会取消后端任务，可用 `arti report <taskId> --json` 恢复。
+- Agent Harness 的实际执行路径、缓存、扣费和失败退款均由后端决定；CLI 不发送强制 `executionPath`。
 
 示例：
 
 ```bash
 export ARTI_AUTH_TOKEN=... ARTI_AUTH_REFRESH_TOKEN=... ARTI_AUTH_EXPIRES_AT=...
 arti quick-scan AAPL --json
-arti deep 01709.HK --json
+arti deep 01709.HK "重点看现金流和估值" --json
+arti report <taskId> --json
 ```
 
 ## 4. 计费 / 错误
 
-- 每次调用按对应能力扣 Credits；`arti credits --json` 查余额。
+- 每次调用是否扣费以及扣多少由后端决定；`arti credits --json` 查余额。`arti report` 只查询已有任务，不重新创建或扣费。
 - 退出码非 0 表示失败；错误信息打到 stderr。常见：未登录 / 积分不足 / 代码不存在 / 后端不可用。
 
 ## 5. 不支持

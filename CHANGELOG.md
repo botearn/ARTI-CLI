@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+- 新增 `arti report <taskId>` 与 `/report <taskId>`，可在终端中断后恢复等待或查看已有研报任务
+- full/deep 支持在股票代码后附加研究重点，并在创建任务时交给 Backend Agent Harness
+
+### 🔧 Changed
+
+- full/deep 从同步 `/v1/orchestrator` 切换为 `/v1/generate-report` + `/v1/report/{taskId}` 异步任务链；CLI 不再预取研报 stockData
+- Harness 执行路径、缓存、扣费和失败退款均由后端决定；CLI 第一版只观察进度，不支持运行中调整
+
 ## [0.4.3] - 2026-07-25
 
 ### ✨ Added

@@ -19,6 +19,14 @@ export function classifyError(err: unknown): ErrorInfo {
     };
   }
 
+  if (err instanceof Error && err.name === "ReportWaitTimeoutError" && "taskId" in err) {
+    return {
+      title: "本地等待超时",
+      detail: err.message,
+      suggestion: `后端任务仍在继续，稍后运行 arti report ${String(err.taskId)}`,
+    };
+  }
+
   if (err instanceof TypeError && String(err.message).includes("fetch")) {
     return {
       title: "网络请求失败",
@@ -76,6 +84,20 @@ export function classifyError(err: unknown): ErrorInfo {
           title: `认证失败 (${status})`,
           detail: err.message,
           suggestion: "接口需要认证，请确认 API 配置是否正确",
+        };
+      }
+      if (status === 402) {
+        return {
+          title: "Credits 不足",
+          detail: err.message,
+          suggestion: "交互终端输入 /credits，外层运行 arti credits 查看余额与套餐权益",
+        };
+      }
+      if (status === 404) {
+        return {
+          title: "任务不存在",
+          detail: err.message,
+          suggestion: "请检查 task ID 是否完整，且当前登录账户是任务创建者",
         };
       }
       if (status === 429) {

@@ -23,7 +23,7 @@ describe("Edge v1 API", () => {
   beforeEach(() => {
     loadConfig.mockReturnValue({
       api: { baseUrl: "https://edge.example/functions/v1", timeout: 30_000 },
-      backend: { url: "https://railway.invalid", timeout: 60_000 },
+      backend: { enabled: true, url: "https://railway.invalid", timeout: 60_000 },
       auth: { token: "old-token", refreshToken: "refresh-token" },
     });
     ensureValidAccessToken.mockResolvedValue("user-jwt");
@@ -172,5 +172,61 @@ describe("Edge v1 API", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe("https://edge.example/functions/v1/v1-scan-stock");
     expect(fetchMock.mock.calls[0][0]).not.toContain("railway.invalid");
+  });
+
+  it("full 通过 Backend 创建 panorama 任务且不由 CLI 指定执行路径", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      taskId: "task-1",
+      status: "pending",
+      cached: false,
+      ready: false,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { createReportTaskBackend } = await import("../src/api.js");
+    await expect(createReportTaskBackend({
+      symbol: "NVDA",
+      reportType: "panorama",
+      rawSymbolText: "nvda",
+      rawUserInput: "重点看估值风险",
+    })).resolves.toMatchObject({
+      taskId: "task-1",
+      status: "pending",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://railway.invalid/v1/generate-report");
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toEqual({
+      symbol: "NVDA",
+      reportType: "panorama",
+      allowCache: true,
+      rawUserInput: "重点看估值风险",
+      rawSymbolText: "nvda",
+    });
+    expect(String(request.body)).not.toContain("executionPath");
+    expect(String(request.body)).not.toContain("stockData");
+  });
+
+  it("查询 Backend 研报任务时编码 task ID 并携带用户 JWT", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      taskId: "task/1",
+      symbol: "NVDA",
+      reportType: "deep",
+      status: "processing",
+      progress: { execution_path: "agent_harness" },
+      result: null,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { getReportTaskBackend } = await import("../src/api.js");
+    await expect(getReportTaskBackend("task/1")).resolves.toMatchObject({
+      taskId: "task/1",
+      status: "processing",
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://railway.invalid/v1/report/task%2F1");
+    const headers = fetchMock.mock.calls[0][1]?.headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer user-jwt");
   });
 });
