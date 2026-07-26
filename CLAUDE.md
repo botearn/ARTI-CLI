@@ -2,7 +2,7 @@
 
 ARTI 是 ARTI 投研产品的命令行客户端，支持美股、港股、A 股三个市场。
 
-CLI 是生产后端的**瘦客户端**：所有能力直接调用与 web 产品同一套生产函数（Supabase Edge Functions + orchestrator），数据口径、计费一致，不维护本地数据处理逻辑，无需本地 Python。
+CLI 是生产后端的**瘦客户端**：Chat / Quick Scan 调用 Supabase Edge Functions，full / deep 调用 Backend 异步研报任务与 Agent Harness；数据口径、计费一致，不维护本地数据处理逻辑，无需本地 Python。
 
 **v1 能力：** 聊天（chat）/ 快速扫描（quick-scan）/ 全景研报（full）/ 深度研报（deep）
 
@@ -21,8 +21,9 @@ CLI 是生产后端的**瘦客户端**：所有能力直接调用与 web 产品�
 - `src/core/conversation-runtime.ts` — 活跃会话、summary boundary、Artifact digest context 与 usage 落盘
 - `src/core/conversation-compact.ts` — 通过普通 `v1-chat` 生成并校验结构化会话摘要
 - `src/core/conversation-display.ts` — `/status`、`/usage`、`/resume` 文本输出
-- `src/api.ts` — 生产函数客户端（chat / scan-stock / classify-intent / orchestrator / 计费）
+- `src/api.ts` — 生产函数客户端（chat / scan-stock / classify-intent / Agent Harness 研报任务）
 - `src/commands/` — 各能力实现（product=quick-scan/full/deep，chat，auth，credits…）
+- `src/commands/report-task.ts` — 创建、轮询、恢复和渲染 Backend Agent Harness 研报任务
 - `src/data/` — 后端 MCP 客户端、研报上下文、共享类型
 - `prompts/` — AI 研报 prompt 定义（从 ARTI_backend 同步）
   - `layer1/` — 8 位分析师 prompt（Natasha/Steve/Tony/Thor/Clint/Sam/Vision/Wanda）
@@ -49,8 +50,9 @@ arti quick-scan AAPL
 arti                          # 进入交互终端（普通文本对话，Slash 调用能力）
 arti chat 美股今天怎么样       # AI 投研对话
 arti quick-scan AAPL          # 快速研判（产品 scan-stock）
-arti full NVDA                # 全景研报（orchestrator）
-arti deep TSLA                # 深度研报
+arti full NVDA                # 创建并等待全景研报任务
+arti deep TSLA                # 创建并等待深度研报任务
+arti report <taskId>          # 恢复等待或查看已有任务
 arti credits                  # 余额套餐
 arti config list              # 查看配置
 ```
@@ -58,6 +60,8 @@ arti config list              # 查看配置
 所有命令支持 `--json` 全局选项，输出结构化 JSON。
 
 交互终端内使用 `/quick AAPL`、`/full NVDA`、`/deep TSLA` 等 Slash Command；不带 `/` 的输入始终作为普通对话。外层命令行为不受影响。
+
+`full` / `deep` 通过 Backend `/v1/generate-report` 创建异步任务，并轮询 `/v1/report/{taskId}`。CLI 不预取研报 stockData、不强制 `executionPath`，实际 Harness rollout、缓存、扣费与退款由后端决定。第一版不支持运行中 steer；中断本地等待后用 `report <taskId>` 恢复。
 
 会话 transcript 默认保留 30 天，配置键为 `session.retentionDays`。Token usage 仅消费 `v1-chat` 的服务端 SSE 事件，不允许用字符数或 provider tokenizer 在 CLI 侧估算，也不能从 Token 推导 Credits。
 

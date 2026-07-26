@@ -44,11 +44,11 @@ export async function dispatchNaturalText(
       else missingSymbolHint();
       return "quick-scan";
     case "panorama":
-      if (res.symbol) await fullReportCommand(res.symbol);
+      if (res.symbol) await fullReportCommand(res.symbol, { rawUserInput: trimmed });
       else missingSymbolHint();
       return "panorama";
     case "deep":
-      if (res.symbol) await deepReportCommand(res.symbol);
+      if (res.symbol) await deepReportCommand(res.symbol, { rawUserInput: trimmed });
       else missingSymbolHint();
       return "deep";
     case "unsupported-market":

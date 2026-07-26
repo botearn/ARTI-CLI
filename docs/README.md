@@ -16,6 +16,7 @@ ARTI CLI 的技术文档与设计资料。
 - [**ARTI_DATA_INTEGRATION_PLAN.md**](ARTI_DATA_INTEGRATION_PLAN.md) — arti-data 上游数据平台接入计划
 - [**BILLING_FLOW.md**](BILLING_FLOW.md) — Credit 计费流程与套餐说明
 - [**RFC-2026-0008**](../rfcs/2026/RFC-2026-0008-conversation-first-cli.md) — 对话优先、Slash、Session、Token 与 Artifact 设计
+- [**RFC-2026-0009**](../rfcs/2026/RFC-2026-0009-backend-agent-harness.md) — full/deep 接入 Backend Agent Harness 异步任务链
 - [**REPORT_STYLES.md**](REPORT_STYLES.md) — 研报输出样式
 - [**ROADMAP.md**](ROADMAP.md) — 规划
 

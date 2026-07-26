@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
  * ARTI CLI — 智能投研命令行工具
- * 数据源：生产后端产品函数（Supabase Edge Functions + orchestrator）
+ * 数据源：生产后端产品函数（Supabase Edge Functions + Agent Harness）
  *
  * 每个命令只定义一次 CommandDef，自动驱动 CLI (Commander) + REPL 两个入口。
  */
 import { Command } from "commander";
 import { quickScanCommand, fullReportCommand, deepReportCommand } from "./commands/product.js";
 import { chatCommand } from "./commands/chat.js";
+import { reportTaskCommand } from "./commands/report-task.js";
 import { configSetCommand, configGetCommand, configListCommand, configResetCommand } from "./commands/config.js";
 import { completionCommand, installCompletion } from "./commands/completion.js";
 import { creditsCommand } from "./commands/credits.js";
@@ -78,37 +79,65 @@ const defs: CommandDef[] = [
   {
     name: "full", aliases: ["panorama", "fr"],
     slashName: "full",
-    description: "8 个 AI 分析角色交叉验证",
-    usage: "full <symbol> [--full]",
-    args: [{ spec: "<symbol>", desc: "股票代码" }],
+    description: "Agent Harness 多角色交叉验证",
+    usage: "full <symbol> [focus...] [--full]",
+    args: [
+      { spec: "<symbol>", desc: "股票代码" },
+      { spec: "[focus...]", desc: "创建任务前指定的研究重点" },
+    ],
     options: [
       { short: "-f", long: "--full", key: "full", type: "boolean", desc: "显示完整报告（默认仅摘要）" },
     ],
     examples: [
       "$ arti full AAPL               # 主产品 Full 全景研报",
       "$ arti panorama NVDA           # 同义别名",
+      "$ arti full TSLA 重点看估值风险",
       "$ arti full TSLA -f            # 展示完整分析内容",
     ],
     invoke: ({ positional, options }) =>
       fullReportCommand(positional[0], {
         full: options.full as boolean | undefined,
+        rawUserInput: positional.slice(1).join(" ") || undefined,
       }),
   },
   {
     name: "deep", aliases: ["dr"],
     slashName: "deep",
     description: "AI 分析角色、大师投资框架与综合裁定",
-    usage: "deep <symbol> [--full]",
-    args: [{ spec: "<symbol>", desc: "股票代码" }],
+    usage: "deep <symbol> [focus...] [--full]",
+    args: [
+      { spec: "<symbol>", desc: "股票代码" },
+      { spec: "[focus...]", desc: "创建任务前指定的研究重点" },
+    ],
     options: [
       { short: "-f", long: "--full", key: "full", type: "boolean", desc: "显示完整报告（默认仅摘要）" },
     ],
     examples: [
       "$ arti deep AAPL               # 主产品 Deep 深度研报",
+      "$ arti deep NVDA 重点看AI供应链和估值",
       "$ arti deep NVDA -f            # 展示完整分析内容",
     ],
     invoke: ({ positional, options }) =>
       deepReportCommand(positional[0], {
+        full: options.full as boolean | undefined,
+        rawUserInput: positional.slice(1).join(" ") || undefined,
+      }),
+  },
+  {
+    name: "report", aliases: [],
+    slashName: "report",
+    description: "恢复查看已有研报任务",
+    usage: "report <taskId> [--full]",
+    args: [{ spec: "<taskId>", desc: "后端研报任务 ID" }],
+    options: [
+      { short: "-f", long: "--full", key: "full", type: "boolean", desc: "显示分析角色完整报告" },
+    ],
+    examples: [
+      "$ arti report <taskId>",
+      "$ arti report <taskId> --json",
+    ],
+    invoke: ({ positional, options }) =>
+      reportTaskCommand(positional[0], {
         full: options.full as boolean | undefined,
       }),
   },

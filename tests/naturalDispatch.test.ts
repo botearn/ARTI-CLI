@@ -98,4 +98,29 @@ describe("dispatchNaturalText", () => {
     });
     expect(onGeneralChat).toHaveBeenCalledWith("今天大盘怎么看");
   });
+
+  it("研报意图把用户原始研究重点交给 Backend Harness", async () => {
+    const classifyIntent = vi.fn().mockResolvedValue({
+      intent: "deep",
+      symbol: "NVDA",
+      needs_symbol: false,
+    });
+    const deepReportCommand = vi.fn().mockResolvedValue(undefined);
+
+    vi.doMock("../src/api.js", () => ({ classifyIntent }));
+    vi.doMock("../src/commands/product.js", () => ({
+      quickScanCommand: vi.fn(),
+      fullReportCommand: vi.fn(),
+      deepReportCommand,
+    }));
+
+    const { dispatchNaturalText } = await import("../src/core/natural-dispatch.js");
+    await dispatchNaturalText("深度研究 NVDA，重点看 AI 供应链", {
+      onGeneralChat: vi.fn(),
+    });
+
+    expect(deepReportCommand).toHaveBeenCalledWith("NVDA", {
+      rawUserInput: "深度研究 NVDA，重点看 AI 供应链",
+    });
+  });
 });

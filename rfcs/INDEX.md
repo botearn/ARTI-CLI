@@ -30,7 +30,9 @@
 
 ## 🚧 Implementing（实施中）
 
-*当前无正在实施的 RFC*
+| RFC | 标题 | 开始日期 |
+|---|---|---|
+| [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) | CLI 接入 Backend Agent Harness | 2026-07-25 |
 
 ---
 
@@ -58,6 +60,7 @@
 
 ### 🏗️ 架构 & 基础设施
 
+- [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 接入 Backend Agent Harness
 - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 对话优先 CLI、Slash Command 与 Token 感知会话
 
 ### 💰 计费 & Credits
@@ -69,15 +72,18 @@
 
 - [RFC-2026-0001](2026/RFC-2026-0001-backend-mcp-integration.md) - Backend MCP 集成
 - [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) - chat / quick-scan 切换 Edge /v1（arti#0055 姊妹篇）
+- [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - full/deep 切换异步研报任务 API
 
 ### 🔧 CLI 命令
 
 - [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成（`arti poly` 子命令组）
 - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 会话内 Slash Command 与外层自动化接口分层
+- [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - full/deep 异步任务与 report 恢复命令
 
 ### 🤖 AI & Research
 
 - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - Token 感知会话、Artifact 与对话工具调用
+- [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - Backend Agent Harness 接入
 
 ### 🔌 MCP Server
 
@@ -98,6 +104,8 @@
 
 ### 2026
 
+- **2026-07-26** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 第一版完成，等待生产 smoke test (Implementing)
+- **2026-07-25** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 接入 Backend Agent Harness (Draft)
 - **2026-07-24** - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 对话优先 CLI、Slash Command 与 Token 感知会话 (Draft)
 - **2026-07-23** - [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) - CLI 加固与审计缺陷修复计划 (Draft, 取代 BACKLOG.md)
 - **2026-07-14** - [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) - chat / quick-scan 切换 Edge /v1 (Draft, arti#0055 姊妹篇)
@@ -119,10 +127,10 @@
 | Draft | 7 |
 | Proposed | 0 |
 | Accepted | 0 |
-| Implementing | 0 |
+| Implementing | 1 |
 | Implemented | 1 |
 | Rejected | 0 |
 | Deprecated | 0 |
-| **总计** | **8** |
+| **总计** | **9** |
 
-**最后更新**: 2026-07-24
+**最后更新**: 2026-07-26
