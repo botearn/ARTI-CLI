@@ -641,6 +641,7 @@ export interface ChatStreamOptions {
   conversation?: ConversationContext;
   clientCapabilities?: ChatClientCapabilities;
   onUsage?: (usage: ChatUsageEvent) => void;
+  signal?: AbortSignal;
 }
 
 function parseChatSseEvent(frame: string): ChatSseEvent | null {
@@ -708,6 +709,12 @@ export async function* streamChat(
   const config = loadConfig();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 300_000); // 5 分钟超时
+  const abortFromCaller = () => controller.abort();
+  if (options?.signal?.aborted) {
+    controller.abort();
+  } else {
+    options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
+  }
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
   const request = async (forceRefresh = false): Promise<Response> => {
@@ -774,6 +781,7 @@ export async function* streamChat(
     }
     controller.abort();
     clearTimeout(timer);
+    options?.signal?.removeEventListener("abort", abortFromCaller);
   }
 }
 

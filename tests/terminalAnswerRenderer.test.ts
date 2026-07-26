@@ -17,6 +17,15 @@ function render(chunks: string[], columns = 80): string {
 }
 
 describe("TerminalAnswerRenderer", () => {
+  it("完整行已经输出后标记为终端可见", () => {
+    const renderer = new TerminalAnswerRenderer({ write: () => {} });
+
+    expect(renderer.hasVisibleOutput).toBe(false);
+    renderer.write("### 结论\n");
+
+    expect(renderer.hasVisibleOutput).toBe(true);
+  });
+
   it("跨流式分片渲染标题、粗体和引用，不暴露 Markdown 标记", () => {
     const output = render([
       "### 📡 技术",

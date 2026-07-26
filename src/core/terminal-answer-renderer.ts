@@ -203,11 +203,16 @@ export class TerminalAnswerRenderer {
   private suggestionHeadingShown = false;
   private codeFence = false;
   private lastOutputBlank = true;
+  private visibleOutput = false;
   private ended = false;
 
   constructor(options: TerminalAnswerRendererOptions = {}) {
     this.columns = Math.max(24, Math.floor(options.columns ?? process.stdout.columns ?? 80));
     this.emit = options.write ?? (text => process.stdout.write(text));
+  }
+
+  get hasVisibleOutput(): boolean {
+    return this.visibleOutput;
   }
 
   write(chunk: string): void {
@@ -437,5 +442,6 @@ export class TerminalAnswerRenderer {
   private emitLine(line: string): void {
     this.emit(line + "\n");
     this.lastOutputBlank = false;
+    this.visibleOutput = true;
   }
 }

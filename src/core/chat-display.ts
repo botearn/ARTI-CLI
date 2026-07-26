@@ -13,6 +13,7 @@ export interface ChatLoadingContext {
   hasSummary: boolean;
   artifactCount: number;
   activeSymbols: string[];
+  canCancel: boolean;
 }
 
 const CONTEXT_REVEAL_MS = 2_000;
@@ -64,14 +65,14 @@ export function buildChatLoadingLines(
   context: ChatLoadingContext,
 ): string[] {
   if (elapsedMs < CONTEXT_REVEAL_MS) {
-    return [`普通对话 · 正在整理会话上下文… ${formatElapsed(elapsedMs)}`];
+    return [`普通对话 · 正在准备会话请求… ${formatElapsed(elapsedMs)}`];
   }
 
-  const status = elapsedMs >= PRINCIPLE_REVEAL_MS
-    ? `普通对话 · 等待 ARTI 返回首个回答… ${formatElapsed(elapsedMs)}`
-    : `普通对话 · 正在连接 ARTI… ${formatElapsed(elapsedMs)}`;
+  const status = `普通对话 · 请求已发送，等待首段回答… ${formatElapsed(elapsedMs)}`;
   const lines = [
-    elapsedMs >= CANCEL_HINT_MS ? `${status} · Ctrl+C 可取消` : status,
+    elapsedMs >= CANCEL_HINT_MS && context.canCancel
+      ? `${status} · Ctrl+C 可取消当前回答`
+      : status,
     "本轮路径：普通对话 · general",
     formatLoadingContext(context),
   ];

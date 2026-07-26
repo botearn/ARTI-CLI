@@ -80,6 +80,29 @@ describe("Edge v1 API", () => {
     expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ Authorization: "Bearer fresh-jwt" });
   });
 
+  it("chat 将调用方取消信号传到当前请求", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      await new Promise<never>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("已取消", "AbortError"));
+        }, { once: true });
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+
+    const { streamChat } = await import("../src/api.js");
+    const collecting = collect(streamChat(
+      [{ role: "user", content: "test" }],
+      { signal: controller.signal },
+    ));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    controller.abort();
+
+    await expect(collecting).rejects.toMatchObject({ name: "AbortError" });
+    expect((fetchMock.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true);
+  });
+
   it("chat 可发送 conversation context 并消费服务端 usage 事件", async () => {
     const onUsage = vi.fn();
     const fetchMock = vi.fn(async () => sseResponse([

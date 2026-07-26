@@ -22,6 +22,7 @@ describe("dispatchNaturalText", () => {
     });
     const quickScanCommand = vi.fn().mockResolvedValue(undefined);
     const onGeneralChat = vi.fn();
+    const onPaidResearchSuggested = vi.fn();
 
     vi.doMock("../src/api.js", () => ({
       classifyIntent,
@@ -34,9 +35,13 @@ describe("dispatchNaturalText", () => {
 
     const { dispatchNaturalText } = await import("../src/core/natural-dispatch.js");
 
-    await expect(dispatchNaturalText("今天的智谱", { onGeneralChat })).resolves.toBe("quick-scan");
+    await expect(dispatchNaturalText("今天的智谱", {
+      onGeneralChat,
+      onPaidResearchSuggested,
+    })).resolves.toBe("quick-scan");
     expect(quickScanCommand).toHaveBeenCalledWith("02513.HK");
     expect(onGeneralChat).not.toHaveBeenCalled();
+    expect(onPaidResearchSuggested).not.toHaveBeenCalled();
   });
 
   // L10：识别到能力意图但缺 symbol 时应给出提示，而非完全沉默
@@ -48,6 +53,7 @@ describe("dispatchNaturalText", () => {
     });
     const quickScanCommand = vi.fn();
     const onGeneralChat = vi.fn();
+    const onPaidResearchSuggested = vi.fn();
 
     vi.doMock("../src/api.js", () => ({ classifyIntent }));
     vi.doMock("../src/commands/product.js", () => ({
@@ -58,7 +64,10 @@ describe("dispatchNaturalText", () => {
 
     const { dispatchNaturalText } = await import("../src/core/natural-dispatch.js");
 
-    await expect(dispatchNaturalText("帮我扫一下", { onGeneralChat })).resolves.toBe("quick-scan");
+    await expect(dispatchNaturalText("帮我扫一下", {
+      onGeneralChat,
+      onPaidResearchSuggested,
+    })).resolves.toBe("quick-scan");
     expect(quickScanCommand).not.toHaveBeenCalled();
     expect(onGeneralChat).not.toHaveBeenCalled();
     // 有可见提示输出，而非沉默
@@ -75,6 +84,7 @@ describe("dispatchNaturalText", () => {
     });
     const onGeneralChat = vi.fn().mockResolvedValue(undefined);
     const onClassified = vi.fn();
+    const onPaidResearchSuggested = vi.fn();
 
     vi.doMock("../src/api.js", () => ({
       classifyIntent,
@@ -90,6 +100,7 @@ describe("dispatchNaturalText", () => {
     await expect(dispatchNaturalText("今天大盘怎么看", {
       onGeneralChat,
       onClassified,
+      onPaidResearchSuggested,
     })).resolves.toBe("general-chat");
     expect(onClassified).toHaveBeenCalledWith({
       intent: "general-chat",
@@ -97,15 +108,17 @@ describe("dispatchNaturalText", () => {
       needs_symbol: false,
     });
     expect(onGeneralChat).toHaveBeenCalledWith("今天大盘怎么看");
+    expect(onPaidResearchSuggested).not.toHaveBeenCalled();
   });
 
-  it("研报意图把用户原始研究重点交给 Backend Harness", async () => {
+  it("研报意图交给调用方要求显式确认，不直接创建 Backend 任务", async () => {
     const classifyIntent = vi.fn().mockResolvedValue({
       intent: "deep",
       symbol: "NVDA",
       needs_symbol: false,
     });
     const deepReportCommand = vi.fn().mockResolvedValue(undefined);
+    const onPaidResearchSuggested = vi.fn().mockResolvedValue(undefined);
 
     vi.doMock("../src/api.js", () => ({ classifyIntent }));
     vi.doMock("../src/commands/product.js", () => ({
@@ -117,10 +130,14 @@ describe("dispatchNaturalText", () => {
     const { dispatchNaturalText } = await import("../src/core/natural-dispatch.js");
     await dispatchNaturalText("深度研究 NVDA，重点看 AI 供应链", {
       onGeneralChat: vi.fn(),
+      onPaidResearchSuggested,
     });
 
-    expect(deepReportCommand).toHaveBeenCalledWith("NVDA", {
-      rawUserInput: "深度研究 NVDA，重点看 AI 供应链",
-    });
+    expect(deepReportCommand).not.toHaveBeenCalled();
+    expect(onPaidResearchSuggested).toHaveBeenCalledWith(
+      "deep",
+      "NVDA",
+      "深度研究 NVDA，重点看 AI 供应链",
+    );
   });
 });

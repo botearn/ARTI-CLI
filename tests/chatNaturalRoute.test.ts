@@ -84,4 +84,52 @@ describe("chat natural routing", () => {
     expect(classifyIntent).not.toHaveBeenCalled();
     expect(streamChat).toHaveBeenCalledWith([{ role: "user", content: "今天的智谱" }]);
   });
+
+  it("研报意图只返回显式命令，不直接创建可能扣费的任务", async () => {
+    const classifyIntent = vi.fn().mockResolvedValue({
+      intent: "deep",
+      symbol: "NVDA",
+      needs_symbol: false,
+    });
+    const streamChat = vi.fn();
+    const fullReportCommand = vi.fn();
+    const deepReportCommand = vi.fn();
+    const outputSpy = vi.fn();
+
+    vi.doMock("../src/api.js", () => ({
+      classifyIntent,
+      streamChat,
+    }));
+    vi.doMock("../src/commands/product.js", () => ({
+      quickScanCommand: vi.fn(),
+      fullReportCommand,
+      deepReportCommand,
+    }));
+    vi.doMock("../src/output.js", () => ({
+      isJsonMode: () => true,
+      output: outputSpy,
+    }));
+    vi.doMock("../src/billing.js", () => ({
+      InsufficientCreditsError: class extends Error {},
+    }));
+    vi.doMock("../src/errors.js", () => ({
+      printError: vi.fn(),
+    }));
+    vi.doMock("../src/tracker.js", () => ({
+      track: vi.fn(),
+    }));
+
+    const { chatCommand } = await import("../src/commands/chat.js");
+    await chatCommand("深度分析 NVDA");
+
+    expect(fullReportCommand).not.toHaveBeenCalled();
+    expect(deepReportCommand).not.toHaveBeenCalled();
+    expect(streamChat).not.toHaveBeenCalled();
+    expect(outputSpy).toHaveBeenCalledWith({
+      status: "confirmation_required",
+      capability: "deep",
+      symbol: "NVDA",
+      command: "arti deep NVDA",
+    }, expect.any(Function));
+  });
 });
