@@ -5,9 +5,23 @@ import {
   saveConfig,
   type ArtiConfig,
 } from "./config.js";
+import {
+  closeSync,
+  mkdirSync,
+  openSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { fetchWithTimeout } from "./http.js";
 
 const AUTH_EXPIRY_SKEW_SECONDS = 60;
+const AUTH_REFRESH_LOCK_PATH = join(homedir(), ".config", "arti", "auth-refresh.lock");
+const AUTH_REFRESH_LOCK_WAIT_MS = 35_000;
+const AUTH_REFRESH_LOCK_STALE_MS = 60_000;
+const AUTH_REFRESH_LOCK_POLL_MS = 50;
 
 export interface AuthState {
   token: string;
@@ -129,13 +143,26 @@ export async function refreshAuthSession(current = getAuthState()): Promise<Auth
   ensureSupabaseKey(current.publishableKey, "自动续期");
 
   inflightRefresh = (async () => {
-    const session = await requestSupabaseSession(
-      current.supabaseUrl,
-      current.publishableKey,
-      "refresh_token",
-      { refresh_token: current.refreshToken },
-    );
-    return persistSession(session, current);
+    const releaseLock = await acquireAuthRefreshLock();
+    try {
+      const latest = getAuthState();
+      if (
+        latest.token !== current.token
+        || latest.refreshToken !== current.refreshToken
+      ) {
+        return latest;
+      }
+
+      const session = await requestSupabaseSession(
+        current.supabaseUrl,
+        current.publishableKey,
+        "refresh_token",
+        { refresh_token: current.refreshToken },
+      );
+      return persistSession(session, current);
+    } finally {
+      releaseLock();
+    }
   })();
 
   try {
@@ -296,4 +323,44 @@ function ensureSupabaseKey(publishableKey: string, action: string): void {
       `${action}需要 Supabase publishable key，请设置 ARTI_SUPABASE_PUBLISHABLE_KEY 或 auth.publishableKey`,
     );
   }
+}
+
+async function acquireAuthRefreshLock(): Promise<() => void> {
+  mkdirSync(join(homedir(), ".config", "arti"), { recursive: true, mode: 0o700 });
+  const startedAt = Date.now();
+
+  while (true) {
+    try {
+      const fd = openSync(AUTH_REFRESH_LOCK_PATH, "wx", 0o600);
+      writeFileSync(fd, `${process.pid}\n${Date.now()}\n`, "utf-8");
+      return () => {
+        closeSync(fd);
+        try {
+          unlinkSync(AUTH_REFRESH_LOCK_PATH);
+        } catch {
+          // 锁已被清理时无需重复处理
+        }
+      };
+    } catch (err) {
+      if (!isFileExistsError(err)) throw err;
+    }
+
+    try {
+      if (Date.now() - statSync(AUTH_REFRESH_LOCK_PATH).mtimeMs > AUTH_REFRESH_LOCK_STALE_MS) {
+        unlinkSync(AUTH_REFRESH_LOCK_PATH);
+        continue;
+      }
+    } catch {
+      continue;
+    }
+
+    if (Date.now() - startedAt >= AUTH_REFRESH_LOCK_WAIT_MS) {
+      throw new Error("等待其他 ARTI 进程完成登录续期超时，请重试");
+    }
+    await new Promise(resolve => setTimeout(resolve, AUTH_REFRESH_LOCK_POLL_MS));
+  }
+}
+
+function isFileExistsError(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error && "code" in err && err.code === "EEXIST";
 }

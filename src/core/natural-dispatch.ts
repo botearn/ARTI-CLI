@@ -3,7 +3,7 @@
  */
 import chalk from "chalk";
 import { classifyIntent, type IntentResult } from "../api.js";
-import { quickScanCommand, fullReportCommand, deepReportCommand } from "../commands/product.js";
+import { quickScanCommand } from "../commands/product.js";
 
 export type NaturalDispatchResult =
   | "quick-scan"
@@ -16,6 +16,11 @@ export type NaturalDispatchResult =
 
 export interface NaturalDispatchOptions {
   onGeneralChat: (text: string) => Promise<void>;
+  onPaidResearchSuggested: (
+    capability: "full" | "deep",
+    symbol: string,
+    originalText: string,
+  ) => Promise<void>;
   onClassified?: (result: IntentResult) => void;
 }
 
@@ -44,11 +49,11 @@ export async function dispatchNaturalText(
       else missingSymbolHint();
       return "quick-scan";
     case "panorama":
-      if (res.symbol) await fullReportCommand(res.symbol, { rawUserInput: trimmed });
+      if (res.symbol) await options.onPaidResearchSuggested("full", res.symbol, trimmed);
       else missingSymbolHint();
       return "panorama";
     case "deep":
-      if (res.symbol) await deepReportCommand(res.symbol, { rawUserInput: trimmed });
+      if (res.symbol) await options.onPaidResearchSuggested("deep", res.symbol, trimmed);
       else missingSymbolHint();
       return "deep";
     case "unsupported-market":

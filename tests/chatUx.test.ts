@@ -14,15 +14,16 @@ describe("普通对话 Loading 与能力引导", () => {
     hasSummary: true,
     artifactCount: 2,
     activeSymbols: ["NVDA"],
+    canCancel: false,
   };
 
   it("按等待时长展示真实阶段、上下文和取消提示", () => {
     expect(buildChatLoadingText(1_200, context)).toBe(
-      "普通对话 · 正在整理会话上下文… 1.2s",
+      "普通对话 · 正在准备会话请求… 1.2s",
     );
 
     const connected = buildChatLoadingLines(2_000, context).join("\n");
-    expect(connected).toContain("正在连接 ARTI");
+    expect(connected).toContain("请求已发送，等待首段回答");
     expect(connected).toContain("普通对话 · general");
     expect(connected).toContain("发送：当前问题");
     expect(connected).toContain("历史 4");
@@ -33,12 +34,18 @@ describe("普通对话 Loading 与能力引导", () => {
     expect(connected).not.toContain("Ctrl+C");
 
     const waiting = buildChatLoadingLines(8_000, context).join("\n");
-    expect(waiting).toContain("等待 ARTI 返回首个回答");
+    expect(waiting).toContain("请求已发送，等待首段回答");
     expect(waiting).toContain("投资原则：");
     expect(waiting).not.toContain("Ctrl+C");
 
-    expect(buildChatLoadingLines(20_000, context).join("\n")).toContain(
-      "Ctrl+C 可取消",
+    expect(buildChatLoadingLines(20_000, context).join("\n")).not.toContain(
+      "Ctrl+C",
+    );
+    expect(buildChatLoadingLines(20_000, {
+      ...context,
+      canCancel: true,
+    }).join("\n")).toContain(
+      "Ctrl+C 可取消当前回答",
     );
   });
 

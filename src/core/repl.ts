@@ -445,12 +445,17 @@ export async function startRepl(): Promise<void> {
     trackCommand(line.trim());
 
     if (input.type === "conversation") {
+      const controller = new AbortController();
+      const abortCurrentChat = () => controller.abort();
+      rl.on("SIGINT", abortCurrentChat);
       try {
         await conversation.runTurn(input.text, (text, options) =>
-          rawChatCommand(text, options)
+          rawChatCommand(text, { ...options, signal: controller.signal })
         );
       } catch (err) {
         console.error(chalk.red(`  处理失败: ${err instanceof Error ? err.message : String(err)}`));
+      } finally {
+        rl.off("SIGINT", abortCurrentChat);
       }
       console.log();
       return false;

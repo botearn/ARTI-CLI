@@ -33,6 +33,7 @@ export interface ChatRuntimeOptions {
   history?: ChatMessage[];
   conversation?: ConversationContext;
   onUsage?: (usage: ChatUsageEvent) => void;
+  signal?: AbortSignal;
 }
 
 export interface ChatCommandOptions extends ChatRuntimeOptions {
@@ -96,6 +97,7 @@ function buildLoadingContext(options?: ChatRuntimeOptions): ChatLoadingContext {
     hasSummary: Boolean(options?.conversation?.summary),
     artifactCount: options?.conversation?.artifacts.length ?? 0,
     activeSymbols: [...(options?.conversation?.activeSymbols ?? [])],
+    canCancel: Boolean(options?.signal),
   };
 }
 
@@ -107,6 +109,35 @@ function printStoredQuestionHint(
   console.log(chalk.gray(
     "  本轮问题已保存在当前 Session，但没有收到回答；处理后请重新发送。",
   ));
+}
+
+function buildInterruptedAnswer(answer: string): string {
+  return `${answer.trimEnd()}\n\n[回答中断]`;
+}
+
+function printInterruptedHint(cancelled: boolean): void {
+  console.log(chalk.gray(
+    cancelled
+      ? "  已取消当前回答，可继续输入下一条问题。"
+      : "  回答中途断开，已生成的部分已保存在当前 Session。",
+  ));
+}
+
+function printPaidResearchSuggestion(
+  capability: "full" | "deep",
+  symbol: string,
+): void {
+  const label = capability === "full" ? "全景研报" : "深度研报";
+  const command = `arti ${capability} ${symbol}`;
+  output({
+    status: "confirmation_required",
+    capability,
+    symbol,
+    command,
+  }, () => {
+    console.log(chalk.yellow(`  ${label}会创建后端任务，并可能按账号套餐扣费。`));
+    console.log(chalk.cyan(`  请显式确认后运行：${command}`));
+  });
 }
 
 function printResearchGuide(): void {
@@ -145,13 +176,14 @@ export async function rawChatCommand(
     ? new TerminalAnswerRenderer()
     : undefined;
   let bodyStarted = false;
+  let firstDeltaAcknowledged = false;
   let lastUsage: ChatUsageEvent | undefined;
+  let assistantText = "";
   try {
     // 计费由服务端权威处理（RFC-2026-0007），CLI 不再本地扣费/展示消耗
     track("chat", []);
-    let assistantText = "";
     const messages = [...(options?.history ?? []), { role: "user" as const, content: text }];
-    const streamOptions = options?.conversation || options?.onUsage
+    const streamOptions = options?.conversation || options?.onUsage || options?.signal
       ? {
           ...(options.conversation ? { conversation: options.conversation } : {}),
           clientCapabilities: { usageEvents: true },
@@ -159,6 +191,7 @@ export async function rawChatCommand(
             lastUsage = usage;
             options?.onUsage?.(usage);
           },
+          ...(options?.signal ? { signal: options.signal } : {}),
         }
       : undefined;
     const stream = streamOptions
@@ -173,6 +206,10 @@ export async function rawChatCommand(
         }
         if (answerRenderer) {
           answerRenderer.write(delta);
+          if (!answerRenderer.hasVisibleOutput && !firstDeltaAcknowledged) {
+            process.stdout.write(chalk.dim("  已收到首段回答，继续生成中…\n\n"));
+            firstDeltaAcknowledged = true;
+          }
         } else {
           process.stdout.write(delta);
         }
@@ -196,15 +233,43 @@ export async function rawChatCommand(
     }
     return result;
   } catch (err) {
-    if (!bodyStarted) loading?.fail();
+    const cancelled = Boolean(options?.signal?.aborted);
+    if (!bodyStarted) {
+      if (cancelled) loading?.stop();
+      else loading?.fail();
+    }
+    answerRenderer?.end();
+    if (!jsonMode && bodyStarted && !interactive) process.stdout.write("\n");
+
+    const partialAnswer = assistantText
+      ? buildInterruptedAnswer(assistantText)
+      : undefined;
+    if (partialAnswer) {
+      if (jsonMode) {
+        output({
+          answer: partialAnswer,
+          status: "incomplete",
+          cancelled,
+        }, () => {});
+      } else {
+        printInterruptedHint(cancelled);
+      }
+    }
+
+    if (cancelled) {
+      if (!partialAnswer && !jsonMode) printInterruptedHint(true);
+      return partialAnswer;
+    }
+
     process.exitCode = 1;
     if (err instanceof InsufficientCreditsError) {
       console.log(chalk.red(`\n  ✗ ${err.message}\n`));
-      printStoredQuestionHint(interactive, options);
-      return;
+      if (!partialAnswer) printStoredQuestionHint(interactive, options);
+      return partialAnswer;
     }
     printError(err);
-    printStoredQuestionHint(interactive, options);
+    if (!partialAnswer) printStoredQuestionHint(interactive, options);
+    return partialAnswer;
   }
 }
 
@@ -223,6 +288,7 @@ export async function chatCommand(
       history: options.history,
       conversation: options.conversation,
       onUsage: options.onUsage,
+      signal: options.signal,
     });
   }
 
@@ -248,7 +314,11 @@ export async function chatCommand(
           history: options?.history,
           conversation: options?.conversation,
           onUsage: options?.onUsage,
+          signal: options?.signal,
         });
+      },
+      onPaidResearchSuggested: async (capability, symbol) => {
+        printPaidResearchSuggestion(capability, symbol);
       },
     });
     stopRouting();

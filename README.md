@@ -109,7 +109,7 @@ arti
 
 新 Session 第一次成功完成普通对话后，CLI 会说明当前入口以及 `/quick`、`/full`、`/deep` 的研究深度。普通对话只展示后端返回的回答正文，CLI 无法据此证明内部存在多角色过程；`/full` 和 `/deep` 才提供可见、可追踪的角色化研究流程。参与角色由 Backend Agent Harness 根据任务选择；分析师和大师均为 AI 角色，大师观点是投资框架模拟，并非真人意见。
 
-普通对话等待首个回答片段时会分阶段显示真实入口、历史消息、摘要、Artifact 和活动标的；超过 8 秒后每 6 秒轮换一条原创投资原则，超过 20 秒提示可按 `Ctrl+C` 取消。首个回答片段到达后 Loading 会立即清除，完成时显示总耗时，以及后端实际返回的模型和 Token usage（如有）。`--json` 或非 TTY 环境不会输出动态 Loading，以保持结构化输出和管道稳定。
+普通对话等待首个回答片段时会分阶段显示真实入口、历史消息、摘要、Artifact 和活动标的；超过 8 秒后每 6 秒轮换一条原创投资原则，超过 20 秒提示可按 `Ctrl+C` 取消当前回答并继续使用 REPL。已经生成的部分会带中断标记保存在 Session。首个回答片段到达后 Loading 会立即清除，完成时显示总耗时，以及后端实际返回的模型和 Token usage（如有）。`--json` 或非 TTY 环境不会输出动态 Loading，以保持结构化输出和管道稳定。
 
 TTY 中的普通对话会把 Markdown 标题、粗体、列表、引用、分隔线和建议标签渲染成适合终端阅读的样式；Markdown 表格会转换成纵向信息块，避免中英文宽字符导致错位。Session、`--json` 和非 TTY 管道仍保留服务端原始回答。
 
@@ -132,7 +132,7 @@ arti report <taskId>
 
 Harness 内部可以选择数据工具、分析角色和补充证据，但第一版不支持用户在运行中调整任务。实际使用 `agent_harness`、`legacy` 或其他 rollout 路径由后端决定，CLI 不强制选择执行路径。
 
-`arti chat <问题>` 是兼容入口，默认先调用产品意图识别，可能派发到快速扫描、全景研报、深度研报或普通对话。需要保证只进行聊天时使用：
+`arti chat <问题>` 是兼容入口，默认先调用产品意图识别：快速扫描可直接派发，普通问题进入对话；全景和深度研报只返回建议命令，必须由用户显式运行 `arti full` 或 `arti deep` 后才创建可能扣费的任务。需要保证只进行聊天时使用：
 
 ```bash
 arti chat --raw 美股今天怎么样
@@ -222,7 +222,7 @@ Credits 和 Token usage 是两套概念：
   ├─ report ───────────────────────────────> report task query
   └─ poly ─────────────────────────────────> poly-data
 
-外层 arti chat（默认）─> classify-intent ──> 上述能力或 v1-chat
+外层 arti chat（默认）─> classify-intent ──> quick-scan / v1-chat / full、deep 显式命令提示
 ```
 
 CLI 是生产后端的瘦客户端，不是面向用户暴露的 MCP Server。`arti doctor mcp` 仅用于诊断 CLI 内部依赖的后端数据链，不代表提供 MCP Server 接入。

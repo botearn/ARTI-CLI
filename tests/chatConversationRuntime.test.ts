@@ -142,7 +142,7 @@ describe("rawChatCommand conversation runtime", () => {
       expect(ora).toHaveBeenCalled();
       expect(ora).toHaveBeenCalledWith(expect.objectContaining({
         discardStdin: false,
-        text: expect.stringContaining("正在整理会话上下文"),
+        text: expect.stringContaining("正在准备会话请求"),
       }));
       expect(spinner.start).toHaveBeenCalledTimes(1);
       expect(spinner.stop).toHaveBeenCalledTimes(1);
@@ -170,6 +170,111 @@ describe("rawChatCommand conversation runtime", () => {
     } finally {
       delete (process.stdout as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
       delete (process.stderr as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+    }
+  });
+
+  it("TTY 下首段没有换行时立即给出已收到回答的可见反馈", async () => {
+    const spinner = {
+      text: "",
+      start: vi.fn(function (this: unknown) {
+        return this;
+      }),
+      stop: vi.fn(),
+      fail: vi.fn(),
+    };
+    let finishStream: (() => void) | undefined;
+    const streamCanFinish = new Promise<void>((resolve) => {
+      finishStream = resolve;
+    });
+    async function* fakeStream() {
+      yield "这是首段但还没有换行";
+      await streamCanFinish;
+    }
+    const streamChat = vi.fn(() => fakeStream());
+
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+
+    vi.doMock("ora", () => ({ default: vi.fn(() => spinner) }));
+    vi.doMock("../src/api.js", () => ({ streamChat }));
+    vi.doMock("../src/output.js", () => ({
+      isJsonMode: () => false,
+      output: vi.fn(),
+    }));
+    vi.doMock("../src/billing.js", () => ({
+      InsufficientCreditsError: class extends Error {},
+    }));
+    vi.doMock("../src/errors.js", () => ({ printError: vi.fn() }));
+    vi.doMock("../src/tracker.js", () => ({ track: vi.fn() }));
+    vi.doMock("../src/core/natural-dispatch.js", () => ({ dispatchNaturalText: vi.fn() }));
+
+    try {
+      const { rawChatCommand } = await import("../src/commands/chat.js");
+      const pendingAnswer = rawChatCommand("继续");
+
+      await vi.waitFor(() => {
+        const rendered = stripVTControlCharacters(
+          stdoutSpy.mock.calls.map(call => String(call[0])).join(""),
+        );
+        expect(rendered).toContain("已收到首段回答");
+      });
+      finishStream?.();
+
+      await expect(pendingAnswer).resolves.toBe("这是首段但还没有换行");
+    } finally {
+      delete (process.stdout as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+      delete (process.stderr as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+    }
+  });
+
+  it("取消当前回答时返回并标记已生成部分，且不把命令记为失败", async () => {
+    async function* fakeStream(
+      _messages: unknown,
+      options?: { signal?: AbortSignal },
+    ) {
+      yield "已经生成的部分";
+      await new Promise<void>((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("已取消", "AbortError"));
+        }, { once: true });
+      });
+    }
+    const streamChat = vi.fn(fakeStream);
+    const controller = new AbortController();
+    const previousExitCode = process.exitCode;
+
+    vi.doMock("../src/api.js", () => ({ streamChat }));
+    vi.doMock("../src/output.js", () => ({
+      isJsonMode: () => false,
+      output: vi.fn(),
+    }));
+    vi.doMock("../src/billing.js", () => ({
+      InsufficientCreditsError: class extends Error {},
+    }));
+    vi.doMock("../src/errors.js", () => ({ printError: vi.fn() }));
+    vi.doMock("../src/tracker.js", () => ({ track: vi.fn() }));
+    vi.doMock("../src/core/natural-dispatch.js", () => ({ dispatchNaturalText: vi.fn() }));
+
+    try {
+      const { rawChatCommand } = await import("../src/commands/chat.js");
+      const pendingAnswer = rawChatCommand("继续", { signal: controller.signal });
+      await vi.waitFor(() => expect(stdoutSpy).toHaveBeenCalled());
+      controller.abort();
+
+      await expect(pendingAnswer).resolves.toBe("已经生成的部分\n\n[回答中断]");
+      expect(process.exitCode).toBe(previousExitCode);
+      expect(streamChat).toHaveBeenCalledWith(
+        [{ role: "user", content: "继续" }],
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    } finally {
+      process.exitCode = previousExitCode;
     }
   });
 
