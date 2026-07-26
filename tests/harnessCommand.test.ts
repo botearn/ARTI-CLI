@@ -80,6 +80,33 @@ describe("Agent Harness human output", () => {
     expect(formatStreamEvent(spawned, makeStats(), true)).toContain("一段很长");
   });
 
+  it("aggregates distinct agents and evidence by public identity", () => {
+    const stats = {
+      startedAt: null,
+      latestAt: null,
+      roles: new Set<string>(),
+      completedRoles: new Set<string>(),
+      evidenceRefs: new Set<string>(),
+      judgeDecision: null,
+      outputGatePassed: null,
+      resultUrl: null,
+      taskId: null,
+    };
+
+    const line = formatStreamEvent(event(8, "agent.completed", {
+      agent_id: "value-guardian",
+      role: "roundtable_master",
+      status: "completed",
+      evidence_refs: ["ev-1", "ev-2"],
+    }), stats);
+
+    expect(line).toContain("[value-guardian]");
+    expect(line).toContain("证据 2");
+    expect(stats.roles).toEqual(new Set(["value-guardian"]));
+    expect(stats.completedRoles).toEqual(new Set(["value-guardian"]));
+    expect(stats.evidenceRefs).toEqual(new Set(["ev-1", "ev-2"]));
+  });
+
   it("renders a compact result summary with quality and report URL", () => {
     const lines = formatRunResult({
       run_id: "3f621494-3ebd-4518-93f8-643a86d5b8bb",
