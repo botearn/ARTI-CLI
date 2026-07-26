@@ -262,11 +262,13 @@ const defs: CommandDef[] = [
       { short: "", long: "--idempotency-key", key: "idempotencyKey", type: "string", desc: "创建请求幂等键", hint: "<key>" },
       { short: "", long: "--after", key: "after", type: "string", desc: "从指定事件序号后恢复", hint: "<sequence>", defaultValue: "0" },
       { short: "", long: "--detach", key: "detach", type: "boolean", desc: "创建后不连接事件流" },
+      { short: "", long: "--verbose", key: "verbose", type: "boolean", desc: "显示完整角色任务目标和更多流式细节" },
     ],
     examples: [
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness run AAPL --type deep",
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness attach <run-id> --after 12",
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness result <run-id>",
+      "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness result <run-id> --json",
     ],
     invoke: ({ positional, options }) => harnessCommand(positional, options),
   },
