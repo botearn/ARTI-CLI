@@ -40,11 +40,12 @@ export async function harnessCommand(
     const status = await getAgentRun(value);
     output(status, () => printLines(formatRunStatus(status)));
   } else if (action === "result") {
-    const [result, status] = await Promise.all([
+    const [result, status, stats] = await Promise.all([
       getAgentRunResult(value),
       getAgentRun(value),
+      collectRunStats(value),
     ]);
-    output(result, () => printLines(formatRunResult(result, status)));
+    output(result, () => printLines(formatRunResult(result, status, stats)));
   } else if (action === "cancel") {
     const result = await cancelAgentRun(value);
     output(result, () => printLines(formatRunStatus(result)));
@@ -94,6 +95,18 @@ async function renderStream(
   if (!isJsonMode()) printLines(formatStreamCompletion(runId, stats));
 }
 
+async function collectRunStats(runId: string): Promise<StreamStats | null> {
+  const stats = createStreamStats();
+  try {
+    for await (const event of attachAgentRun(runId, { afterSequence: 0 })) {
+      updateStreamStats(event, stats);
+    }
+    return stats;
+  } catch {
+    return null;
+  }
+}
+
 export function formatStreamEvent(
   event: AgentRunEvent,
   stats: StreamStats,
@@ -102,7 +115,7 @@ export function formatStreamEvent(
   updateStreamStats(event, stats);
   const payload = event.payload;
   const sequence = chalk.gray(event.sequence.toString().padStart(4, " "));
-  const role = text(payload.role) || "Agent";
+  const role = text(payload.agent_id) || text(payload.role) || "Agent";
   const evidenceCount = stringList(payload.evidence_refs).length;
   const round = positiveNumber(payload.judge_round) || positiveNumber(payload.retry_round);
   switch (event.type) {
@@ -153,6 +166,7 @@ export function formatStreamEvent(
 export function formatRunResult(
   result: Record<string, unknown>,
   status: Record<string, unknown>,
+  stats: StreamStats | null = null,
 ): string[] {
   const payload = record(result.payload);
   const quality = record(result.quality);
@@ -175,17 +189,22 @@ export function formatRunResult(
     ?? trace.outputGatePassed
     ?? trace.output_gate_passed;
   const evidenceCount = firstNumber(
+    stats?.evidenceRefs.size,
     trace.evidenceRefCount,
     trace.evidence_ref_count,
     trace.evidenceCount,
     trace.evidence_count,
   );
   const masterCount = firstNumber(
+    stats?.roles.size,
     trace.subagentCount,
     trace.subagent_count,
     Array.isArray(payload.masters) ? payload.masters.length : undefined,
   );
   const reportUrl = taskId ? reportPageUrl(taskId) : null;
+  const elapsed = stats && stats.startedAt !== null && stats.latestAt !== null
+    ? formatDuration(Math.max(0, stats.latestAt - stats.startedAt))
+    : "未提供";
   return [
     chalk.bold("Agent Harness 结果摘要"),
     `Run ID：${runId || "未提供"}`,
@@ -194,6 +213,7 @@ export function formatRunResult(
     `状态：${text(result.status) || text(status.status) || "未提供"}`,
     `质量裁决：${decision}`,
     `质量门禁：${gateValue === true ? "通过" : gateValue === false ? "未通过" : "未提供"}`,
+    `耗时：${elapsed}`,
     `证据数量：${evidenceCount ?? "未提供"}`,
     `角色数量：${masterCount ?? "未提供"}`,
     `报告卡片：${cards.length}`,
@@ -222,7 +242,7 @@ function updateStreamStats(event: AgentRunEvent, stats: StreamStats): void {
     stats.latestAt = stats.latestAt === null ? timestamp : Math.max(stats.latestAt, timestamp);
   }
   stats.taskId ||= event.task_id ? String(event.task_id) : null;
-  const role = text(event.payload.role);
+  const role = text(event.payload.agent_id) || text(event.payload.role);
   if (role) stats.roles.add(role);
   if (event.type === "agent.completed" && role) stats.completedRoles.add(role);
   for (const ref of stringList(event.payload.evidence_refs)) stats.evidenceRefs.add(ref);
