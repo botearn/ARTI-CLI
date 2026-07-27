@@ -213,6 +213,17 @@ export class PlanAccessError extends Error {
   }
 }
 
+class BillingReadError extends Error {
+  constructor(
+    table: string,
+    public status: number,
+    detail: string,
+  ) {
+    super(`读取 ${table} 失败: ${detail}`);
+    this.name = "BillingReadError";
+  }
+}
+
 // L14：扣费/计费后端不可用（区别于"积分不足"的 InsufficientCreditsError）
 
 export function isPlanId(value: string): value is PlanId {
@@ -353,7 +364,7 @@ async function supabaseSelect<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "unknown error");
-    throw new Error(`读取 ${table} 失败: ${text}`);
+    throw new BillingReadError(table, res.status, text);
   }
 
   return { data: await res.json() as T };
@@ -383,7 +394,7 @@ async function supabaseMaybeSingle<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "unknown error");
-    throw new Error(`读取 ${table} 失败: ${text}`);
+    throw new BillingReadError(table, res.status, text);
   }
 
   const json = await res.json() as T[];

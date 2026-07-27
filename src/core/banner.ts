@@ -52,6 +52,7 @@ export interface BannerInput {
   version?: string;
   /** 登录身份（email 或 userId）；null/缺省 = 未登录 */
   who?: string | null;
+  statusFill?: StatusFill;
   columns?: number;
   unicode?: boolean;
   now?: Date;
@@ -63,15 +64,24 @@ export interface RenderedBanner {
   statusLineIndex: number;
 }
 
-/** 状态行填充内容：pending = 等待余额回填；error = 拉取失败只保留身份 */
-export type StatusFill = BillingState | "pending" | "error";
+/** 状态行填充内容：pending = 验证中；invalid = 凭证失效；unavailable = 暂时无法验证 */
+export type StatusFill = BillingState | "pending" | "invalid" | "unavailable";
 
 export function renderStatusContent(who: string, fill: StatusFill): string {
-  const dot = chalk.green("●");
-  if (fill === "error") return `  ${dot} ${who}`;
-  if (fill === "pending") return `  ${dot} ${who} ${chalk.dim("· 余额查询中…")}`;
+  if (fill === "pending") {
+    return `  ${chalk.yellow("●")} ${who} ${chalk.dim("· 正在验证登录状态…")}`;
+  }
+  if (fill === "invalid") {
+    return (
+      `  ${chalk.red("●")} ${who} ${chalk.dim("·")} ${chalk.red("登录已失效")} ` +
+      `${chalk.dim("· 输入")} ${chalk.cyan("/login")} ${chalk.dim("重新登录")}`
+    );
+  }
+  if (fill === "unavailable") {
+    return `  ${chalk.yellow("●")} ${who} ${chalk.dim("· 登录状态暂时无法验证")}`;
+  }
   return (
-    `  ${dot} ${who} ${chalk.dim("·")} ${chalk.cyan(fill.tierLabel)} ${chalk.dim("·")} ` +
+    `  ${chalk.green("●")} ${who} ${chalk.dim("·")} ${chalk.cyan(fill.tierLabel)} ${chalk.dim("·")} ` +
     chalk.hex("#FFD700")(formatCredits(fill.balance))
   );
 }
@@ -102,7 +112,7 @@ export function renderBanner(input: BannerInput = {}): RenderedBanner {
   let statusLineIndex = -1;
   if (who) {
     statusLineIndex = lines.length;
-    lines.push(renderStatusContent(who, "pending"));
+    lines.push(renderStatusContent(who, input.statusFill ?? "pending"));
   } else {
     lines.push(renderLoginHint());
   }

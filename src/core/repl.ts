@@ -9,10 +9,16 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
 import { trackCommand } from "./session.js";
-import { getAuthState, isLoggedIn } from "../auth.js";
+import { getAuthState, isLoggedIn, isTokenExpiringSoon } from "../auth.js";
 import { VERSION } from "../version.js";
-import { printBanner, renderStatusContent, type PrintedBanner } from "./banner.js";
+import {
+  printBanner,
+  renderStatusContent,
+  type PrintedBanner,
+  type StatusFill,
+} from "./banner.js";
 import { getActiveBillingState } from "../billing.js";
+import { isAuthenticationError } from "../errors.js";
 import { checkForUpdate, formatUpdateNotice } from "../update-check.js";
 import {
   rawChatCommand,
@@ -100,14 +106,26 @@ function trimHistoryIfNeeded(): void {
   }
 }
 
-/** 本地读取登录身份（email 或 userId）；未登录/读取失败返回 null，不发起网络请求 */
-function readLocalWho(): string | null {
+interface LocalAuthDisplay {
+  who: string | null;
+  statusFill: StatusFill;
+}
+
+/** 本地读取登录身份和可确定的过期状态；不发起网络请求 */
+function readLocalAuthDisplay(): LocalAuthDisplay {
   try {
     const auth = getAuthState();
-    if (!isLoggedIn(auth)) return null;
-    return auth.email || auth.userId || "已登录账户";
+    if (!isLoggedIn(auth)) {
+      return { who: null, statusFill: "pending" };
+    }
+    return {
+      who: auth.email || auth.userId || "已登录账户",
+      statusFill: isTokenExpiringSoon(auth, 0) && !auth.refreshToken
+        ? "invalid"
+        : "pending",
+    };
   } catch {
-    return null;
+    return { who: null, statusFill: "pending" };
   }
 }
 
@@ -133,23 +151,36 @@ function rewriteBannerStatus(rl: readline.Interface, banner: PrintedBanner, cont
   rl.prompt(true);
 }
 
-/** banner 异步信息：更新提示（网络检查）+ 余额回填。canUpdate 不满足时静默丢弃 */
+/** banner 异步信息：更新提示（网络检查）+ 登录/余额状态回填 */
 function wireBannerAsyncInfo(
   rl: readline.Interface,
   banner: PrintedBanner,
   who: string | null,
-  canUpdate: () => boolean,
+  options: {
+    canRewrite: () => boolean;
+    onStatusNotice: (content: string) => void;
+  },
 ): void {
   void checkForUpdate(VERSION, (latest) => {
-    if (canUpdate()) insertLineAbovePrompt(rl, formatUpdateNotice(VERSION, latest));
+    if (options.canRewrite()) {
+      insertLineAbovePrompt(rl, formatUpdateNotice(VERSION, latest));
+    }
   });
   if (who) {
     void getActiveBillingState()
       .then((state) => {
-        if (canUpdate()) rewriteBannerStatus(rl, banner, renderStatusContent(who, state));
+        if (options.canRewrite()) {
+          rewriteBannerStatus(rl, banner, renderStatusContent(who, state));
+        }
       })
-      .catch(() => {
-        if (canUpdate()) rewriteBannerStatus(rl, banner, renderStatusContent(who, "error"));
+      .catch((err) => {
+        const fill = isAuthenticationError(err) ? "invalid" : "unavailable";
+        const content = renderStatusContent(who, fill);
+        if (options.canRewrite()) {
+          rewriteBannerStatus(rl, banner, content);
+        } else {
+          options.onStatusNotice(content);
+        }
       });
   }
 }
@@ -385,8 +416,13 @@ function findSlashCommand(name: string): ReplCommand | undefined {
 export async function startRepl(): Promise<void> {
   // 仅交互终端打印 banner；管道输入/输出时保持安静
   const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-  const who = interactive ? readLocalWho() : null;
-  const banner = interactive ? printBanner({ who }) : null;
+  const localAuth = interactive
+    ? readLocalAuthDisplay()
+    : { who: null, statusFill: "pending" as const };
+  const who = localAuth.who;
+  const banner = interactive
+    ? printBanner({ who, statusFill: localAuth.statusFill })
+    : null;
 
   const history = loadHistory();
   const config = loadConfig();
@@ -414,10 +450,22 @@ export async function startRepl(): Promise<void> {
     historySize: MAX_HISTORY,
   });
 
-  // 仅当 banner 之后尚无新输出、且用户未在输入时，允许异步回填（余额/更新提示）
+  // 成功时安静回填 banner；失败状态在输出繁忙时延迟到下一个 prompt。
   let bannerFresh = banner !== null;
+  let processing = false;
+  let deferredBannerNotice: string | undefined;
+  const showOrDeferBannerNotice = (content: string): void => {
+    if (!processing && rl.line.length === 0) {
+      insertLineAbovePrompt(rl, content);
+      return;
+    }
+    deferredBannerNotice = content;
+  };
   if (banner) {
-    wireBannerAsyncInfo(rl, banner, who, () => bannerFresh && rl.line.length === 0);
+    wireBannerAsyncInfo(rl, banner, who, {
+      canRewrite: () => bannerFresh && rl.line.length === 0,
+      onStatusNotice: showOrDeferBannerNotice,
+    });
   }
 
   // M-C9：退出前 graceful 关闭 backend MCP 连接。幂等 + 防重入。
@@ -600,7 +648,6 @@ export async function startRepl(): Promise<void> {
 
   // M-C4：命令执行期间继续到达的输入行进入队列，串行处理，避免并发竞态与输出交错
   const pending: string[] = [];
-  let processing = false;
   const drain = async (): Promise<void> => {
     if (processing) return;
     processing = true;
@@ -612,6 +659,10 @@ export async function startRepl(): Promise<void> {
       }
     } finally {
       processing = false;
+    }
+    if (deferredBannerNotice) {
+      console.log(deferredBannerNotice);
+      deferredBannerNotice = undefined;
     }
     rl.prompt();
   };
