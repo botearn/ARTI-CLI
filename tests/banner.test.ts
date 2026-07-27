@@ -27,7 +27,7 @@ describe("启动 banner", () => {
     expect(text).toContain("█████"); // 大字标
     expect(text).toContain("0.4.0");
     expect(text).toContain("zhe@artifin.ai");
-    expect(text).toContain("余额查询中");
+    expect(text).toContain("正在验证登录状态");
     expect(text).toContain("提示：");
     // 状态行下标指向含身份的那一行，供异步回填定位
     expect(statusLineIndex).toBeGreaterThan(0);
@@ -76,21 +76,38 @@ describe("启动 banner", () => {
 });
 
 describe("状态行内容", () => {
-  it("pending 显示占位符，billing 到位后显示套餐与余额", () => {
-    expect(renderStatusContent("zhe@x.com", "pending")).toContain("余额查询中");
+  it("pending 显示黄色验证状态，billing 到位后显示套餐与余额", () => {
+    expect(renderStatusContent("zhe@x.com", "pending")).toContain("正在验证登录状态");
 
     const filled = renderStatusContent("zhe@x.com", fakeBilling);
     expect(filled).toContain("zhe@x.com");
     expect(filled).toContain("Pro");
     expect(filled).toContain("1,240");
     expect(filled).toContain("Credits");
-    expect(filled).not.toContain("余额查询中");
+    expect(filled).not.toContain("正在验证登录状态");
   });
 
-  it("error 只保留身份，去掉占位符", () => {
-    const line = renderStatusContent("zhe@x.com", "error");
-    expect(line).toContain("zhe@x.com");
-    expect(line).not.toContain("余额查询中");
+  it("认证失效时直接提示 /login，网络异常时不误导用户重新登录", () => {
+    const invalid = renderStatusContent("zhe@x.com", "invalid");
+    expect(invalid).toContain("zhe@x.com");
+    expect(invalid).toContain("登录已失效");
+    expect(invalid).toContain("/login");
+
+    const unavailable = renderStatusContent("zhe@x.com", "unavailable");
+    expect(unavailable).toContain("登录状态暂时无法验证");
+    expect(unavailable).not.toContain("登录已失效");
+    expect(unavailable).not.toContain("/login");
+  });
+
+  it("本地已确定过期时 banner 首屏直接显示失效状态", () => {
+    const { lines } = renderBanner({
+      version: "0.4.3",
+      who: "zhe@x.com",
+      statusFill: "invalid",
+      columns: 80,
+    });
+
+    expect(lines.join("\n")).toContain("登录已失效");
   });
 });
 

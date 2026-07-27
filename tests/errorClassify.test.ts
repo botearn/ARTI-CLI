@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../src/api.js";
 import { ReportWaitTimeoutError } from "../src/commands/report-task.js";
-import { classifyError } from "../src/errors.js";
+import { classifyError, isAuthenticationError } from "../src/errors.js";
 import { InsufficientCreditsError, PlanAccessError } from "../src/billing.js";
 
 // L15：计费/套餐类错误应被 classifyError 精确识别，不落入"未知错误"兜底。
@@ -31,6 +31,20 @@ describe("classifyError 计费类错误分类", () => {
     expect(info.title).toBe("登录态不可用");
     expect(info.suggestion).toContain("/login");
     expect(info.suggestion).toContain("arti login");
+  });
+
+  it("区分认证失效与网络、服务端错误", () => {
+    const unauthorized = Object.assign(new Error("authorization failed"), {
+      status: 401,
+    });
+
+    expect(isAuthenticationError(new Error("invalid_grant: refresh token 已失效"))).toBe(true);
+    expect(isAuthenticationError(new Error("JWT expired"))).toBe(true);
+    expect(isAuthenticationError(unauthorized)).toBe(true);
+    expect(isAuthenticationError(new TypeError("fetch failed"))).toBe(false);
+    expect(isAuthenticationError(Object.assign(new Error("server error"), {
+      status: 500,
+    }))).toBe(false);
   });
 
   it("研报 402 提示查看后端权威 Credits", () => {

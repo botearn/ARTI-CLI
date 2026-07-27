@@ -9,6 +9,27 @@ interface ErrorInfo {
   suggestion: string;
 }
 
+export function isAuthenticationError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const status = "status" in err && typeof err.status === "number"
+    ? err.status
+    : null;
+  if (status === 401 || status === 403) return true;
+
+  const message = err.message.toLowerCase();
+  return [
+    "未登录",
+    "登录已过期",
+    "refresh_token",
+    "refresh token",
+    "invalid_grant",
+    "jwt expired",
+    "invalid jwt",
+    "token has expired",
+    "token is expired",
+  ].some(pattern => message.includes(pattern));
+}
+
 export function classifyError(err: unknown): ErrorInfo {
   // L15：Credits/套餐类错误自带完整文案，透传 message，不落入"未知错误"兜底
   if (err instanceof Error && (err.name === "InsufficientCreditsError" || err.name === "PlanAccessError")) {
@@ -27,6 +48,14 @@ export function classifyError(err: unknown): ErrorInfo {
     };
   }
 
+  if (isAuthenticationError(err)) {
+    return {
+      title: "登录态不可用",
+      detail: err.message,
+      suggestion: "交互终端输入 /login，外层运行 arti login 后重试",
+    };
+  }
+
   if (err instanceof TypeError && String(err.message).includes("fetch")) {
     return {
       title: "网络请求失败",
@@ -37,14 +66,6 @@ export function classifyError(err: unknown): ErrorInfo {
 
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
-
-    if (msg.includes("未登录") || msg.includes("登录已过期") || msg.includes("refresh_token") || msg.includes("refresh token")) {
-      return {
-        title: "登录态不可用",
-        detail: err.message,
-        suggestion: "交互终端输入 /login，外层运行 arti login 后重试",
-      };
-    }
 
     // DNS / 网络层
     if (msg.includes("getaddrinfo") || msg.includes("enotfound")) {
@@ -79,13 +100,6 @@ export function classifyError(err: unknown): ErrorInfo {
     // HTTP 状态码（来自 ApiError）
     if ("status" in err) {
       const status = (err as { status: number }).status;
-      if (status === 401 || status === 403) {
-        return {
-          title: `认证失败 (${status})`,
-          detail: err.message,
-          suggestion: "接口需要认证，请确认 API 配置是否正确",
-        };
-      }
       if (status === 402) {
         return {
           title: "Credits 不足",
