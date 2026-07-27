@@ -9,7 +9,7 @@ interface ErrorInfo {
   suggestion: string;
 }
 
-export function isAuthenticationError(err: unknown): boolean {
+export function isAuthenticationError(err: unknown): err is Error {
   if (!(err instanceof Error)) return false;
   const status = "status" in err && typeof err.status === "number"
     ? err.status
