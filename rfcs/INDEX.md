@@ -30,9 +30,7 @@
 
 ## 🚧 Implementing（实施中）
 
-| RFC | 标题 | 开始日期 |
-|---|---|---|
-| [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) | CLI 接入 Backend Agent Harness | 2026-07-25 |
+*当前无实施中的 RFC*
 
 ---
 
@@ -40,6 +38,7 @@
 
 | RFC | 标题 | 完成日期 | 版本 |
 |---|---|---|---|
+| [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) | CLI 接入 Backend Agent Harness | 2026-07-28 | v0.4.4 |
 | [RFC-2026-0001](2026/RFC-2026-0001-backend-mcp-integration.md) | Backend MCP 集成 - 主链支持所有市场 | 2026-05-19 | v0.3.0 |
 
 ---
@@ -104,6 +103,7 @@
 
 ### 2026
 
+- **2026-07-28** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - 生产 Agent Harness smoke test 完成并随 v0.4.4 发布 (Implemented)
 - **2026-07-26** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 第一版完成，等待生产 smoke test (Implementing)
 - **2026-07-25** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 接入 Backend Agent Harness (Draft)
 - **2026-07-24** - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 对话优先 CLI、Slash Command 与 Token 感知会话 (Draft)
@@ -127,10 +127,10 @@
 | Draft | 7 |
 | Proposed | 0 |
 | Accepted | 0 |
-| Implementing | 1 |
-| Implemented | 1 |
+| Implementing | 0 |
+| Implemented | 2 |
 | Rejected | 0 |
 | Deprecated | 0 |
 | **总计** | **9** |
 
-**最后更新**: 2026-07-26
+**最后更新**: 2026-07-28

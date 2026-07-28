@@ -10,7 +10,7 @@ CLI 是生产后端的**瘦客户端**：Chat / Quick Scan 调用 Supabase Edge 
 
 - **主线分支为 `main`**（GitHub 默认分支）。旧的 `master` 已弃用，不再使用。
 - 从 `main` 切分支开发：新功能 `feat/<名>`、修复 `fix/<名>`；不直接在 `main` 上提交。
-- 当前版本 `0.4.3` = 对话优先 v1：保留生产瘦客户端边界，并新增 Slash Control Plane、本地 Session、Compact、Artifact、分阶段 Loading 与终端回答排版。详见 `CHANGELOG.md`、RFC-2026-0003 与 RFC-2026-0008。
+- 当前版本 `0.4.4` = 对话优先 v1 + Backend Agent Harness：保留生产瘦客户端边界，支持 Slash Control Plane、本地 Session、Compact、Artifact、可取消 Chat，以及 full/deep 异步任务与 `report` 恢复。详见 `CHANGELOG.md`、RFC-2026-0008 与 RFC-2026-0009。
 
 ## 项目结构
 
