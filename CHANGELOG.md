@@ -7,15 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-07-28
+
 ### ✨ Added
 
 - 新增 `arti report <taskId>` 与 `/report <taskId>`，可在终端中断后恢复等待或查看已有研报任务
 - full/deep 支持在股票代码后附加研究重点，并在创建任务时交给 Backend Agent Harness
+- 新增 PR CI，自动执行依赖安装、类型检查、构建和测试
 
 ### 🔧 Changed
 
 - full/deep 从同步 `/v1/orchestrator` 切换为 `/v1/generate-report` + `/v1/report/{taskId}` 异步任务链；CLI 不再预取研报 stockData
 - Harness 执行路径、缓存、扣费和失败退款均由后端决定；CLI 第一版只观察进度，不支持运行中调整
+- 普通对话识别到全景或深度研报意图时只提示显式命令，不再直接创建可能扣费的任务
+- Chat Loading 收到首段内容后明确反馈生成状态；按 `Ctrl+C` 可取消当前回答并继续使用 REPL，已生成部分带中断标记保存到 Session
+
+### ✅ Fixed
+
+- 修复并发进程刷新登录凭证时复用旧 refresh token，导致凭证意外失效的问题
+- 修复启动后认证失败仍显示绿色登录状态的问题；现在会区分登录失效与服务暂时不可用
+- 修复认证错误类型未正确收窄，导致发布工作流类型检查失败的问题
 
 ## [0.4.3] - 2026-07-25
 
@@ -53,10 +64,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 更新检查改为回调模式：REPL 内异步插入提示、命令模式改走 stderr、`--json` 模式完全跳过（stdout 保持纯净）；定时器 unref 不再拖住进程退出
 - **计费一律服务端权威（RFC-2026-0007）**：移除 CLI 侧本地扣费（chat / quick-scan / full / deep 不再调用 `consume_credits_atomic`），消除 chat / quick-scan 的双重扣费；命令结尾不再展示"消耗 / 余额"行，`arti credits` 仍可查询余额
 - 普通对话显式使用通用 Agent；快速扫描补齐后端返回的分析判断、综合结论、风险和行情来源
-
-### ⚠️ 已知问题
-
-- **full / deep 暂时免费**：其后端链路（Railway `/v1/orchestrator`）尚未接入服务端扣费，在后端补齐前 `full` / `deep` 不计费。跟踪见 RFC-2026-0007「待后端跟进」
 
 ## [0.4.0] - 2026-06-24
 
