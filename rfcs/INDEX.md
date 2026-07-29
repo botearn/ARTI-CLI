@@ -6,6 +6,7 @@
 
 | RFC | 标题 | 创建日期 |
 |---|---|---|
+| [RFC-2026-0010](2026/RFC-2026-0010-insight-research-capabilities.md) | CLI 引入 ARTI Insight 与 ARTI Research | 2026-07-29 |
 | [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) | 对话优先 CLI、Slash Command 与 Token 感知会话 | 2026-07-24 |
 | [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) | 新用户上手 — 一行安装 + REPL 登录态 Onboarding | 2026-06-01 |
 | [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) | CLI 数据链收敛到生产产品函数，下线 OpenBB 第二套处理 | 2026-06-24 |
@@ -59,6 +60,7 @@
 
 ### 🏗️ 架构 & 基础设施
 
+- [RFC-2026-0010](2026/RFC-2026-0010-insight-research-capabilities.md) - Insight 一次性判断与 Research 长期资源
 - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 接入 Backend Agent Harness
 - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 对话优先 CLI、Slash Command 与 Token 感知会话
 
@@ -75,12 +77,14 @@
 
 ### 🔧 CLI 命令
 
+- [RFC-2026-0010](2026/RFC-2026-0010-insight-research-capabilities.md) - `/insight` 与 `/research` 能力边界
 - [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成（`arti poly` 子命令组）
 - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 会话内 Slash Command 与外层自动化接口分层
 - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - full/deep 异步任务与 report 恢复命令
 
 ### 🤖 AI & Research
 
+- [RFC-2026-0010](2026/RFC-2026-0010-insight-research-capabilities.md) - 结构化 Insight 与版本化 Research
 - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - Token 感知会话、Artifact 与对话工具调用
 - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - Backend Agent Harness 接入
 
@@ -103,6 +107,7 @@
 
 ### 2026
 
+- **2026-07-29** - [RFC-2026-0010](2026/RFC-2026-0010-insight-research-capabilities.md) - CLI 引入 ARTI Insight 与 ARTI Research (Draft)
 - **2026-07-28** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - 生产 Agent Harness smoke test 完成并随 v0.4.4 发布 (Implemented)
 - **2026-07-26** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 第一版完成，等待生产 smoke test (Implementing)
 - **2026-07-25** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 接入 Backend Agent Harness (Draft)
@@ -124,13 +129,13 @@
 
 | 状态 | 数量 |
 |---|---|
-| Draft | 7 |
+| Draft | 8 |
 | Proposed | 0 |
 | Accepted | 0 |
 | Implementing | 0 |
 | Implemented | 2 |
 | Rejected | 0 |
 | Deprecated | 0 |
-| **总计** | **9** |
+| **总计** | **10** |
 
-**最后更新**: 2026-07-28
+**最后更新**: 2026-07-29
