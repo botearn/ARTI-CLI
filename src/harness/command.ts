@@ -92,7 +92,9 @@ async function renderStream(
       if (line) console.log(line);
     });
   }
-  if (!isJsonMode()) printLines(formatStreamCompletion(runId, stats));
+  if (!isJsonMode()) {
+    printLines(formatStreamCompletion(runId, stats, afterSequence));
+  }
 }
 
 async function collectRunStats(runId: string): Promise<StreamStats | null> {
@@ -257,19 +259,24 @@ function updateStreamStats(event: AgentRunEvent, stats: StreamStats): void {
   }
 }
 
-function formatStreamCompletion(runId: string, stats: StreamStats): string[] {
+export function formatStreamCompletion(
+  runId: string,
+  stats: StreamStats,
+  afterSequence = 0,
+): string[] {
   if (stats.latestAt === null) return [];
   const elapsed = stats.startedAt === null
     ? "未提供"
     : formatDuration(Math.max(0, stats.latestAt - stats.startedAt));
   const reportUrl = stats.taskId ? reportPageUrl(stats.taskId) : null;
+  const replayPrefix = afterSequence > 0 ? "重放窗口" : "";
   return [
     "",
-    chalk.bold("执行摘要"),
+    chalk.bold(afterSequence > 0 ? `断点续传摘要（序号 > ${afterSequence}）` : "执行摘要"),
     `Run ID：${runId}`,
-    `角色：${stats.completedRoles.size}/${stats.roles.size} 完成`,
-    `耗时：${elapsed}`,
-    `证据：${stats.evidenceRefs.size}`,
+    `${replayPrefix}角色：${stats.completedRoles.size}/${stats.roles.size} 完成`,
+    `${replayPrefix}耗时：${elapsed}`,
+    `${replayPrefix}证据：${stats.evidenceRefs.size}`,
     `最终裁决：${stats.judgeDecision || "未提供"}`,
     `质量门禁：${stats.outputGatePassed === true ? "通过" : stats.outputGatePassed === false ? "未通过" : "未提供"}`,
     `报告页面：${reportUrl || absoluteResultUrl(stats.resultUrl) || "未提供"}`,

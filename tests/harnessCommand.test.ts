@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   formatRunResult,
+  formatStreamCompletion,
   formatStreamEvent,
 } from "../src/harness/command.js";
 import type { AgentRunEvent } from "../src/harness/types.js";
@@ -143,5 +144,27 @@ describe("Agent Harness human output", () => {
       "https://dev.artifin.ai/report/task/6d02a989-f2df-4457-8057-83595320dd9f",
     );
     expect(lines.join("\n")).toContain("--json");
+  });
+
+  it("labels resumed stream metrics as a replay window rather than full-run totals", () => {
+    const lines = formatStreamCompletion(
+      "3f621494-3ebd-4518-93f8-643a86d5b8bb",
+      {
+        startedAt: Date.parse("2026-07-26T10:00:00Z"),
+        latestAt: Date.parse("2026-07-26T10:01:00Z"),
+        roles: new Set(["cycle-judge", "business-model"]),
+        completedRoles: new Set(["cycle-judge", "business-model"]),
+        evidenceRefs: new Set(["ev-1", "ev-2", "ev-3"]),
+        judgeDecision: "pass_with_gaps",
+        outputGatePassed: true,
+        resultUrl: null,
+        taskId: "6d02a989-f2df-4457-8057-83595320dd9f",
+      },
+      50,
+    );
+
+    expect(lines.join("\n")).toContain("断点续传摘要（序号 > 50）");
+    expect(lines.join("\n")).toContain("重放窗口角色：2/2 完成");
+    expect(lines.join("\n")).not.toContain("\n角色：2/2 完成");
   });
 });
