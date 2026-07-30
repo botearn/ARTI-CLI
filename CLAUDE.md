@@ -24,6 +24,7 @@ CLI 是生产后端的**瘦客户端**：Chat / Quick Scan 调用 Supabase Edge 
 - `src/api.ts` — 生产函数客户端（chat / scan-stock / classify-intent / Agent Harness 研报任务）
 - `src/commands/` — 各能力实现（product=quick-scan/full/deep，chat，auth，credits…）
 - `src/commands/report-task.ts` — 创建、轮询、恢复和渲染 Backend Agent Harness 研报任务
+- `src/harness/` — 默认关闭的 Agent Run Streaming 参考消费者；只实现事件契约与终端渐进式披露，不拥有执行策略、Migration 或部署逻辑
 - `src/data/` — 后端 MCP 客户端、研报上下文、共享类型
 - `prompts/` — AI 研报 prompt 定义（从 ARTI_backend 同步）
   - `layer1/` — 8 位分析师 prompt（Natasha/Steve/Tony/Thor/Clint/Sam/Vision/Wanda）

@@ -57,6 +57,19 @@ describe("Agent Harness streaming client", () => {
     ensureValidAccessToken.mockReset();
   });
 
+  it("stays fail-closed and performs no auth or network work unless explicitly enabled", async () => {
+    delete process.env.ARTI_HARNESS_STREAMING_ENABLED;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { getAgentRun } = await import("../src/harness/client.js");
+
+    await expect(getAgentRun(runId)).rejects.toThrow(
+      "Agent Harness streaming is disabled",
+    );
+    expect(ensureValidAccessToken).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("accepts gaps caused by server-side visibility filtering", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => sse([event(1), event(2), event(10), event(19)])));
 
