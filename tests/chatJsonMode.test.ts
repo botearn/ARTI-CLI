@@ -15,12 +15,32 @@ describe("rawChatCommand JSON 模式", () => {
     vi.restoreAllMocks();
   });
 
-  it("JSON 模式下不流式写 stdout，改为结构化输出 answer", async () => {
-    async function* fakeStream() {
+  it("JSON 模式下不流式写 stdout，并输出服务端返回的模型与 Token usage", async () => {
+    async function* fakeStream(
+      _messages: unknown,
+      options?: {
+        onUsage?: (usage: {
+          requestId: string;
+          model: string;
+          inputTokens: number;
+          outputTokens: number;
+          cachedInputTokens: number;
+          totalTokens: number;
+        }) => void;
+      },
+    ) {
+      options?.onUsage?.({
+        requestId: "req-json",
+        model: "claude-sonnet",
+        inputTokens: 120,
+        outputTokens: 30,
+        cachedInputTokens: 20,
+        totalTokens: 150,
+      });
       yield "美股";
       yield "今天上涨";
     }
-    const streamChat = vi.fn(() => fakeStream());
+    const streamChat = vi.fn(fakeStream);
     const outputSpy = vi.fn();
     const ora = vi.fn();
 
@@ -60,10 +80,26 @@ describe("rawChatCommand JSON 模式", () => {
     expect(streamed).not.toContain("美股");
     expect(streamed).not.toContain("今天上涨");
 
-    // 结构化输出包含完整 answer
+    // 结构化输出包含完整 answer 与服务端权威 metadata
     expect(outputSpy).toHaveBeenCalledTimes(1);
-    const payload = outputSpy.mock.calls[0][0] as { answer: string };
-    expect(payload.answer).toBe("美股今天上涨");
+    expect(outputSpy.mock.calls[0][0]).toEqual({
+      answer: "美股今天上涨",
+      requestId: "req-json",
+      model: "claude-sonnet",
+      usage: {
+        inputTokens: 120,
+        outputTokens: 30,
+        cachedInputTokens: 20,
+        totalTokens: 150,
+      },
+    });
+    expect(streamChat).toHaveBeenCalledWith(
+      [{ role: "user", content: "美股怎么样" }],
+      {
+        clientCapabilities: { usageEvents: true },
+        onUsage: expect.any(Function),
+      },
+    );
     expect(result).toBe("美股今天上涨");
     expect(ora).not.toHaveBeenCalled();
   });

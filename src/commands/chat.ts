@@ -46,7 +46,12 @@ interface ActiveChatLoading {
 }
 
 function canRenderInteractiveStatus(jsonMode: boolean): boolean {
-  return !jsonMode && Boolean(process.stdout.isTTY && process.stderr.isTTY);
+  const stdoutColumns = process.stdout.columns;
+  const stderrColumns = process.stderr.columns;
+  return !jsonMode
+    && Boolean(process.stdout.isTTY && process.stderr.isTTY)
+    && (stdoutColumns === undefined || stdoutColumns > 0)
+    && (stderrColumns === undefined || stderrColumns > 0);
 }
 
 function renderChatLoadingText(
@@ -156,6 +161,32 @@ function printResearchGuide(): void {
   if (disclosure) console.log(chalk.dim(`  ${disclosure}`));
 }
 
+function buildChatJsonPayload(
+  answer: string,
+  usage?: ChatUsageEvent,
+): Record<string, unknown> {
+  if (!usage) return { answer };
+  return {
+    answer,
+    requestId: usage.requestId,
+    ...(usage.model ? { model: usage.model } : {}),
+    usage: {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      ...(usage.cachedInputTokens !== undefined
+        ? { cachedInputTokens: usage.cachedInputTokens }
+        : {}),
+      ...(usage.reasoningTokens !== undefined
+        ? { reasoningTokens: usage.reasoningTokens }
+        : {}),
+      totalTokens: usage.totalTokens,
+      ...(usage.contextWindow !== undefined
+        ? { contextWindow: usage.contextWindow }
+        : {}),
+    },
+  };
+}
+
 export async function rawChatCommand(
   message: string,
   options?: ChatRuntimeOptions,
@@ -183,20 +214,16 @@ export async function rawChatCommand(
     // 计费由服务端权威处理（RFC-2026-0007），CLI 不再本地扣费/展示消耗
     track("chat", []);
     const messages = [...(options?.history ?? []), { role: "user" as const, content: text }];
-    const streamOptions = options?.conversation || options?.onUsage || options?.signal
-      ? {
-          ...(options.conversation ? { conversation: options.conversation } : {}),
-          clientCapabilities: { usageEvents: true },
-          onUsage: (usage: ChatUsageEvent) => {
-            lastUsage = usage;
-            options?.onUsage?.(usage);
-          },
-          ...(options?.signal ? { signal: options.signal } : {}),
-        }
-      : undefined;
-    const stream = streamOptions
-      ? streamChat(messages, streamOptions)
-      : streamChat(messages);
+    const streamOptions = {
+      ...(options?.conversation ? { conversation: options.conversation } : {}),
+      clientCapabilities: { usageEvents: true },
+      onUsage: (usage: ChatUsageEvent) => {
+        lastUsage = usage;
+        options?.onUsage?.(usage);
+      },
+      ...(options?.signal ? { signal: options.signal } : {}),
+    };
+    const stream = streamChat(messages, streamOptions);
     for await (const delta of stream) {
       if (!jsonMode && delta) {
         if (!bodyStarted) {
@@ -222,7 +249,7 @@ export async function rawChatCommand(
 
     const result = assistantText || undefined;
     if (jsonMode) {
-      output({ answer: result ?? "" }, () => {});
+      output(buildChatJsonPayload(result ?? "", lastUsage), () => {});
     } else if (result) {
       console.log(chalk.gray(
         `  ${buildChatCompletionText(Date.now() - startedAt, lastUsage)}`,

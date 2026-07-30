@@ -82,7 +82,13 @@ describe("chat natural routing", () => {
 
     // --raw 直接走纯 chat：不做意图分发，直接把单条 message 发给 streamChat
     expect(classifyIntent).not.toHaveBeenCalled();
-    expect(streamChat).toHaveBeenCalledWith([{ role: "user", content: "今天的智谱" }]);
+    expect(streamChat).toHaveBeenCalledWith(
+      [{ role: "user", content: "今天的智谱" }],
+      {
+        clientCapabilities: { usageEvents: true },
+        onUsage: expect.any(Function),
+      },
+    );
   });
 
   it("研报意图只返回显式命令，不直接创建可能扣费的任务", async () => {

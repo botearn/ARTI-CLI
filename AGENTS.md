@@ -94,10 +94,14 @@ export ARTI_AUTH_EXPIRES_AT=<unix-seconds>
 
 ```bash
 export ARTI_AUTH_TOKEN=... ARTI_AUTH_REFRESH_TOKEN=... ARTI_AUTH_EXPIRES_AT=...
+arti chat --raw "用一句话解释市盈率" --json
 arti quick-scan AAPL --json
 arti deep 01709.HK "重点看现金流和估值" --json
 arti report <taskId> --json
 ```
+
+`chat --json` 始终包含 `answer`；后端返回 usage 事件时，还会包含
+`requestId`、`model` 和服务端权威 `usage`。这些 Token 数据不等于 Credits。
 
 ## 4. 计费 / 错误
 

@@ -85,4 +85,17 @@ describe("TerminalAnswerRenderer", () => {
     expect(contentLines.length).toBeGreaterThan(1);
     expect(contentLines.every(line => line.length <= 36)).toBe(true);
   });
+
+  it("将常见 LaTeX 公式降级为终端可读文本", () => {
+    const output = render([
+      "$$PE = \\frac{100}{5} = \\textbf{20 倍}$$\n",
+      "$$\nP/E = \\frac{Price}{EPS}\n$$\n",
+    ]);
+
+    expect(output).toContain("PE = 100 / 5 = 20 倍");
+    expect(output).toContain("P/E = Price / EPS");
+    expect(output).not.toContain("$$");
+    expect(output).not.toContain("\\frac");
+    expect(output).not.toContain("\\textbf");
+  });
 });

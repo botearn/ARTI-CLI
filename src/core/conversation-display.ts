@@ -22,10 +22,12 @@ function formatUsage(usage: TokenUsage): string {
 
 export function formatSessionStatus(snapshot: ConversationSessionSnapshot): string[] {
   const { entry, lastUsage } = snapshot;
-  const context = lastUsage?.contextWindow
-    ? `${formatNumber(lastUsage.inputTokens)} / ${formatNumber(lastUsage.contextWindow)} tokens (${(
-        lastUsage.inputTokens / lastUsage.contextWindow * 100
-      ).toFixed(1)}%)`
+  const context = lastUsage
+    ? lastUsage.contextWindow
+      ? `${formatNumber(lastUsage.inputTokens)} / ${formatNumber(lastUsage.contextWindow)} tokens (${(
+          lastUsage.inputTokens / lastUsage.contextWindow * 100
+        ).toFixed(1)}%)`
+      : "已记录 Token usage；服务端未返回上下文窗口"
     : snapshot.messages.length
       ? "服务端尚未返回 Token usage"
       : "尚无（完成一次对话后由服务端返回）";
