@@ -91,6 +91,7 @@ export ARTI_AUTH_EXPIRES_AT=<unix-seconds>
 - CLI 创建任务后会打印 task ID。进程中断不会取消后端任务，可用 `arti report <taskId> --json` 恢复。
 - Agent Harness 的实际执行路径、缓存、扣费和失败退款均由后端决定；CLI 不发送强制 `executionPath`。
 - `arti harness` 是默认关闭的参考消费者，不替代 `full/deep/report`；关闭时不得鉴权或发送网络请求，也不提供 Migration、部署或数据库管理能力。
+- Dev Harness 测试必须显式对齐 `ARTI_SUPABASE_URL`、`ARTI_BACKEND_URL` 与 `ARTI_WEB_AUTH_URL=https://dev.artifin.ai/cli/auth`；不得让 Dev 会话进入生产设备登录页，也不得在 CLI 内按域名猜测环境。
 
 示例：
 

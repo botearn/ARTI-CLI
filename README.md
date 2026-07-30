@@ -141,6 +141,7 @@ Harness 内部可以选择数据工具、分析角色和补充证据，但第一
 ```bash
 export ARTI_HARNESS_STREAMING_ENABLED=true
 export ARTI_BACKEND_URL=https://api-gateway-dev-dev.up.railway.app
+export ARTI_WEB_AUTH_URL=https://dev.artifin.ai/cli/auth
 
 arti harness run AAPL --type panorama
 arti harness attach <run-id> --after 12
@@ -151,6 +152,8 @@ arti harness cancel <run-id>
 ```
 
 默认终端输出只显示角色、耗时、证据数量、质量门禁和报告地址；完整结构化结果使用 `--json`。该命令不允许客户端强制选择内部执行路径，也不包含数据库 Migration 或部署能力。
+
+在 Dev 环境重新执行 `arti login` 时，必须让 `ARTI_SUPABASE_URL`、`ARTI_BACKEND_URL` 和 `ARTI_WEB_AUTH_URL` 指向同一环境。`ARTI_WEB_AUTH_URL` 未设置时默认使用生产设备登录页；CLI 不根据域名猜测环境。
 
 `arti chat <问题>` 是兼容入口，默认先调用产品意图识别：快速扫描可直接派发，普通问题进入对话；全景和深度研报只返回建议命令，必须由用户显式运行 `arti full` 或 `arti deep` 后才创建可能扣费的任务。需要保证只进行聊天时使用：
 
