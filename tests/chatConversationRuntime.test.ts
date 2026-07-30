@@ -14,7 +14,7 @@ describe("rawChatCommand conversation runtime", () => {
     vi.restoreAllMocks();
   });
 
-  it("只在会话调用时附加 conversation、usage capability 和回调", async () => {
+  it("会话调用附加 conversation、usage capability 和回调", async () => {
     async function* fakeStream() {
       yield "### 原始回答\n";
     }
@@ -77,6 +77,72 @@ describe("rawChatCommand conversation runtime", () => {
     expect(stdoutSpy.mock.calls.map(call => String(call[0])).join("")).toContain(
       "### 原始回答\n",
     );
+  });
+
+  it("终端宽度为零时关闭动态 Loading，但继续请求并输出回答", async () => {
+    async function* fakeStream() {
+      yield "回答正常返回";
+    }
+    const streamChat = vi.fn(() => fakeStream());
+    const ora = vi.fn();
+
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(process.stdout, "columns", {
+      configurable: true,
+      value: 0,
+    });
+    Object.defineProperty(process.stderr, "columns", {
+      configurable: true,
+      value: 0,
+    });
+
+    vi.doMock("ora", () => ({ default: ora }));
+    vi.doMock("../src/api.js", () => ({ streamChat }));
+    vi.doMock("../src/output.js", () => ({
+      isJsonMode: () => false,
+      output: vi.fn(),
+    }));
+    vi.doMock("../src/billing.js", () => ({
+      InsufficientCreditsError: class extends Error {},
+    }));
+    vi.doMock("../src/errors.js", () => ({ printError: vi.fn() }));
+    vi.doMock("../src/tracker.js", () => ({ track: vi.fn() }));
+    vi.doMock("../src/core/natural-dispatch.js", () => ({ dispatchNaturalText: vi.fn() }));
+
+    try {
+      const { rawChatCommand } = await import("../src/commands/chat.js");
+      await expect(rawChatCommand("继续")).resolves.toBe("回答正常返回");
+
+      expect(ora).not.toHaveBeenCalled();
+      expect(streamChat).toHaveBeenCalledWith(
+        [{ role: "user", content: "继续" }],
+        {
+          clientCapabilities: { usageEvents: true },
+          onUsage: expect.any(Function),
+        },
+      );
+      expect(
+        stdoutSpy.mock.calls.map(call => String(call[0])).join(""),
+      ).toContain("回答正常返回");
+    } finally {
+      delete (process.stdout as NodeJS.WriteStream & {
+        columns?: number;
+        isTTY?: boolean;
+      }).columns;
+      delete (process.stderr as NodeJS.WriteStream & {
+        columns?: number;
+        isTTY?: boolean;
+      }).columns;
+      delete (process.stdout as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+      delete (process.stderr as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+    }
   });
 
   it("TTY 下首个 Token 前显示状态，且 Loading 不接管 REPL stdin", async () => {

@@ -84,6 +84,23 @@ describe("Session 状态与 Token usage 展示", () => {
     ]);
   });
 
+  it("已有 usage 但缺少上下文窗口时明确区分两种状态", () => {
+    const withoutContextWindow = snapshot({
+      lastUsage: {
+        requestId: "req-1",
+        model: "claude-sonnet",
+        inputTokens: 1_200,
+        outputTokens: 320,
+        cachedInputTokens: 400,
+        totalTokens: 1_520,
+      },
+    });
+
+    expect(formatSessionStatus(withoutContextWindow)).toContain(
+      "上下文: 已记录 Token usage；服务端未返回上下文窗口",
+    );
+  });
+
   it("新会话把尚无 usage 与服务端缺失区分开", () => {
     const empty = snapshot({
       messages: [],

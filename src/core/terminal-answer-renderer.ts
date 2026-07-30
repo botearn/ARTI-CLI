@@ -191,6 +191,26 @@ function isTableSeparator(line: string): boolean {
   return cells.length > 0 && cells.every(cell => TABLE_SEPARATOR.test(cell));
 }
 
+function normalizeTerminalMath(text: string): string {
+  const containsLatex = text.includes("$$")
+    || text.includes("\\frac")
+    || text.includes("\\text")
+    || text.includes("\\mathbf")
+    || text.includes("\\[")
+    || text.includes("\\]");
+  if (!containsLatex) return text;
+
+  return text
+    .replace(/\\(?:textbf|mathbf|mathrm|text)\s*\{([^{}]*)\}/gu, "**$1**")
+    .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/gu, "$1 / $2")
+    .replace(/\\times\b/gu, "×")
+    .replace(/\\div\b/gu, "÷")
+    .replace(/\\cdot\b/gu, "·")
+    .replace(/\\(?:left|right)\b/gu, "")
+    .replace(/(?:\$\$|\\\[|\\\])/gu, "")
+    .trim();
+}
+
 export class TerminalAnswerRenderer {
   private readonly columns: number;
   private readonly emit: (text: string) => void;
@@ -382,7 +402,10 @@ export class TerminalAnswerRenderer {
       textWidth(stripVTControlCharacters(continuationPrefix)),
     );
     const contentWidth = Math.max(12, Math.min(96, this.columns - prefixWidth));
-    const lines = wrapSegments(parseInline(markdown), contentWidth);
+    const lines = wrapSegments(
+      parseInline(normalizeTerminalMath(markdown)),
+      contentWidth,
+    );
 
     lines.forEach((segments, index) => {
       const prefix = index === 0 ? firstPrefix : continuationPrefix;

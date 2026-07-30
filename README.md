@@ -111,7 +111,7 @@ arti
 
 普通对话等待首个回答片段时会分阶段显示真实入口、历史消息、摘要、Artifact 和活动标的；超过 8 秒后每 6 秒轮换一条原创投资原则，超过 20 秒提示可按 `Ctrl+C` 取消当前回答并继续使用 REPL。已经生成的部分会带中断标记保存在 Session。首个回答片段到达后 Loading 会立即清除，完成时显示总耗时，以及后端实际返回的模型和 Token usage（如有）。`--json` 或非 TTY 环境不会输出动态 Loading，以保持结构化输出和管道稳定。
 
-TTY 中的普通对话会把 Markdown 标题、粗体、列表、引用、分隔线和建议标签渲染成适合终端阅读的样式；Markdown 表格会转换成纵向信息块，避免中英文宽字符导致错位。Session、`--json` 和非 TTY 管道仍保留服务端原始回答。
+TTY 中的普通对话会把 Markdown 标题、粗体、列表、引用、分隔线和建议标签渲染成适合终端阅读的样式；Markdown 表格会转换成纵向信息块，常见 LaTeX 公式会降级为纯文本，避免中英文宽字符或数学标记影响阅读。Session、`--json` 和非 TTY 管道仍保留服务端原始回答。
 
 ### 外层命令
 
@@ -141,10 +141,14 @@ arti chat --raw 美股今天怎么样
 Slash Command 只属于交互终端。自动化程序应调用外层命令并加全局 `--json`：
 
 ```bash
+arti chat --raw "用一句话解释市盈率" --json
 arti quick-scan AAPL --json
 arti deep 01709.HK --json
 arti credits --json
 ```
+
+`chat --json` 的 `answer` 字段始终存在；后端返回 usage 事件时，结果还包含
+`requestId`、`model` 和 `usage`。Token usage 只反映模型上下文，不代表 Credits。
 
 ## Slash Command
 

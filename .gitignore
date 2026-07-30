@@ -30,4 +30,8 @@ __pycache__/
 .deductive/logs/
 .deductive/evidence/
 .deductive/DISABLED
+
+# 本地测试记录
+/chat-test-results-*/
+
 .gstack/
