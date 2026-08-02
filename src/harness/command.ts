@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import chalk from "chalk";
 import { loadConfig } from "../config.js";
+import { printError } from "../errors.js";
 import { isJsonMode, output } from "../output.js";
 import {
   attachAgentRun,
@@ -51,6 +52,18 @@ export async function harnessCommand(
     output(result, () => printLines(formatRunStatus(result)));
   } else {
     throw new Error("harness action must be run, attach, status, result, or cancel");
+  }
+}
+
+export async function runHarnessCommand(
+  args: string[],
+  options: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await harnessCommand(args, options);
+  } catch (error) {
+    printError(error);
+    process.exitCode = 1;
   }
 }
 

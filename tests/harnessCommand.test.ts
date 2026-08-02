@@ -3,6 +3,7 @@ import {
   formatRunResult,
   formatStreamCompletion,
   formatStreamEvent,
+  runHarnessCommand,
 } from "../src/harness/command.js";
 import type { AgentRunEvent } from "../src/harness/types.js";
 
@@ -26,12 +27,31 @@ function event(
 }
 
 describe("Agent Harness human output", () => {
+  const originalExitCode = process.exitCode;
+
   beforeEach(() => {
     process.env.ARTI_WEB_URL = "https://dev.artifin.ai";
   });
 
   afterEach(() => {
     delete process.env.ARTI_WEB_URL;
+    process.exitCode = originalExitCode;
+  });
+
+  it("reports command failures without leaking an unhandled stack trace", async () => {
+    const error = console.error;
+    const messages: string[] = [];
+    console.error = (...args: unknown[]) => messages.push(args.join(" "));
+    process.exitCode = undefined;
+    try {
+      await runHarnessCommand(["unknown", "run-id"], {});
+    } finally {
+      console.error = error;
+    }
+
+    expect(process.exitCode).toBe(1);
+    expect(messages.join("\n")).toContain("未知错误");
+    expect(messages.join("\n")).toContain("harness action must be");
   });
 
   it("renders the final hard-gate decision and retry state", () => {

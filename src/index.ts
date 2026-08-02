@@ -14,7 +14,7 @@ import { completionCommand, installCompletion } from "./commands/completion.js";
 import { creditsCommand } from "./commands/credits.js";
 import { loginCommand, logoutCommand, whoamiCommand, tokenCommand } from "./commands/auth.js";
 import { doctorCommand } from "./commands/doctor.js";
-import { harnessCommand } from "./harness/command.js";
+import { runHarnessCommand } from "./harness/command.js";
 import { polyCommand } from "./poly/commands.js";
 import { shutdownBackendMcp } from "./data/mcp-client.js";
 import chalk from "chalk";
@@ -299,7 +299,7 @@ const defs: CommandDef[] = [
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness result <run-id>",
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness result <run-id> --json",
     ],
-    invoke: ({ positional, options }) => harnessCommand(positional, options),
+    invoke: ({ positional, options }) => runHarnessCommand(positional, options),
   },
   {
     name: "completion", aliases: [],
