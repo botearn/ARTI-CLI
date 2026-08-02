@@ -3,6 +3,7 @@ import {
   formatRunResult,
   formatStreamCompletion,
   formatStreamEvent,
+  harnessCommand,
   runHarnessCommand,
 } from "../src/harness/command.js";
 import type { AgentRunEvent } from "../src/harness/types.js";
@@ -50,8 +51,18 @@ describe("Agent Harness human output", () => {
     }
 
     expect(process.exitCode).toBe(1);
-    expect(messages.join("\n")).toContain("未知错误");
+    expect(messages.join("\n")).toContain("参数错误");
     expect(messages.join("\n")).toContain("harness action must be");
+  });
+
+  it("rejects an unknown report type instead of silently creating a panorama run", async () => {
+    await expect(harnessCommand(["run", "AAPL"], { type: "deeep" }))
+      .rejects.toThrow("--type must be panorama or deep");
+  });
+
+  it("rejects an invalid replay cursor before opening the event stream", async () => {
+    await expect(harnessCommand(["attach", "run-id"], { after: "NaN" }))
+      .rejects.toThrow("--after must be a non-negative integer");
   });
 
   it("renders the final hard-gate decision and retry state", () => {

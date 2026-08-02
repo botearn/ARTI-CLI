@@ -7,9 +7,12 @@ export class SseFrameParser {
     this.buffer += chunk;
     const normalized = this.buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     const blocks = normalized.split("\n\n");
-    this.buffer = flush ? "" : (blocks.pop() ?? "");
-    if (flush && blocks.at(-1) !== "") {
-      blocks.push(normalized.slice(normalized.lastIndexOf("\n\n") + 2));
+    const trailing = blocks.pop() ?? "";
+    if (flush) {
+      this.buffer = "";
+      if (trailing) blocks.push(trailing);
+    } else {
+      this.buffer = trailing;
     }
 
     return blocks

@@ -9,6 +9,13 @@ interface ErrorInfo {
   suggestion: string;
 }
 
+export class CliUsageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CliUsageError";
+  }
+}
+
 export function isAuthenticationError(err: unknown): err is Error {
   if (!(err instanceof Error)) return false;
   const status = "status" in err && typeof err.status === "number"
@@ -31,6 +38,14 @@ export function isAuthenticationError(err: unknown): err is Error {
 }
 
 export function classifyError(err: unknown): ErrorInfo {
+  if (err instanceof CliUsageError) {
+    return {
+      title: "参数错误",
+      detail: err.message,
+      suggestion: "请检查命令参数后重试，可运行 arti harness --help 查看用法",
+    };
+  }
+
   // L15：Credits/套餐类错误自带完整文案，透传 message，不落入"未知错误"兜底
   if (err instanceof Error && (err.name === "InsufficientCreditsError" || err.name === "PlanAccessError")) {
     return {

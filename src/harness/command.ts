@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import chalk from "chalk";
 import { loadConfig } from "../config.js";
-import { printError } from "../errors.js";
+import { CliUsageError, printError } from "../errors.js";
 import { isJsonMode, output } from "../output.js";
 import {
   attachAgentRun,
@@ -19,8 +19,8 @@ export async function harnessCommand(
   const action = (args[0] || "run").toLowerCase();
   const value = args[1];
   if (action === "run") {
-    if (!value) throw new Error("usage: arti harness run <symbol> [--type panorama|deep]");
-    const reportType = options.type === "deep" ? "deep" : "panorama";
+    if (!value) throw new CliUsageError("usage: arti harness run <symbol> [--type panorama|deep]");
+    const reportType = parseReportType(options.type);
     const created = await createAgentRun({
       symbol: value,
       reportType,
@@ -34,9 +34,9 @@ export async function harnessCommand(
     await renderStream(created.runId, 0, Boolean(options.verbose));
     return;
   }
-  if (!value) throw new Error(`usage: arti harness ${action} <run-id>`);
+  if (!value) throw new CliUsageError(`usage: arti harness ${action} <run-id>`);
   if (action === "attach") {
-    await renderStream(value, Number(options.after || 0), Boolean(options.verbose));
+    await renderStream(value, parseAfterSequence(options.after), Boolean(options.verbose));
   } else if (action === "status") {
     const status = await getAgentRun(value);
     output(status, () => printLines(formatRunStatus(status)));
@@ -51,8 +51,28 @@ export async function harnessCommand(
     const result = await cancelAgentRun(value);
     output(result, () => printLines(formatRunStatus(result)));
   } else {
-    throw new Error("harness action must be run, attach, status, result, or cancel");
+    throw new CliUsageError("harness action must be run, attach, status, result, or cancel");
   }
+}
+
+function parseReportType(value: unknown): "panorama" | "deep" {
+  const reportType = String(value ?? "panorama").trim().toLowerCase();
+  if (reportType !== "panorama" && reportType !== "deep") {
+    throw new CliUsageError("--type must be panorama or deep");
+  }
+  return reportType;
+}
+
+function parseAfterSequence(value: unknown): number {
+  const raw = String(value ?? "0").trim();
+  if (!/^(0|[1-9][0-9]*)$/.test(raw)) {
+    throw new CliUsageError("--after must be a non-negative integer");
+  }
+  const sequence = Number(raw);
+  if (!Number.isSafeInteger(sequence)) {
+    throw new CliUsageError("--after exceeds the safe integer range");
+  }
+  return sequence;
 }
 
 export async function runHarnessCommand(

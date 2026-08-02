@@ -86,7 +86,11 @@ export async function* attachAgentRun(
   runId: string,
   options: { afterSequence?: number; signal?: AbortSignal } = {},
 ): AsyncGenerator<AgentRunEvent> {
-  let lastSequence = Math.max(options.afterSequence ?? 0, 0);
+  const afterSequence = options.afterSequence ?? 0;
+  if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
+    throw new Error("afterSequence must be a non-negative safe integer");
+  }
+  let lastSequence = afterSequence;
   const response = await request(`/v1/agent-runs/${encodeURIComponent(runId)}/events`, {
     method: "GET",
     headers: lastSequence ? { "Last-Event-ID": String(lastSequence) } : {},

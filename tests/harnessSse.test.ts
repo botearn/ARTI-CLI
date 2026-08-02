@@ -41,6 +41,17 @@ describe("Agent Harness SSE parser", () => {
     expect(frames).toHaveLength(1);
     expect(frames[0].id).toBe("42");
   });
+
+  it("flushes a final frame even when the stream omits the trailing blank line", () => {
+    const parser = new SseFrameParser();
+    const frame = `id: 42\nevent: judge.completed\ndata: ${JSON.stringify(validEvent)}`;
+
+    expect(parser.feed(frame, true)).toEqual([{
+      id: "42",
+      event: "judge.completed",
+      data: JSON.stringify(validEvent),
+    }]);
+  });
 });
 
 describe("Agent event compatibility", () => {
