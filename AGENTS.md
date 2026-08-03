@@ -83,12 +83,15 @@ export ARTI_AUTH_EXPIRES_AT=<unix-seconds>
 | 全景研报 | `arti full <symbol> [重点] --json` | 后端异步研报任务 + Agent Harness |
 | 深度研报 | `arti deep <symbol> [重点] --json` | 后端异步深度任务 + 投资框架圆桌与裁定 |
 | 恢复研报 | `arti report <taskId> --json` | 恢复等待或读取已有任务，不重复创建 |
+| 流式 Harness 参考客户端 | `ARTI_HARNESS_STREAMING_ENABLED=true arti harness <action>` | 默认关闭；用于通用 Agent Run 事件的 run/attach/status/result/cancel |
 
 代码规范：
 - 美股直接代码 `AAPL`；港股 5 位补零 `01709.HK`；A 股 `600519.SS` / `000858.SZ`。
 - `full` / `deep` 是异步长任务，可能需要数分钟或更久；命令会等待最终结果后一次性输出 JSON，任务进度只写 stderr。
 - CLI 创建任务后会打印 task ID。进程中断不会取消后端任务，可用 `arti report <taskId> --json` 恢复。
 - Agent Harness 的实际执行路径、缓存、扣费和失败退款均由后端决定；CLI 不发送强制 `executionPath`。
+- `arti harness` 是默认关闭的参考消费者，不替代 `full/deep/report`；关闭时不得鉴权或发送网络请求，也不提供 Migration、部署或数据库管理能力。
+- Dev Harness 测试必须显式对齐 `ARTI_SUPABASE_URL`、`ARTI_BACKEND_URL` 与 `ARTI_WEB_AUTH_URL=https://dev.artifin.ai/cli/auth`；不得让 Dev 会话进入生产设备登录页，也不得在 CLI 内按域名猜测环境。
 
 示例：
 

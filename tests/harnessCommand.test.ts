@@ -1,0 +1,201 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  formatRunResult,
+  formatStreamCompletion,
+  formatStreamEvent,
+  harnessCommand,
+  runHarnessCommand,
+} from "../src/harness/command.js";
+import type { AgentRunEvent } from "../src/harness/types.js";
+
+function event(
+  sequence: number,
+  type: string,
+  payload: Record<string, unknown>,
+): AgentRunEvent {
+  return {
+    schema_version: "1.0",
+    event_id: String(sequence),
+    sequence,
+    run_id: "3f621494-3ebd-4518-93f8-643a86d5b8bb",
+    task_id: "6d02a989-f2df-4457-8057-83595320dd9f",
+    attempt: 1,
+    timestamp: `2026-07-26T10:00:${String(sequence).padStart(2, "0")}Z`,
+    type,
+    visibility: "public",
+    payload,
+  };
+}
+
+describe("Agent Harness human output", () => {
+  const originalExitCode = process.exitCode;
+
+  beforeEach(() => {
+    process.env.ARTI_WEB_URL = "https://dev.artifin.ai";
+  });
+
+  afterEach(() => {
+    delete process.env.ARTI_WEB_URL;
+    process.exitCode = originalExitCode;
+  });
+
+  it("reports command failures without leaking an unhandled stack trace", async () => {
+    const error = console.error;
+    const messages: string[] = [];
+    console.error = (...args: unknown[]) => messages.push(args.join(" "));
+    process.exitCode = undefined;
+    try {
+      await runHarnessCommand(["unknown", "run-id"], {});
+    } finally {
+      console.error = error;
+    }
+
+    expect(process.exitCode).toBe(1);
+    expect(messages.join("\n")).toContain("参数错误");
+    expect(messages.join("\n")).toContain("harness action must be");
+  });
+
+  it("rejects an unknown report type instead of silently creating a panorama run", async () => {
+    await expect(harnessCommand(["run", "AAPL"], { type: "deeep" }))
+      .rejects.toThrow("--type must be panorama or deep");
+  });
+
+  it("rejects an invalid replay cursor before opening the event stream", async () => {
+    await expect(harnessCommand(["attach", "run-id"], { after: "NaN" }))
+      .rejects.toThrow("--after must be a non-negative integer");
+  });
+
+  it("renders the final hard-gate decision and retry state", () => {
+    const stats = {
+      startedAt: null,
+      latestAt: null,
+      roles: new Set<string>(),
+      completedRoles: new Set<string>(),
+      evidenceRefs: new Set<string>(),
+      judgeDecision: null,
+      outputGatePassed: null,
+      resultUrl: null,
+      taskId: null,
+    };
+    const line = formatStreamEvent(event(24, "judge.completed", {
+      judge_round: 1,
+      decision: "needs_more_evidence",
+      output_gate_passed: false,
+      should_retry: true,
+      missing_evidence: ["price", "financials"],
+    }), stats);
+
+    expect(line).toContain("needs_more_evidence");
+    expect(line).toContain("门禁未通过");
+    expect(line).toContain("缺口 2");
+    expect(line).toContain("将继续补证");
+  });
+
+  it("keeps long objectives hidden unless verbose mode is requested", () => {
+    const makeStats = () => ({
+      startedAt: null,
+      latestAt: null,
+      roles: new Set<string>(),
+      completedRoles: new Set<string>(),
+      evidenceRefs: new Set<string>(),
+      judgeDecision: null,
+      outputGatePassed: null,
+      resultUrl: null,
+      taskId: null,
+    });
+    const spawned = event(3, "agent.spawned", {
+      role: "value-guardian",
+      objective_summary: "一段很长的内部任务目标",
+    });
+
+    expect(formatStreamEvent(spawned, makeStats(), false)).not.toContain("一段很长");
+    expect(formatStreamEvent(spawned, makeStats(), true)).toContain("一段很长");
+  });
+
+  it("aggregates distinct agents and evidence by public identity", () => {
+    const stats = {
+      startedAt: null,
+      latestAt: null,
+      roles: new Set<string>(),
+      completedRoles: new Set<string>(),
+      evidenceRefs: new Set<string>(),
+      judgeDecision: null,
+      outputGatePassed: null,
+      resultUrl: null,
+      taskId: null,
+    };
+
+    const line = formatStreamEvent(event(8, "agent.completed", {
+      agent_id: "value-guardian",
+      role: "roundtable_master",
+      status: "completed",
+      evidence_refs: ["ev-1", "ev-2"],
+    }), stats);
+
+    expect(line).toContain("[value-guardian]");
+    expect(line).toContain("证据 2");
+    expect(stats.roles).toEqual(new Set(["value-guardian"]));
+    expect(stats.completedRoles).toEqual(new Set(["value-guardian"]));
+    expect(stats.evidenceRefs).toEqual(new Set(["ev-1", "ev-2"]));
+  });
+
+  it("renders a compact result summary with quality and report URL", () => {
+    const lines = formatRunResult({
+      run_id: "3f621494-3ebd-4518-93f8-643a86d5b8bb",
+      status: "completed_with_gaps",
+      quality: {
+        judge_decision: "pass_with_gaps",
+        output_gate_passed: true,
+      },
+      payload: {
+        cards: [
+          {
+            type: "hero",
+            data: { symbol: "AAPL", name: "Apple Inc." },
+          },
+          {
+            type: "roundtable",
+            data: {
+              harnessTrace: {
+                evidenceRefCount: 19,
+                subagentCount: 4,
+              },
+            },
+          },
+        ],
+      },
+    }, {
+      task_id: "6d02a989-f2df-4457-8057-83595320dd9f",
+    });
+
+    expect(lines.join("\n")).toContain("Apple Inc.（AAPL）");
+    expect(lines.join("\n")).toContain("质量门禁：通过");
+    expect(lines.join("\n")).toContain("证据数量：19");
+    expect(lines.join("\n")).toContain(
+      "https://dev.artifin.ai/report/task/6d02a989-f2df-4457-8057-83595320dd9f",
+    );
+    expect(lines.join("\n")).toContain("--json");
+  });
+
+  it("labels resumed stream metrics as a replay window rather than full-run totals", () => {
+    const lines = formatStreamCompletion(
+      "3f621494-3ebd-4518-93f8-643a86d5b8bb",
+      {
+        startedAt: Date.parse("2026-07-26T10:00:00Z"),
+        latestAt: Date.parse("2026-07-26T10:01:00Z"),
+        roles: new Set(["cycle-judge", "business-model"]),
+        completedRoles: new Set(["cycle-judge", "business-model"]),
+        evidenceRefs: new Set(["ev-1", "ev-2", "ev-3"]),
+        judgeDecision: "pass_with_gaps",
+        outputGatePassed: true,
+        resultUrl: null,
+        taskId: "6d02a989-f2df-4457-8057-83595320dd9f",
+      },
+      50,
+    );
+
+    expect(lines.join("\n")).toContain("断点续传摘要（序号 > 50）");
+    expect(lines.join("\n")).toContain("重放窗口角色：2/2 完成");
+    expect(lines.join("\n")).not.toContain("\n角色：2/2 完成");
+  });
+});

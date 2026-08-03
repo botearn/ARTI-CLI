@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- 新增默认关闭的 `arti harness run|attach|status|result|cancel` Streaming Reference Consumer，支持持久 Run、SSE 重放、轮询、取消、摘要输出和 `--json` 完整结果
+- 流式摘要显示真实角色、耗时、证据数量、Runtime Judge 最终决定、质量门禁和报告地址
+
+### Security
+
+- `ARTI_HARNESS_STREAMING_ENABLED` 未显式开启时，Harness 客户端 fail closed，不执行鉴权或网络请求
+- Harness CLI 不包含 Migration、部署或数据库管理能力，也不能强制选择后端执行路径
+- 更新锁定依赖，消除 `@modelcontextprotocol/sdk` 运行时依赖链中的 High 已知漏洞
+- 为保持 Node.js 18 兼容性，将 `@hono/node-server` 锁定到 1.x；其残余 Windows 静态文件服务风险不在本 CLI 仅客户端的调用路径中
+
+### Fixed
+
+- `--type` 拼写错误时不再静默创建 Panorama 任务，避免错误任务和潜在误扣费
+- `--after` 只接受非负安全整数，禁止无效断点游标进入网络请求
+- 本地命令参数错误会显示明确的用法提示，不再误报为网络问题
+- 修复 SSE 连接最后一帧缺少尾部空行时首字符被丢弃的问题
+
 ## [0.4.4] - 2026-07-28
 
 ### ✨ Added
