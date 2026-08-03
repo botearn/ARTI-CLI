@@ -16,6 +16,16 @@ export class CliUsageError extends Error {
   }
 }
 
+export class FeatureDisabledError extends Error {
+  constructor(
+    public readonly feature: string,
+    public readonly enableHint: string,
+  ) {
+    super(`${feature} is disabled`);
+    this.name = "FeatureDisabledError";
+  }
+}
+
 export function isAuthenticationError(err: unknown): err is Error {
   if (!(err instanceof Error)) return false;
   const status = "status" in err && typeof err.status === "number"
@@ -38,6 +48,14 @@ export function isAuthenticationError(err: unknown): err is Error {
 }
 
 export function classifyError(err: unknown): ErrorInfo {
+  if (err instanceof FeatureDisabledError) {
+    return {
+      title: "功能未启用",
+      detail: `${err.feature} 当前默认关闭`,
+      suggestion: `运行命令前设置 ${err.enableHint}`,
+    };
+  }
+
   if (err instanceof CliUsageError) {
     return {
       title: "参数错误",
