@@ -1,6 +1,7 @@
 import { ensureValidAccessToken } from "../auth.js";
 import { loadConfig } from "../config.js";
 import { ApiError } from "../api.js";
+import { FeatureDisabledError } from "../errors.js";
 import { SseFrameParser } from "./sse.js";
 import {
   parseAgentRunEvent,
@@ -16,8 +17,9 @@ function enabled(): boolean {
 
 function requireEnabled(): void {
   if (!enabled()) {
-    throw new Error(
-      "Agent Harness streaming is disabled. Set ARTI_HARNESS_STREAMING_ENABLED=true to opt in.",
+    throw new FeatureDisabledError(
+      "Agent Harness streaming",
+      "ARTI_HARNESS_STREAMING_ENABLED=true",
     );
   }
 }
