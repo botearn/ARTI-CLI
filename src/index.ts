@@ -289,12 +289,15 @@ const defs: CommandDef[] = [
     options: [
       { short: "", long: "--type", key: "type", type: "string", desc: "报告类型: panorama | deep", hint: "<type>", defaultValue: "panorama" },
       { short: "", long: "--idempotency-key", key: "idempotencyKey", type: "string", desc: "创建请求幂等键", hint: "<key>" },
+      { short: "", long: "--release", key: "release", type: "string", desc: "显式选择 Harness Release（需后端授权）", hint: "<release-id>" },
+      { short: "", long: "--experiment-id", key: "experimentId", type: "string", desc: "本次运行的实验标识", hint: "<id>" },
       { short: "", long: "--after", key: "after", type: "string", desc: "从指定事件序号后恢复", hint: "<sequence>", defaultValue: "0" },
       { short: "", long: "--detach", key: "detach", type: "boolean", desc: "创建后不连接事件流" },
       { short: "", long: "--verbose", key: "verbose", type: "boolean", desc: "显示完整角色任务目标和更多流式细节" },
     ],
     examples: [
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness run AAPL --type deep",
+      "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness run AAPL --release harness-v2.3.12 --experiment-id v2-e2e",
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness attach <run-id> --after 12",
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness result <run-id>",
       "$ ARTI_HARNESS_STREAMING_ENABLED=true arti harness result <run-id> --json",

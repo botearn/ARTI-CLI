@@ -25,6 +25,47 @@ describe("browser login flow", () => {
     expect(url.searchParams.get("device_code")).toBe("A7K9X2");
   });
 
+  it("keeps a dev auth session on the dev web origin", async () => {
+    const { resolveWebAuthUrl } = await import("../src/browser-login.js");
+    const resolved = resolveWebAuthUrl({
+      serverUrl: "https://www.artifin.ai/auth",
+      supabaseUrl: "https://laoclhqedllwjuboyqib.supabase.co",
+      config: {
+        api: { baseUrl: "https://laoclhqedllwjuboyqib.supabase.co/functions/v1", timeout: 30000 },
+        backend: { enabled: true, url: "https://api-gateway-dev-dev.up.railway.app", timeout: 60000, mcpUrl: "", mcpEnabled: false, mcpTimeout: 10000, mcpFailureCooldown: 60000 },
+        auth: { token: "", refreshToken: "", expiresAt: null, userId: "", email: "", supabaseUrl: "https://laoclhqedllwjuboyqib.supabase.co", publishableKey: "test" },
+        data: { provider: "hybrid", artiDataBaseUrl: "", artiDataTimeout: 15000, artiDataInternalKey: "" },
+        display: { market: "US", lang: "zh" },
+        poly: { apiBaseUrl: "https://www.artifin.ai/app/predict/api/v1" },
+        session: { retentionDays: 30 },
+        watchlist: [],
+      },
+    });
+
+    expect(resolved).toBe("https://dev.artifin.ai/cli/auth");
+  });
+
+  it("prefers an explicit web auth url", async () => {
+    const { resolveWebAuthUrl } = await import("../src/browser-login.js");
+    const resolved = resolveWebAuthUrl({
+      requestedUrl: "https://preview.artifin.test/cli/auth",
+      serverUrl: "https://www.artifin.ai/auth",
+      supabaseUrl: "https://laoclhqedllwjuboyqib.supabase.co",
+      config: {
+        api: { baseUrl: "https://example.test/functions/v1", timeout: 30000 },
+        backend: { enabled: true, url: "https://example.test", timeout: 60000, mcpUrl: "", mcpEnabled: false, mcpTimeout: 10000, mcpFailureCooldown: 60000 },
+        auth: { token: "", refreshToken: "", expiresAt: null, userId: "", email: "", supabaseUrl: "https://example.test", publishableKey: "test" },
+        data: { provider: "hybrid", artiDataBaseUrl: "", artiDataTimeout: 15000, artiDataInternalKey: "" },
+        display: { market: "US", lang: "zh" },
+        poly: { apiBaseUrl: "https://www.artifin.ai/app/predict/api/v1" },
+        session: { retentionDays: 30 },
+        watchlist: [],
+      },
+    });
+
+    expect(resolved).toBe("https://preview.artifin.test/cli/auth");
+  });
+
   it("polls the server-side login session and persists the approved session", async () => {
     let currentConfig = {
       api: { baseUrl: "https://wklskhbrjnyppqfmxhxa.supabase.co/functions/v1", timeout: 30000 },

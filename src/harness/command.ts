@@ -26,6 +26,8 @@ export async function harnessCommand(
       reportType,
       idempotencyKey: String(options.idempotencyKey || randomUUID()),
       deliveryMode: options.detach ? "poll" : "stream",
+      harnessReleaseId: optionalText(options.release),
+      experimentId: optionalText(options.experimentId),
     });
     output(created, () => {
       console.log(chalk.cyan(`Run ${created.runId} queued for task ${created.taskId}`));
@@ -53,6 +55,11 @@ export async function harnessCommand(
   } else {
     throw new CliUsageError("harness action must be run, attach, status, result, or cancel");
   }
+}
+
+function optionalText(value: unknown): string | undefined {
+  const normalized = String(value ?? "").trim();
+  return normalized || undefined;
 }
 
 function parseReportType(value: unknown): "panorama" | "deep" {

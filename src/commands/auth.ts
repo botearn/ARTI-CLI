@@ -38,8 +38,8 @@ interface LoginOptions {
 }
 
 /** device flow 第一步：取授权链接，落盘待确认会话，立即返回（不开浏览器、不阻塞）。供 agent 用 */
-async function loginStart(): Promise<void> {
-  const started = await startLoginSession();
+async function loginStart(options?: LoginOptions): Promise<void> {
+  const started = await startLoginSession(options?.webAuthUrl);
   savePendingLogin({
     session_id: started.session_id,
     poll_token: started.poll_token,
@@ -111,7 +111,7 @@ async function loginPoll(options: LoginOptions): Promise<void> {
 
 export async function loginCommand(options?: LoginOptions): Promise<void> {
   // device flow 两步式（agent 用）：先 --start 取链接，再 --poll 等确认
-  if (options?.start) { await loginStart(); return; }
+  if (options?.start) { await loginStart(options); return; }
   if (options?.poll) { await loginPoll(options); return; }
 
   const token = options?.token?.trim() || process.env.ARTI_AUTH_TOKEN?.trim() || "";

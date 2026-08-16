@@ -53,6 +53,8 @@ export async function createAgentRun(input: {
   reportType: "panorama" | "deep";
   idempotencyKey: string;
   deliveryMode?: "stream" | "poll";
+  harnessReleaseId?: string;
+  experimentId?: string;
 }): Promise<AgentRunCreateResponse> {
   const response = await request("/v1/agent-runs", {
     method: "POST",
@@ -61,6 +63,8 @@ export async function createAgentRun(input: {
       symbol: input.symbol,
       reportType: input.reportType,
       deliveryMode: input.deliveryMode ?? "stream",
+      ...(input.harnessReleaseId ? { harnessReleaseId: input.harnessReleaseId } : {}),
+      ...(input.experimentId ? { experimentId: input.experimentId } : {}),
     }),
   });
   return await response.json() as AgentRunCreateResponse;

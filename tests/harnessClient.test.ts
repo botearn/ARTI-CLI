@@ -102,10 +102,16 @@ describe("Agent Harness streaming client", () => {
       reportType: "panorama",
       idempotencyKey: "poll-key",
       deliveryMode: "poll",
+      harnessReleaseId: "harness-v2.3.12",
+      experimentId: "v2-e2e",
     });
 
     expect(created.eventsUrl).toBeNull();
     const request = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(JSON.parse(String(request.body))).toMatchObject({ deliveryMode: "poll" });
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      deliveryMode: "poll",
+      harnessReleaseId: "harness-v2.3.12",
+      experimentId: "v2-e2e",
+    });
   });
 });
