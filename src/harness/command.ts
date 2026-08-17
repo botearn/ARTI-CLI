@@ -127,20 +127,33 @@ async function renderStream(
 ): Promise<void> {
   const stats = createStreamStats();
   let cursor = afterSequence;
+  let consecutiveFailures = 0;
   while (true) {
-    for await (const event of attachAgentRun(runId, { afterSequence: cursor })) {
-      cursor = Math.max(cursor, event.sequence);
-      output(event, () => {
-        const line = formatStreamEvent(event, stats, verbose);
-        if (line) console.log(line);
-      });
+    let streamFailed = false;
+    try {
+      for await (const event of attachAgentRun(runId, { afterSequence: cursor })) {
+        cursor = Math.max(cursor, event.sequence);
+        consecutiveFailures = 0;
+        output(event, () => {
+          const line = formatStreamEvent(event, stats, verbose);
+          if (line) console.log(line);
+        });
+      }
+    } catch (error) {
+      streamFailed = true;
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= 5) throw error;
     }
     const status = await getAgentRun(runId);
     if (isTerminalRunStatus(status.status)) break;
     if (!isJsonMode()) {
-      console.log(chalk.gray(`实时连接暂时结束，任务仍在运行；从序号 ${cursor} 自动恢复...`));
+      const reason = streamFailed ? "实时连接中断" : "实时连接暂时结束";
+      console.log(chalk.gray(`${reason}，任务仍在运行；从序号 ${cursor} 自动恢复...`));
     }
-    await new Promise(resolve => setTimeout(resolve, 750));
+    const delayMs = streamFailed
+      ? Math.min(5_000, 500 * (2 ** (consecutiveFailures - 1)))
+      : 750;
+    await new Promise(resolve => setTimeout(resolve, delayMs));
   }
   if (!isJsonMode()) {
     printLines(formatStreamCompletion(runId, stats, afterSequence));
