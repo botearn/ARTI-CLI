@@ -126,15 +126,30 @@ async function renderStream(
   verbose: boolean,
 ): Promise<void> {
   const stats = createStreamStats();
-  for await (const event of attachAgentRun(runId, { afterSequence })) {
-    output(event, () => {
-      const line = formatStreamEvent(event, stats, verbose);
-      if (line) console.log(line);
-    });
+  let cursor = afterSequence;
+  while (true) {
+    for await (const event of attachAgentRun(runId, { afterSequence: cursor })) {
+      cursor = Math.max(cursor, event.sequence);
+      output(event, () => {
+        const line = formatStreamEvent(event, stats, verbose);
+        if (line) console.log(line);
+      });
+    }
+    const status = await getAgentRun(runId);
+    if (isTerminalRunStatus(status.status)) break;
+    if (!isJsonMode()) {
+      console.log(chalk.gray(`实时连接暂时结束，任务仍在运行；从序号 ${cursor} 自动恢复...`));
+    }
+    await new Promise(resolve => setTimeout(resolve, 750));
   }
   if (!isJsonMode()) {
     printLines(formatStreamCompletion(runId, stats, afterSequence));
   }
+}
+
+export function isTerminalRunStatus(status: unknown): boolean {
+  return new Set(["completed", "completed_with_gaps", "failed", "cancelled"])
+    .has(String(status ?? "").trim().toLowerCase());
 }
 
 async function collectRunStats(runId: string): Promise<StreamStats | null> {

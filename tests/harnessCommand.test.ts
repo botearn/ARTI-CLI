@@ -4,6 +4,7 @@ import {
   formatStreamCompletion,
   formatStreamEvent,
   harnessCommand,
+  isTerminalRunStatus,
   runHarnessCommand,
 } from "../src/harness/command.js";
 import type { AgentRunEvent } from "../src/harness/types.js";
@@ -63,6 +64,15 @@ describe("Agent Harness human output", () => {
   it("rejects an invalid replay cursor before opening the event stream", async () => {
     await expect(harnessCommand(["attach", "run-id"], { after: "NaN" }))
       .rejects.toThrow("--after must be a non-negative integer");
+  });
+
+  it("only treats durable terminal states as final", () => {
+    expect(isTerminalRunStatus("running")).toBe(false);
+    expect(isTerminalRunStatus("queued")).toBe(false);
+    expect(isTerminalRunStatus("completed")).toBe(true);
+    expect(isTerminalRunStatus("completed_with_gaps")).toBe(true);
+    expect(isTerminalRunStatus("failed")).toBe(true);
+    expect(isTerminalRunStatus("cancelled")).toBe(true);
   });
 
   it("renders the final hard-gate decision and retry state", () => {
