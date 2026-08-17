@@ -7,6 +7,7 @@ import { getAuthState, saveSupabaseSession, type AuthState, type SupabaseAuthRes
 import { fetchWithTimeout } from "./http.js";
 
 const DEFAULT_WEB_AUTH_URL = "https://artifin.ai/cli/auth";
+const DEV_WEB_AUTH_URL = "https://dev.artifin.ai/cli/auth";
 const PENDING_FILE = join(homedir(), ".config", "arti", "pending-login.json");
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_POLL_INTERVAL_MS = 2000;
@@ -43,7 +44,7 @@ export async function loginWithBrowser(options?: BrowserLoginOptions): Promise<A
   // 确保首次使用时配置文件被创建
   ensureConfigInitialized();
   const timeoutMs = options?.timeoutMs ?? LOGIN_TIMEOUT_MS;
-  const started = await startLoginSession();
+  const started = await startLoginSession(options?.webAuthUrl);
 
   options?.onLoginUrl?.(started.login_url);
   options?.onCode?.(started.code);
@@ -157,7 +158,7 @@ export function buildBrowserLoginUrl(webAuthUrl: string, sessionId: string, code
   return url.toString();
 }
 
-export async function startLoginSession(): Promise<CliAuthStartResponse> {
+export async function startLoginSession(webAuthUrl?: string): Promise<CliAuthStartResponse> {
   const auth = getAuthState();
   const res = await fetchWithTimeout(`${auth.supabaseUrl}/functions/v1/cli-auth`, {
     method: "POST",
@@ -171,11 +172,38 @@ export async function startLoginSession(): Promise<CliAuthStartResponse> {
     throw new Error(`启动网页登录失败: ${await safeText(res)}`);
   }
   const data = await res.json() as CliAuthStartResponse;
-  const webAuthUrl = process.env.ARTI_WEB_AUTH_URL?.trim() || DEFAULT_WEB_AUTH_URL;
+  const resolvedWebAuthUrl = resolveWebAuthUrl({
+    requestedUrl: webAuthUrl,
+    serverUrl: data.login_url,
+    supabaseUrl: auth.supabaseUrl,
+    config: loadConfig(),
+  });
   return {
     ...data,
-    login_url: buildBrowserLoginUrl(webAuthUrl, data.session_id, data.code),
+    login_url: buildBrowserLoginUrl(resolvedWebAuthUrl, data.session_id, data.code),
   };
+}
+
+export function resolveWebAuthUrl(input: {
+  requestedUrl?: string;
+  serverUrl?: string;
+  supabaseUrl?: string;
+  config: ReturnType<typeof loadConfig>;
+}): string {
+  const requestedUrl = input.requestedUrl?.trim() || process.env.ARTI_WEB_AUTH_URL?.trim();
+  if (requestedUrl) return requestedUrl;
+
+  const environmentSignals = [
+    input.supabaseUrl,
+    input.config.api.baseUrl,
+    input.config.backend.url,
+  ].filter(Boolean).join(" ").toLowerCase();
+  const usesDevEnvironment = environmentSignals.includes("laoclhqedllwjuboyqib")
+    || environmentSignals.includes("dev.artifin.ai")
+    || environmentSignals.includes("-dev");
+
+  if (usesDevEnvironment) return DEV_WEB_AUTH_URL;
+  return input.serverUrl?.trim() || DEFAULT_WEB_AUTH_URL;
 }
 
 export async function pollLoginSession(sessionId: string, pollToken: string): Promise<CliAuthPollResponse> {

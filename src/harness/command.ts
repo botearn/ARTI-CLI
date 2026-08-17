@@ -26,6 +26,8 @@ export async function harnessCommand(
       reportType,
       idempotencyKey: String(options.idempotencyKey || randomUUID()),
       deliveryMode: options.detach ? "poll" : "stream",
+      harnessReleaseId: optionalText(options.release),
+      experimentId: optionalText(options.experimentId),
     });
     output(created, () => {
       console.log(chalk.cyan(`Run ${created.runId} queued for task ${created.taskId}`));
@@ -53,6 +55,11 @@ export async function harnessCommand(
   } else {
     throw new CliUsageError("harness action must be run, attach, status, result, or cancel");
   }
+}
+
+function optionalText(value: unknown): string | undefined {
+  const normalized = String(value ?? "").trim();
+  return normalized || undefined;
 }
 
 function parseReportType(value: unknown): "panorama" | "deep" {
@@ -119,15 +126,43 @@ async function renderStream(
   verbose: boolean,
 ): Promise<void> {
   const stats = createStreamStats();
-  for await (const event of attachAgentRun(runId, { afterSequence })) {
-    output(event, () => {
-      const line = formatStreamEvent(event, stats, verbose);
-      if (line) console.log(line);
-    });
+  let cursor = afterSequence;
+  let consecutiveFailures = 0;
+  while (true) {
+    let streamFailed = false;
+    try {
+      for await (const event of attachAgentRun(runId, { afterSequence: cursor })) {
+        cursor = Math.max(cursor, event.sequence);
+        consecutiveFailures = 0;
+        output(event, () => {
+          const line = formatStreamEvent(event, stats, verbose);
+          if (line) console.log(line);
+        });
+      }
+    } catch (error) {
+      streamFailed = true;
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= 5) throw error;
+    }
+    const status = await getAgentRun(runId);
+    if (isTerminalRunStatus(status.status)) break;
+    if (!isJsonMode()) {
+      const reason = streamFailed ? "实时连接中断" : "实时连接暂时结束";
+      console.log(chalk.gray(`${reason}，任务仍在运行；从序号 ${cursor} 自动恢复...`));
+    }
+    const delayMs = streamFailed
+      ? Math.min(5_000, 500 * (2 ** (consecutiveFailures - 1)))
+      : 750;
+    await new Promise(resolve => setTimeout(resolve, delayMs));
   }
   if (!isJsonMode()) {
     printLines(formatStreamCompletion(runId, stats, afterSequence));
   }
+}
+
+export function isTerminalRunStatus(status: unknown): boolean {
+  return new Set(["completed", "completed_with_gaps", "failed", "cancelled"])
+    .has(String(status ?? "").trim().toLowerCase());
 }
 
 async function collectRunStats(runId: string): Promise<StreamStats | null> {

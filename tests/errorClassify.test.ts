@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../src/api.js";
 import { ReportWaitTimeoutError } from "../src/commands/report-task.js";
-import { classifyError, isAuthenticationError } from "../src/errors.js";
+import {
+  classifyError,
+  FeatureDisabledError,
+  isAuthenticationError,
+} from "../src/errors.js";
 import { InsufficientCreditsError, PlanAccessError } from "../src/billing.js";
 
 // L15：计费/套餐类错误应被 classifyError 精确识别，不落入"未知错误"兜底。
@@ -23,6 +27,17 @@ describe("classifyError 计费类错误分类", () => {
   it("普通未知错误仍走兜底", () => {
     const info = classifyError(new Error("something odd"));
     expect(info.title).toBe("未知错误");
+  });
+
+  it("功能开关关闭时给出明确的启用方式", () => {
+    const info = classifyError(new FeatureDisabledError(
+      "Agent Harness streaming",
+      "ARTI_HARNESS_STREAMING_ENABLED=true",
+    ));
+
+    expect(info.title).toBe("功能未启用");
+    expect(info.detail).toContain("Agent Harness streaming");
+    expect(info.suggestion).toContain("ARTI_HARNESS_STREAMING_ENABLED=true");
   });
 
   it("登录错误同时说明会话内与外层入口", () => {

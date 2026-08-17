@@ -1,6 +1,7 @@
 import { ensureValidAccessToken } from "../auth.js";
 import { loadConfig } from "../config.js";
 import { ApiError } from "../api.js";
+import { FeatureDisabledError } from "../errors.js";
 import { SseFrameParser } from "./sse.js";
 import {
   parseAgentRunEvent,
@@ -16,8 +17,9 @@ function enabled(): boolean {
 
 function requireEnabled(): void {
   if (!enabled()) {
-    throw new Error(
-      "Agent Harness streaming is disabled. Set ARTI_HARNESS_STREAMING_ENABLED=true to opt in.",
+    throw new FeatureDisabledError(
+      "Agent Harness streaming",
+      "ARTI_HARNESS_STREAMING_ENABLED=true",
     );
   }
 }
@@ -51,6 +53,8 @@ export async function createAgentRun(input: {
   reportType: "panorama" | "deep";
   idempotencyKey: string;
   deliveryMode?: "stream" | "poll";
+  harnessReleaseId?: string;
+  experimentId?: string;
 }): Promise<AgentRunCreateResponse> {
   const response = await request("/v1/agent-runs", {
     method: "POST",
@@ -59,6 +63,8 @@ export async function createAgentRun(input: {
       symbol: input.symbol,
       reportType: input.reportType,
       deliveryMode: input.deliveryMode ?? "stream",
+      ...(input.harnessReleaseId ? { harnessReleaseId: input.harnessReleaseId } : {}),
+      ...(input.experimentId ? { experimentId: input.experimentId } : {}),
     }),
   });
   return await response.json() as AgentRunCreateResponse;
