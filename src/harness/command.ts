@@ -211,7 +211,10 @@ export function formatStreamEvent(
       const gate = payload.output_gate_passed === true ? "门禁通过" : "门禁未通过";
       const missing = stringList(payload.missing_evidence).length;
       const retry = payload.should_retry === true ? " · 将继续补证" : "";
-      return `${sequence} ${chalk.yellow(`第 ${round || "?"} 轮裁判`)}：${decision} · ${gate} · 缺口 ${missing}${retry}`;
+      const judgeLabel = payload.is_terminal_quality_decision === true
+        ? "最终产品门禁"
+        : `第 ${round || "?"} 轮裁判`;
+      return `${sequence} ${chalk.yellow(judgeLabel)}：${decision} · ${gate} · 缺口 ${missing}${retry}`;
     }
     case "refine.started": {
       const targets = stringList(payload.target_agent_ids);
