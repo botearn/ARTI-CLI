@@ -101,6 +101,44 @@ describe("Agent Harness human output", () => {
     expect(line).toContain("将继续补证");
   });
 
+  it("uses the terminal product gate as the final stream truth", () => {
+    const stats = {
+      startedAt: null,
+      latestAt: null,
+      roles: new Set<string>(),
+      completedRoles: new Set<string>(),
+      evidenceRefs: new Set<string>(),
+      judgeDecision: null,
+      outputGatePassed: null,
+      resultUrl: null,
+      taskId: null,
+    };
+
+    formatStreamEvent(event(24, "judge.completed", {
+      judge_round: 1,
+      decision: "pass_with_gaps",
+      output_gate_passed: true,
+      should_retry: false,
+      missing_evidence: [],
+    }), stats);
+    const terminalLine = formatStreamEvent(event(40, "judge.completed", {
+      judge_round: "final",
+      decision: "needs_more_evidence",
+      output_gate_passed: false,
+      should_retry: false,
+      is_terminal_quality_decision: true,
+      gate_source: "product_grounding_gate",
+      missing_evidence: ["最终产品文案仍有数字缺少引用"],
+    }), stats);
+    const completion = formatStreamCompletion("run-id", stats);
+
+    expect(terminalLine).toContain("最终产品门禁");
+    expect(terminalLine).toContain("needs_more_evidence");
+    expect(terminalLine).toContain("门禁未通过");
+    expect(completion).toContain("最终裁决：needs_more_evidence");
+    expect(completion).toContain("质量门禁：未通过");
+  });
+
   it("keeps long objectives hidden unless verbose mode is requested", () => {
     const makeStats = () => ({
       startedAt: null,
