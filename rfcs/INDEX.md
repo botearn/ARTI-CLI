@@ -11,7 +11,6 @@
 | [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) | 新用户上手 — 一行安装 + REPL 登录态 Onboarding | 2026-06-01 |
 | [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) | CLI 数据链收敛到生产产品函数，下线 OpenBB 第二套处理 | 2026-06-24 |
 | [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) | ARTi Poly CLI 集成 — `arti poly` 子命令接入 ARTi-poly 公开 API | 2026-07-08 |
-| [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) | chat / quick-scan 切换 Supabase Edge /v1 + REPL 会话历史（arti#0055 姊妹篇） | 2026-07-14 |
 | [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) | CLI 加固与审计缺陷修复计划（取代 docs/BACKLOG.md） | 2026-07-23 |
 | [RFC-2026-0007](2026/RFC-2026-0007-remove-cli-local-billing.md) | 移除 CLI 本地扣费，计费一律服务端权威 | 2026-07-23 |
 
@@ -40,6 +39,7 @@
 | RFC | 标题 | 完成日期 | 版本 |
 |---|---|---|---|
 | [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) | CLI 接入 Backend Agent Harness | 2026-07-28 | v0.4.4 |
+| [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) | chat / quick-scan 切换 Supabase Edge /v1 + REPL 会话历史（arti#0055 姊妹篇） | 2026-07-14 | v0.4.1 |
 | [RFC-2026-0001](2026/RFC-2026-0001-backend-mcp-integration.md) | Backend MCP 集成 - 主链支持所有市场 | 2026-05-19 | v0.3.0 |
 
 ---
@@ -113,7 +113,7 @@
 - **2026-07-25** - [RFC-2026-0009](2026/RFC-2026-0009-backend-agent-harness.md) - CLI 接入 Backend Agent Harness (Draft)
 - **2026-07-24** - [RFC-2026-0008](2026/RFC-2026-0008-conversation-first-cli.md) - 对话优先 CLI、Slash Command 与 Token 感知会话 (Draft)
 - **2026-07-23** - [RFC-2026-0006](2026/RFC-2026-0006-cli-hardening-audit-fixes.md) - CLI 加固与审计缺陷修复计划 (Draft, 取代 BACKLOG.md)
-- **2026-07-14** - [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) - chat / quick-scan 切换 Edge /v1 (Draft, arti#0055 姊妹篇)
+- **2026-07-14** - [RFC-2026-0005](2026/RFC-2026-0005-edge-v1-migration.md) - chat / quick-scan 切换 Edge /v1 (Implemented, arti#0055 姊妹篇)
 - **2026-07-08** - [RFC-2026-0004](2026/RFC-2026-0004-poly-cli-integration.md) - ARTi Poly CLI 集成 (Draft)
 - **2026-06-24** - [RFC-2026-0003](2026/RFC-2026-0003-cli-data-chain-converge.md) - CLI 数据链收敛 (Draft)
 - **2026-06-01** - [RFC-2026-0002](2026/RFC-2026-0002-onboarding-install.md) - 新用户上手 / 一行安装 + Onboarding (Draft)
@@ -129,11 +129,11 @@
 
 | 状态 | 数量 |
 |---|---|
-| Draft | 8 |
+| Draft | 7 |
 | Proposed | 0 |
 | Accepted | 0 |
 | Implementing | 0 |
-| Implemented | 2 |
+| Implemented | 3 |
 | Rejected | 0 |
 | Deprecated | 0 |
 | **总计** | **10** |
