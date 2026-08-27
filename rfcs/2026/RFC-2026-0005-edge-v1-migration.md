@@ -5,11 +5,11 @@
 - **RFC 编号**: RFC-2026-0005
 - **标题**: chat / quick-scan 切换 Supabase Edge /v1 + REPL 会话历史
 - **作者**: zhe
-- **状态**: Draft
+- **状态**: Implemented
 - **创建日期**: 2026-07-14
-- **最后更新**: 2026-07-14
+- **最后更新**: 2026-08-27
 - **关联 Issue**: N/A
-- **关联 PR**: N/A（开 PR 后回填）
+- **关联 PR**: [#24](https://github.com/botearn/ARTI-CLI/pull/24)
 - **主篇 RFC**: [arti#0055-channel-conversation-parity](https://github.com/iloveopt/arti/blob/main/docs/rfcs/0055-channel-conversation-parity.md)
 - **取代**: 延续 RFC-2026-0003「收敛到生产产品函数」方向，修正其 chat/quick 实际落点（Railway Python 网关 → Edge /v1）
 - **被取代**: N/A
@@ -76,4 +76,4 @@ RFC-2026-0003 把 CLI 收敛为"生产后端瘦客户端"，但 chat / quick-sca
 
 | 日期 | PR | 一句话 |
 |------|-----|--------|
-| —    | —   | —      |
+| 2026-07-14 | [#24](https://github.com/botearn/ARTI-CLI/pull/24) | Chat / Quick Scan 切到 Supabase Edge `/v1`，补齐 typed SSE、401 刷新、REPL 最近 6 轮历史及对应测试；17 files / 52 tests 与构建通过，后续随 v0.4.1 发布 |
