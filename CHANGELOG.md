@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-08-03
+
 ### Added
 
 - 新增默认关闭的 `arti harness run|attach|status|result|cancel` Streaming Reference Consumer，支持持久 Run、SSE 重放、轮询、取消、摘要输出和 `--json` 完整结果
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--type` 拼写错误时不再静默创建 Panorama 任务，避免错误任务和潜在误扣费
 - `--after` 只接受非负安全整数，禁止无效断点游标进入网络请求
 - 本地命令参数错误会显示明确的用法提示，不再误报为网络问题
+- Harness 功能开关关闭时显示明确的启用方式，不再误报为未知或网络错误
 - 修复 SSE 连接最后一帧缺少尾部空行时首字符被丢弃的问题
 
 ## [0.4.4] - 2026-07-28
